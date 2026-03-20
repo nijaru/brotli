@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/andybalholm/brotli/matchfinder"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 const (
@@ -120,38 +120,68 @@ type nopCloser struct {
 
 func (nopCloser) Close() error { return nil }
 
+func getMatchFinder(level int) matchfinder.MatchFinder {
+	switch level {
+	case 0, 1:
+		return &matchfinder.ZFast{MaxDistance: 1 << 20}
+	case 2:
+		return &matchfinder.ZDFast{MaxDistance: 1 << 20}
+	case 3:
+		return &matchfinder.ZM{MaxDistance: 1 << 20}
+	case 4:
+		return &matchfinder.Trio{MaxDistance: 1 << 20}
+	case 5, 6:
+		return &matchfinder.Bargain1{MaxDistance: 1 << 20}
+	case 7:
+		return &matchfinder.Bargain2{MaxDistance: 1 << 20, Skip: true}
+	case 8:
+		return &matchfinder.Bargain2{MaxDistance: 1 << 20}
+	case 9:
+		return &matchfinder.Bargain3{MaxDistance: 1 << 20}
+	}
+	return &matchfinder.Bargain3{MaxDistance: 1 << 20}
+}
+
+// NewParallelWriter is like NewWriterV2, but it uses multiple goroutines to
+// compress blocks in parallel.
+func NewParallelWriter(dst io.Writer, level int, concurrency int) *matchfinder.ParallelWriter {
+	if level < 0 {
+		level = 0
+	} else if level > 9 {
+		level = 9
+	}
+
+	w := &matchfinder.ParallelWriter{
+		Dest: dst,
+		MatchFinder: func() matchfinder.MatchFinder {
+			if level >= 5 && level <= 6 {
+				return matchfinder.GetBargain1()
+			}
+			return getMatchFinder(level)
+		},
+		Encoder: func() matchfinder.Encoder {
+			if level < 1 {
+				return matchfinder.GetFastEncoder(func() matchfinder.Encoder { return &FastEncoder{} })
+			}
+			return matchfinder.GetEncoder(func() matchfinder.Encoder { return &Encoder{} })
+		},
+		BlockSize:   1 << 16,
+		Concurrency: concurrency,
+	}
+	return w
+}
+
 // NewWriterV2 is like NewWriterLevel, but it uses the new implementation
-// based on the matchfinder package. It currently supports up to level 9;
-// if a higher level is specified, level 9 will be used.
 func NewWriterV2(dst io.Writer, level int) *matchfinder.Writer {
 	if level < 0 {
 		level = 0
 	} else if level > 9 {
 		level = 9
 	}
-	var mf matchfinder.MatchFinder
-	switch level {
-	case 0, 1:
-		mf = &matchfinder.ZFast{MaxDistance: 1 << 20}
-	case 2:
-		mf = &matchfinder.ZDFast{MaxDistance: 1 << 20}
-	case 3:
-		mf = &matchfinder.ZM{MaxDistance: 1 << 20}
-	case 4:
-		mf = &matchfinder.Trio{MaxDistance: 1 << 20}
-	case 5, 6:
-		mf = &matchfinder.Bargain1{MaxDistance: 1 << 20}
-	case 7:
-		mf = &matchfinder.Bargain2{MaxDistance: 1 << 20, Skip: true}
-	case 8:
-		mf = &matchfinder.Bargain2{MaxDistance: 1 << 20}
-	case 9:
-		mf = &matchfinder.Bargain3{MaxDistance: 1 << 20}
-	}
 
 	w := &matchfinder.Writer{
 		Dest:        dst,
-		MatchFinder: mf,
+		MatchFinder: getMatchFinder(level),
 		Encoder:     &Encoder{},
 		BlockSize:   1 << 16,
 	}

@@ -1,6 +1,6 @@
-module github.com/andybalholm/brotli
+module github.com/nijaru/brotli
 
-go 1.22
+go 1.26
 
 retract v1.0.1 // occasional panics and data corruption
 

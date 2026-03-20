@@ -1,6 +1,6 @@
 package brotli
 
-import "github.com/andybalholm/brotli/matchfinder"
+import "github.com/nijaru/brotli/matchfinder"
 
 // An Encoder implements the matchfinder.Encoder interface, writing in Brotli format.
 type Encoder struct {
@@ -12,6 +12,12 @@ type Encoder struct {
 func (e *Encoder) Reset() {
 	e.wroteHeader = false
 	e.bw = bitWriter{}
+}
+
+func (e *Encoder) Close() error {
+	e.Reset()
+	matchfinder.PutEncoder(e)
+	return nil
 }
 
 func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, lastBlock bool) []byte {

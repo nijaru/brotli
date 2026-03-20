@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andybalholm/brotli/flate"
+	"github.com/nijaru/brotli/flate"
 )
 
 // HTTPCompressor chooses a compression method (brotli, gzip, or none) based on

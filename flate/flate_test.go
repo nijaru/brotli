@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/andybalholm/brotli/matchfinder"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 func test(t *testing.T, filename string, m matchfinder.MatchFinder, blockSize int) {
@@ -110,7 +110,7 @@ func benchmark(b *testing.B, filename string, m matchfinder.MatchFinder, blockSi
 	w.Close()
 	b.ReportMetric(float64(len(data))/float64(buf.Len()), "ratio")
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		w.Reset(io.Discard)
 		w.Write(data)
 		w.Close()
@@ -136,7 +136,7 @@ func BenchmarkWriterLevels(b *testing.B) {
 			b.ReportAllocs()
 			b.ReportMetric(float64(len(opticks))/float64(buf.Len()), "ratio")
 			b.SetBytes(int64(len(opticks)))
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				w.Reset(io.Discard)
 				w.Write(opticks)
 				w.Close()
@@ -160,7 +160,7 @@ func BenchmarkStdlibLevels(b *testing.B) {
 			b.ReportAllocs()
 			b.ReportMetric(float64(len(opticks))/float64(buf.Len()), "ratio")
 			b.SetBytes(int64(len(opticks)))
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				w.Reset(io.Discard)
 				w.Write(opticks)
 				w.Close()

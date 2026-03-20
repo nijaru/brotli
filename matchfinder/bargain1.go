@@ -35,6 +35,11 @@ func (z *Bargain1) Reset() {
 	z.history = z.history[:0]
 }
 
+func (z *Bargain1) Close() error {
+	z.Reset()
+	putBargain1(z)
+	return nil
+}
 func (z *Bargain1) FindMatches(dst []Match, src []byte) []Match {
 	if z.MaxDistance == 0 {
 		z.MaxDistance = 1 << 16

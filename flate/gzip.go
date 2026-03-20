@@ -4,7 +4,7 @@ import (
 	"hash/crc32"
 	"time"
 
-	"github.com/andybalholm/brotli/matchfinder"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 func NewGZIPEncoder() matchfinder.Encoder {

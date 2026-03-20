@@ -3,7 +3,7 @@ package brotli
 import (
 	"math"
 
-	"github.com/andybalholm/brotli/matchfinder"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 func gaussianProbability(x, mean, stdDev float64) float64 {
@@ -23,6 +23,12 @@ type FastEncoder struct {
 func (e *FastEncoder) Reset() {
 	e.wroteHeader = false
 	e.bw = bitWriter{}
+}
+
+func (e *FastEncoder) Close() error {
+	e.Reset()
+	matchfinder.PutFastEncoder(e)
+	return nil
 }
 
 func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, lastBlock bool) []byte {

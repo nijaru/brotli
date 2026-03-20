@@ -3,7 +3,7 @@ package flate
 import (
 	"io"
 
-	"github.com/andybalholm/brotli/matchfinder"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 // NewWriter returns a new matchfinder.Writer that compresses data at the given level,
