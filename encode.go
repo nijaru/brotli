@@ -3,6 +3,10 @@ package brotli
 import (
 	"io"
 	"math"
+	"github.com/nijaru/brotli/internal/common"
+	"github.com/nijaru/brotli/internal/hasher"
+	"github.com/nijaru/brotli/internal/metablock"
+	"github.com/nijaru/brotli/internal/ringbuffer"
 )
 
 /* Copyright 2016 Google Inc. All Rights Reserved.
@@ -76,16 +80,16 @@ type Writer struct {
 	options WriterOptions
 	err     error
 
-	params              encoderParams
-	hasher_             hasherHandle
+	params              common.EncoderParams
+	hasher_             hasher.Handle
 	input_pos_          uint64
-	ringbuffer_         ringBuffer
-	commands            []command
+	ringbuffer_         ringbuffer.RingBuffer
+	commands            []metablock.Command
 	num_literals_       uint
 	last_insert_len_    uint
 	last_flush_pos_     uint64
 	last_processed_pos_ uint64
-	dist_cache_         [numDistanceShortCodes]int
+	dist_cache_         [common.NumDistanceShortCodes]int
 	saved_dist_cache_   [4]int
 	last_bytes_         uint16
 	last_bytes_bits_    byte

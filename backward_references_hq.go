@@ -1,6 +1,13 @@
 package brotli
 
-import "math"
+import (
+	"math"
+
+	"github.com/nijaru/brotli/internal/common"
+	"github.com/nijaru/brotli/internal/context"
+	"github.com/nijaru/brotli/internal/hasher"
+	"github.com/nijaru/brotli/internal/metablock"
+)
 
 type zopfliNode struct {
 	length              uint32
@@ -49,7 +56,7 @@ func zopfliNodeCopyDistance(self *zopfliNode) uint32 {
 func zopfliNodeDistanceCode(self *zopfliNode) uint32 {
 	var short_code uint32 = self.dcode_insert_length >> 27
 	if short_code == 0 {
-		return zopfliNodeCopyDistance(self) + numDistanceShortCodes - 1
+		return zopfliNodeCopyDistance(self) + common.NumDistanceShortCodes - 1
 	} else {
 		return short_code - 1
 	}
@@ -61,7 +68,7 @@ func zopfliNodeCommandLength(self *zopfliNode) uint32 {
 
 /* Histogram based cost model for zopflification. */
 type zopfliCostModel struct {
-	cost_cmd_               [numCommandSymbols]float32
+	cost_cmd_               [common.NumCommandSymbols]float32
 	cost_dist_              []float32
 	distance_histogram_size uint32
 	literal_costs_          []float32
@@ -69,15 +76,15 @@ type zopfliCostModel struct {
 	num_bytes_              uint
 }
 
-func initZopfliCostModel(self *zopfliCostModel, dist *distanceParams, num_bytes uint) {
-	var distance_histogram_size uint32 = dist.alphabet_size
+func initZopfliCostModel(self *zopfliCostModel, dist *common.DistanceParams, num_bytes uint) {
+	var distance_histogram_size uint32 = dist.Alphabet_size
 	if distance_histogram_size > maxEffectiveDistanceAlphabetSize {
 		distance_histogram_size = maxEffectiveDistanceAlphabetSize
 	}
 
 	self.num_bytes_ = num_bytes
 	self.literal_costs_ = make([]float32, (num_bytes + 2))
-	self.cost_dist_ = make([]float32, (dist.alphabet_size))
+	self.cost_dist_ = make([]float32, (dist.Alphabet_size))
 	self.distance_histogram_size = distance_histogram_size
 }
 
@@ -96,7 +103,7 @@ func setCost(histogram []uint32, histogram_size uint, literal_histogram bool, co
 		sum += uint(histogram[i])
 	}
 
-	log2sum = float32(fastLog2(sum))
+	log2sum = float32(common.FastLog2(sum))
 	missing_symbol_sum = sum
 	if !literal_histogram {
 		for i = 0; i < histogram_size; i++ {
@@ -106,7 +113,7 @@ func setCost(histogram []uint32, histogram_size uint, literal_histogram bool, co
 		}
 	}
 
-	missing_symbol_cost = float32(fastLog2(missing_symbol_sum)) + 2
+	missing_symbol_cost = float32(common.FastLog2(missing_symbol_sum)) + 2
 	for i = 0; i < histogram_size; i++ {
 		if histogram[i] == 0 {
 			cost[i] = missing_symbol_cost
@@ -114,7 +121,7 @@ func setCost(histogram []uint32, histogram_size uint, literal_histogram bool, co
 		}
 
 		/* Shannon bits for this symbol. */
-		cost[i] = log2sum - float32(fastLog2(uint(histogram[i])))
+		cost[i] = log2sum - float32(common.FastLog2(uint(histogram[i])))
 
 		/* Cannot be coded with less than 1 bit */
 		if cost[i] < 1 {
@@ -123,25 +130,25 @@ func setCost(histogram []uint32, histogram_size uint, literal_histogram bool, co
 	}
 }
 
-func zopfliCostModelSetFromCommands(self *zopfliCostModel, position uint, ringbuffer []byte, ringbuffer_mask uint, commands []command, last_insert_len uint) {
-	var histogram_literal [numLiteralSymbols]uint32
-	var histogram_cmd [numCommandSymbols]uint32
+func zopfliCostModelSetFromCommands(self *zopfliCostModel, position uint, ringbuffer []byte, ringbuffer_mask uint, commands []metablock.Command, last_insert_len uint) {
+	var histogram_literal [common.NumLiteralSymbols]uint32
+	var histogram_cmd [common.NumCommandSymbols]uint32
 	var histogram_dist [maxEffectiveDistanceAlphabetSize]uint32
-	var cost_literal [numLiteralSymbols]float32
+	var cost_literal [common.NumLiteralSymbols]float32
 	var pos uint = position - last_insert_len
 	var min_cost_cmd float32 = kInfinity
 	var cost_cmd []float32 = self.cost_cmd_[:]
 	var literal_costs []float32
 
-	histogram_literal = [numLiteralSymbols]uint32{}
-	histogram_cmd = [numCommandSymbols]uint32{}
+	histogram_literal = [common.NumLiteralSymbols]uint32{}
+	histogram_cmd = [common.NumCommandSymbols]uint32{}
 	histogram_dist = [maxEffectiveDistanceAlphabetSize]uint32{}
 
 	for i := range commands {
-		var inslength uint = uint(commands[i].insert_len_)
-		var copylength uint = uint(commandCopyLen(&commands[i]))
-		var distcode uint = uint(commands[i].dist_prefix_) & 0x3FF
-		var cmdcode uint = uint(commands[i].cmd_prefix_)
+		var inslength uint = uint(commands[i].Insert_len_)
+		var copylength uint = uint(metablock.CommandCopyLen(&commands[i]))
+		var distcode uint = uint(commands[i].Dist_prefix_) & 0x3FF
+		var cmdcode uint = uint(commands[i].Cmd_prefix_)
 		var j uint
 
 		histogram_cmd[cmdcode]++
@@ -156,12 +163,12 @@ func zopfliCostModelSetFromCommands(self *zopfliCostModel, position uint, ringbu
 		pos += inslength + copylength
 	}
 
-	setCost(histogram_literal[:], numLiteralSymbols, true, cost_literal[:])
-	setCost(histogram_cmd[:], numCommandSymbols, false, cost_cmd)
+	setCost(histogram_literal[:], common.NumLiteralSymbols, true, cost_literal[:])
+	setCost(histogram_cmd[:], common.NumCommandSymbols, false, cost_cmd)
 	setCost(histogram_dist[:], uint(self.distance_histogram_size), false, self.cost_dist_)
 
-	for i := 0; i < numCommandSymbols; i++ {
-		min_cost_cmd = brotli_min_float(min_cost_cmd, cost_cmd[i])
+	for i := 0; i < common.NumCommandSymbols; i++ {
+		min_cost_cmd = common.BrotliMinFloat(min_cost_cmd, cost_cmd[i])
 	}
 
 	self.min_cost_cmd_ = min_cost_cmd
@@ -185,7 +192,7 @@ func zopfliCostModelSetFromLiteralCosts(self *zopfliCostModel, position uint, ri
 	var cost_cmd []float32 = self.cost_cmd_[:]
 	var num_bytes uint = self.num_bytes_
 	var i uint
-	estimateBitCostsForLiterals(position, num_bytes, ringbuffer_mask, ringbuffer, literal_costs[1:])
+	context.EstimateBitCostsForLiterals(position, num_bytes, ringbuffer_mask, ringbuffer, literal_costs[1:])
 	literal_costs[0] = 0.0
 	for i = 0; i < num_bytes; i++ {
 		literal_carry += literal_costs[i+1]
@@ -193,15 +200,15 @@ func zopfliCostModelSetFromLiteralCosts(self *zopfliCostModel, position uint, ri
 		literal_carry -= literal_costs[i+1] - literal_costs[i]
 	}
 
-	for i = 0; i < numCommandSymbols; i++ {
-		cost_cmd[i] = float32(fastLog2(uint(11 + uint32(i))))
+	for i = 0; i < common.NumCommandSymbols; i++ {
+		cost_cmd[i] = float32(common.FastLog2(uint(11 + uint32(i))))
 	}
 
 	for i = 0; uint32(i) < self.distance_histogram_size; i++ {
-		cost_dist[i] = float32(fastLog2(uint(20 + uint32(i))))
+		cost_dist[i] = float32(common.FastLog2(uint(20 + uint32(i))))
 	}
 
-	self.min_cost_cmd_ = float32(fastLog2(11))
+	self.min_cost_cmd_ = float32(common.FastLog2(11))
 }
 
 func zopfliCostModelGetCommandCost(self *zopfliCostModel, cmdcode uint16) float32 {
@@ -249,7 +256,7 @@ func initStartPosQueue(self *startPosQueue) {
 }
 
 func startPosQueueSize(self *startPosQueue) uint {
-	return brotli_min_size_t(self.idx_, 8)
+	return common.BrotliMinSizeT(self.idx_, 8)
 }
 
 func startPosQueuePush(self *startPosQueue, posdata *posData) {
@@ -379,10 +386,10 @@ func evaluateNode(block_start uint, pos uint, max_backward_limit uint, gap uint,
 }
 
 /* Returns longest copy length. */
-func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, ringbuffer_mask uint, params *encoderParams, max_backward_limit uint, starting_dist_cache []int, num_matches uint, matches []backwardMatch, model *zopfliCostModel, queue *startPosQueue, nodes []zopfliNode) uint {
+func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, max_backward_limit uint, starting_dist_cache []int, num_matches uint, matches []hasher.BackwardMatch, model *zopfliCostModel, queue *startPosQueue, nodes []zopfliNode) uint {
 	var cur_ix uint = block_start + pos
 	var cur_ix_masked uint = cur_ix & ringbuffer_mask
-	var max_distance uint = brotli_min_size_t(cur_ix, max_backward_limit)
+	var max_distance uint = common.BrotliMinSizeT(cur_ix, max_backward_limit)
 	var max_len uint = num_bytes - pos
 	var max_zopfli_len uint = maxZopfliLen(params)
 	var max_iters uint = maxZopfliCandidates(params)
@@ -403,14 +410,14 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 	for k = 0; k < max_iters && k < startPosQueueSize(queue); k++ {
 		var posdata *posData = startPosQueueAt(queue, k)
 		var start uint = posdata.pos
-		var inscode uint16 = getInsertLengthCode(pos - start)
+		var inscode uint16 = metablock.GetInsertLengthCode(pos - start)
 		var start_costdiff float32 = posdata.costdiff
-		var base_cost float32 = start_costdiff + float32(getInsertExtra(inscode)) + zopfliCostModelGetLiteralCosts(model, 0, pos)
+		var base_cost float32 = start_costdiff + float32(metablock.GetInsertExtra(inscode)) + zopfliCostModelGetLiteralCosts(model, 0, pos)
 		var best_len uint = min_len - 1
 		var j uint = 0
 		/* Look for last distance matches using the distance cache from this
 		   starting position. */
-		for ; j < numDistanceShortCodes && best_len < max_len; j++ {
+		for ; j < common.NumDistanceShortCodes && best_len < max_len; j++ {
 			var idx uint = uint(kDistanceCacheIndex[j])
 			var backward uint = uint(posdata.distance_cache[idx] + kDistanceCacheOffset[j])
 			var prev_ix uint = cur_ix - backward
@@ -436,7 +443,7 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 					continue
 				}
 
-				len = findMatchLengthWithLimit(ringbuffer[prev_ix:], ringbuffer[cur_ix_masked:], max_len)
+				len = common.FindMatchLengthWithLimit(ringbuffer[prev_ix:], ringbuffer[cur_ix_masked:], max_len)
 			} else {
 				continue
 			}
@@ -444,18 +451,18 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 				var dist_cost float32 = base_cost + zopfliCostModelGetDistanceCost(model, j)
 				var l uint
 				for l = best_len + 1; l <= len; l++ {
-					var copycode uint16 = getCopyLengthCode(l)
-					var cmdcode uint16 = combineLengthCodes(inscode, copycode, j == 0)
+					var copycode uint16 = metablock.GetCopyLengthCode(l)
+					var cmdcode uint16 = metablock.CombineLengthCodes(inscode, copycode, j == 0)
 					var tmp float32
 					if cmdcode < 128 {
 						tmp = base_cost
 					} else {
 						tmp = dist_cost
 					}
-					var cost float32 = tmp + float32(getCopyExtra(copycode)) + zopfliCostModelGetCommandCost(model, cmdcode)
+					var cost float32 = tmp + float32(metablock.GetCopyExtra(copycode)) + zopfliCostModelGetCommandCost(model, cmdcode)
 					if cost < nodes[pos+l].u.cost {
 						updateZopfliNode(nodes, pos, start, l, l, backward, j+1, cost)
-						result = brotli_max_size_t(result, l)
+						result = common.BrotliMaxSizeT(result, l)
 					}
 
 					best_len = l
@@ -473,10 +480,10 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 			/* Loop through all possible copy lengths at this position. */
 			var len uint = min_len
 			for j = 0; j < num_matches; j++ {
-				var match backwardMatch = matches[j]
-				var dist uint = uint(match.distance)
+				var match hasher.BackwardMatch = matches[j]
+				var dist uint = uint(match.Distance)
 				var is_dictionary_match bool = (dist > max_distance+gap)
-				var dist_code uint = dist + numDistanceShortCodes - 1
+				var dist_code uint = dist + common.NumDistanceShortCodes - 1
 				var dist_symbol uint16
 				var distextra uint32
 				var distnumextra uint32
@@ -484,7 +491,7 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 				var max_match_len uint
 				/* We already tried all possible last distance matches, so we can use
 				   normal distance code here. */
-				prefixEncodeCopyDistance(dist_code, uint(params.dist.num_direct_distance_codes), uint(params.dist.distance_postfix_bits), &dist_symbol, &distextra)
+				common.PrefixEncodeCopyDistance(dist_code, uint(params.Dist.Num_direct_distance_codes), uint(params.Dist.Distance_postfix_bits), &dist_symbol, &distextra)
 
 				distnumextra = uint32(dist_symbol) >> 10
 				dist_cost = base_cost + float32(distnumextra) + zopfliCostModelGetDistanceCost(model, uint(dist_symbol)&0x3FF)
@@ -492,7 +499,7 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 				/* Try all copy lengths up until the maximum copy length corresponding
 				   to this distance. If the distance refers to the static dictionary, or
 				   the maximum length is long enough, try only one maximum length. */
-				max_match_len = backwardMatchLength(&match)
+				max_match_len = hasher.BackwardMatchLength(&match)
 
 				if len < max_match_len && (is_dictionary_match || max_match_len > max_zopfli_len) {
 					len = max_match_len
@@ -501,13 +508,13 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 				for ; len <= max_match_len; len++ {
 					var len_code uint
 					if is_dictionary_match {
-						len_code = backwardMatchLengthCode(&match)
+						len_code = hasher.BackwardMatchLengthCode(&match)
 					} else {
 						len_code = len
 					}
-					var copycode uint16 = getCopyLengthCode(len_code)
-					var cmdcode uint16 = combineLengthCodes(inscode, copycode, false)
-					var cost float32 = dist_cost + float32(getCopyExtra(copycode)) + zopfliCostModelGetCommandCost(model, cmdcode)
+					var copycode uint16 = metablock.GetCopyLengthCode(len_code)
+					var cmdcode uint16 = metablock.CombineLengthCodes(inscode, copycode, false)
+					var cost float32 = dist_cost + float32(metablock.GetCopyExtra(copycode)) + zopfliCostModelGetCommandCost(model, cmdcode)
 					if cost < nodes[pos+len].u.cost {
 						updateZopfliNode(nodes, pos, start, uint(len), len_code, dist, 0, cost)
 						if len > result {
@@ -540,8 +547,8 @@ func computeShortestPathFromNodes(num_bytes uint, nodes []zopfliNode) uint {
 }
 
 /* REQUIRES: nodes != NULL and len(nodes) >= num_bytes + 1 */
-func zopfliCreateCommands(num_bytes uint, block_start uint, nodes []zopfliNode, dist_cache []int, last_insert_len *uint, params *encoderParams, commands *[]command, num_literals *uint) {
-	var max_backward_limit uint = maxBackwardLimit(params.lgwin)
+func zopfliCreateCommands(num_bytes uint, block_start uint, nodes []zopfliNode, dist_cache []int, last_insert_len *uint, params *common.EncoderParams, commands *[]metablock.Command, num_literals *uint) {
+	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
 	var pos uint = 0
 	var offset uint32 = nodes[0].u.next
 	var i uint
@@ -559,10 +566,10 @@ func zopfliCreateCommands(num_bytes uint, block_start uint, nodes []zopfliNode, 
 		{
 			var distance uint = uint(zopfliNodeCopyDistance(next))
 			var len_code uint = uint(zopfliNodeLengthCode(next))
-			var max_distance uint = brotli_min_size_t(block_start+pos, max_backward_limit)
+			var max_distance uint = common.BrotliMinSizeT(block_start+pos, max_backward_limit)
 			var is_dictionary bool = (distance > max_distance+gap)
 			var dist_code uint = uint(zopfliNodeDistanceCode(next))
-			*commands = append(*commands, makeCommand(&params.dist, insert_length, copy_length, int(len_code)-int(copy_length), dist_code))
+			*commands = append(*commands, metablock.MakeCommand(&params.Dist, insert_length, copy_length, int(len_code)-int(copy_length), dist_code))
 
 			if !is_dictionary && dist_code > 0 {
 				dist_cache[3] = dist_cache[2]
@@ -579,8 +586,8 @@ func zopfliCreateCommands(num_bytes uint, block_start uint, nodes []zopfliNode, 
 	*last_insert_len += num_bytes - pos
 }
 
-func zopfliIterate(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *encoderParams, gap uint, dist_cache []int, model *zopfliCostModel, num_matches []uint32, matches []backwardMatch, nodes []zopfliNode) uint {
-	var max_backward_limit uint = maxBackwardLimit(params.lgwin)
+func zopfliIterate(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, gap uint, dist_cache []int, model *zopfliCostModel, num_matches []uint32, matches []hasher.BackwardMatch, nodes []zopfliNode) uint {
+	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
 	var max_zopfli_len uint = maxZopfliLen(params)
 	var queue startPosQueue
 	var cur_match_pos uint = 0
@@ -594,8 +601,8 @@ func zopfliIterate(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_
 			skip = 0
 		}
 		cur_match_pos += uint(num_matches[i])
-		if num_matches[i] == 1 && backwardMatchLength(&matches[cur_match_pos-1]) > max_zopfli_len {
-			skip = brotli_max_size_t(backwardMatchLength(&matches[cur_match_pos-1]), skip)
+		if num_matches[i] == 1 && hasher.BackwardMatchLength(&matches[cur_match_pos-1]) > max_zopfli_len {
+			skip = common.BrotliMaxSizeT(hasher.BackwardMatchLength(&matches[cur_match_pos-1]), skip)
 		}
 
 		if skip > 1 {
@@ -633,15 +640,15 @@ Computes the shortest path of commands from position to at most
 
 REQUIRES: nodes != nil and len(nodes) >= num_bytes + 1
 */
-func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *encoderParams, dist_cache []int, hasher *h10, nodes []zopfliNode) uint {
-	var max_backward_limit uint = maxBackwardLimit(params.lgwin)
+func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, dist_cache []int, handle *hasher.H10, nodes []zopfliNode) uint {
+	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
 	var max_zopfli_len uint = maxZopfliLen(params)
 	var model zopfliCostModel
 	var queue startPosQueue
-	var matches [2 * (maxNumMatchesH10 + 64)]backwardMatch
+	var matches [2 * (hasher.MaxNumMatchesH10 + 64)]hasher.BackwardMatch
 	var store_end uint
-	if num_bytes >= hasher.StoreLookahead() {
-		store_end = position + num_bytes - hasher.StoreLookahead() + 1
+	if num_bytes >= handle.StoreLookahead() {
+		store_end = position + num_bytes - handle.StoreLookahead() + 1
 	} else {
 		store_end = position
 	}
@@ -650,16 +657,16 @@ func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte,
 	var lz_matches_offset uint = 0
 	nodes[0].length = 0
 	nodes[0].u.cost = 0
-	initZopfliCostModel(&model, &params.dist, num_bytes)
+	initZopfliCostModel(&model, &params.Dist, num_bytes)
 	zopfliCostModelSetFromLiteralCosts(&model, position, ringbuffer, ringbuffer_mask)
 	initStartPosQueue(&queue)
-	for i = 0; i+hasher.HashTypeLength()-1 < num_bytes; i++ {
+	for i = 0; i+handle.HashTypeLength()-1 < num_bytes; i++ {
 		var pos uint = position + i
-		var max_distance uint = brotli_min_size_t(pos, max_backward_limit)
+		var max_distance uint = common.BrotliMinSizeT(pos, max_backward_limit)
 		var skip uint
 		var num_matches uint
-		num_matches = findAllMatchesH10(hasher, &params.dictionary, ringbuffer, ringbuffer_mask, pos, num_bytes-i, max_distance, gap, params, matches[lz_matches_offset:])
-		if num_matches > 0 && backwardMatchLength(&matches[num_matches-1]) > max_zopfli_len {
+		num_matches = hasher.FindAllMatchesH10(handle, params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, pos, num_bytes-i, max_distance, gap, params, matches[lz_matches_offset:])
+		if num_matches > 0 && hasher.BackwardMatchLength(&matches[num_matches-1]) > max_zopfli_len {
 			matches[0] = matches[num_matches-1]
 			num_matches = 1
 		}
@@ -668,18 +675,18 @@ func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte,
 		if skip < longCopyQuickStep {
 			skip = 0
 		}
-		if num_matches == 1 && backwardMatchLength(&matches[0]) > max_zopfli_len {
-			skip = brotli_max_size_t(backwardMatchLength(&matches[0]), skip)
+		if num_matches == 1 && hasher.BackwardMatchLength(&matches[0]) > max_zopfli_len {
+			skip = common.BrotliMaxSizeT(hasher.BackwardMatchLength(&matches[0]), skip)
 		}
 
 		if skip > 1 {
 			/* Add the tail of the copy to the hasher. */
-			hasher.StoreRange(ringbuffer, ringbuffer_mask, pos+1, brotli_min_size_t(pos+skip, store_end))
+			handle.StoreRange(ringbuffer, ringbuffer_mask, pos+1, common.BrotliMinSizeT(pos+skip, store_end))
 
 			skip--
 			for skip != 0 {
 				i++
-				if i+hasher.HashTypeLength()-1 >= num_bytes {
+				if i+handle.HashTypeLength()-1 >= num_bytes {
 					break
 				}
 				evaluateNode(position, i, max_backward_limit, gap, dist_cache, &model, &queue, nodes)
@@ -692,22 +699,22 @@ func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte,
 	return computeShortestPathFromNodes(num_bytes, nodes)
 }
 
-func createZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *encoderParams, hasher *h10, dist_cache []int, last_insert_len *uint, commands *[]command, num_literals *uint) {
+func createZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle *hasher.H10, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
 	var nodes []zopfliNode
 	nodes = make([]zopfliNode, (num_bytes + 1))
 	initZopfliNodes(nodes, num_bytes+1)
-	zopfliComputeShortestPath(num_bytes, position, ringbuffer, ringbuffer_mask, params, dist_cache, hasher, nodes)
+	zopfliComputeShortestPath(num_bytes, position, ringbuffer, ringbuffer_mask, params, dist_cache, handle, nodes)
 	zopfliCreateCommands(num_bytes, position, nodes, dist_cache, last_insert_len, params, commands, num_literals)
 	nodes = nil
 }
 
-func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *encoderParams, hasher hasherHandle, dist_cache []int, last_insert_len *uint, commands *[]command, num_literals *uint) {
-	var max_backward_limit uint = maxBackwardLimit(params.lgwin)
+func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.HasherHandle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
+	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
 	var num_matches []uint32 = make([]uint32, num_bytes)
 	var matches_size uint = 4 * num_bytes
 	var store_end uint
-	if num_bytes >= hasher.StoreLookahead() {
-		store_end = position + num_bytes - hasher.StoreLookahead() + 1
+	if num_bytes >= handle.StoreLookahead() {
+		store_end = position + num_bytes - handle.StoreLookahead() + 1
 	} else {
 		store_end = position
 	}
@@ -719,30 +726,30 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 	var orig_num_commands int
 	var model zopfliCostModel
 	var nodes []zopfliNode
-	var matches []backwardMatch = make([]backwardMatch, matches_size)
+	var matches []hasher.BackwardMatch = make([]hasher.BackwardMatch, matches_size)
 	var gap uint = 0
 	var shadow_matches uint = 0
-	var new_array []backwardMatch
-	for i = 0; i+hasher.HashTypeLength()-1 < num_bytes; i++ {
+	var new_array []hasher.BackwardMatch
+	for i = 0; i+handle.HashTypeLength()-1 < num_bytes; i++ {
 		var pos uint = position + i
-		var max_distance uint = brotli_min_size_t(pos, max_backward_limit)
+		var max_distance uint = common.BrotliMinSizeT(pos, max_backward_limit)
 		var max_length uint = num_bytes - i
 		var num_found_matches uint
 		var cur_match_end uint
 		var j uint
 
 		/* Ensure that we have enough free slots. */
-		if matches_size < cur_match_pos+maxNumMatchesH10+shadow_matches {
+		if matches_size < cur_match_pos+hasher.MaxNumMatchesH10+shadow_matches {
 			var new_size uint = matches_size
 			if new_size == 0 {
-				new_size = cur_match_pos + maxNumMatchesH10 + shadow_matches
+				new_size = cur_match_pos + hasher.MaxNumMatchesH10 + shadow_matches
 			}
 
-			for new_size < cur_match_pos+maxNumMatchesH10+shadow_matches {
+			for new_size < cur_match_pos+hasher.MaxNumMatchesH10+shadow_matches {
 				new_size *= 2
 			}
 
-			new_array = make([]backwardMatch, new_size)
+			new_array = make([]hasher.BackwardMatch, new_size)
 			if matches_size != 0 {
 				copy(new_array, matches[:matches_size])
 			}
@@ -751,15 +758,15 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 			matches_size = new_size
 		}
 
-		num_found_matches = findAllMatchesH10(hasher.(*h10), &params.dictionary, ringbuffer, ringbuffer_mask, pos, max_length, max_distance, gap, params, matches[cur_match_pos+shadow_matches:])
+		num_found_matches = hasher.FindAllMatchesH10(handle.(*hasher.H10), params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, pos, max_length, max_distance, gap, params, matches[cur_match_pos+shadow_matches:])
 		cur_match_end = cur_match_pos + num_found_matches
 		for j = cur_match_pos; j+1 < cur_match_end; j++ {
-			assert(backwardMatchLength(&matches[j]) <= backwardMatchLength(&matches[j+1]))
+			common.Assert(hasher.BackwardMatchLength(&matches[j]) <= hasher.BackwardMatchLength(&matches[j+1]))
 		}
 
 		num_matches[i] = uint32(num_found_matches)
 		if num_found_matches > 0 {
-			var match_len uint = backwardMatchLength(&matches[cur_match_end-1])
+			var match_len uint = hasher.BackwardMatchLength(&matches[cur_match_end-1])
 			if match_len > maxZopfliLenQuality11 {
 				var skip uint = match_len - 1
 				matches[cur_match_pos] = matches[cur_match_end-1]
@@ -767,7 +774,7 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 				num_matches[i] = 1
 
 				/* Add the tail of the copy to the hasher. */
-				hasher.StoreRange(ringbuffer, ringbuffer_mask, pos+1, brotli_min_size_t(pos+match_len, store_end))
+				handle.StoreRange(ringbuffer, ringbuffer_mask, pos+1, common.BrotliMinSizeT(pos+match_len, store_end))
 				var pos uint = i
 				for i := 0; i < int(skip); i++ {
 					num_matches[pos+1:][i] = 0
@@ -784,7 +791,7 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 	copy(orig_dist_cache[:], dist_cache[:4])
 	orig_num_commands = len(*commands)
 	nodes = make([]zopfliNode, (num_bytes + 1))
-	initZopfliCostModel(&model, &params.dist, num_bytes)
+	initZopfliCostModel(&model, &params.Dist, num_bytes)
 	for i = 0; i < 2; i++ {
 		initZopfliNodes(nodes, num_bytes+1)
 		if i == 0 {

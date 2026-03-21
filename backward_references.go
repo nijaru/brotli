@@ -2,6 +2,10 @@ package brotli
 
 import (
 	"sync"
+
+	"github.com/nijaru/brotli/internal/common"
+	"github.com/nijaru/brotli/internal/hasher"
+	"github.com/nijaru/brotli/internal/metablock"
 )
 
 /* Copyright 2013 Google Inc. All Rights Reserved.
@@ -32,18 +36,18 @@ func computeDistanceCode(distance uint, max_distance uint, dist_cache []int) uin
 		}
 	}
 
-	return distance + numDistanceShortCodes - 1
+	return distance + common.NumDistanceShortCodes - 1
 }
 
 var hasherSearchResultPool sync.Pool
 
-func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *encoderParams, hasher hasherHandle, dist_cache []int, last_insert_len *uint, commands *[]command, num_literals *uint) {
-	var max_backward_limit uint = maxBackwardLimit(params.lgwin)
+func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.HasherHandle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
+	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
 	var insert_length uint = *last_insert_len
 	var pos_end uint = position + num_bytes
 	var store_end uint
-	if num_bytes >= hasher.StoreLookahead() {
-		store_end = position + num_bytes - hasher.StoreLookahead() + 1
+	if num_bytes >= handle.StoreLookahead() {
+		store_end = position + num_bytes - handle.StoreLookahead() + 1
 	} else {
 		store_end = position
 	}
@@ -57,41 +61,41 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 	/* For speed up heuristics for random data. */
 
 	/* Minimum score to accept a backward reference. */
-	hasher.PrepareDistanceCache(dist_cache)
-	sr2, _ := hasherSearchResultPool.Get().(*hasherSearchResult)
+	handle.PrepareDistanceCache(dist_cache)
+	sr2, _ := hasherSearchResultPool.Get().(*hasher.HasherSearchResult)
 	if sr2 == nil {
-		sr2 = &hasherSearchResult{}
+		sr2 = &hasher.HasherSearchResult{}
 	}
-	sr, _ := hasherSearchResultPool.Get().(*hasherSearchResult)
+	sr, _ := hasherSearchResultPool.Get().(*hasher.HasherSearchResult)
 	if sr == nil {
-		sr = &hasherSearchResult{}
+		sr = &hasher.HasherSearchResult{}
 	}
 
-	for position+hasher.HashTypeLength() < pos_end {
+	for position+handle.HashTypeLength() < pos_end {
 		var max_length uint = pos_end - position
-		var max_distance uint = brotli_min_size_t(position, max_backward_limit)
-		sr.len = 0
-		sr.len_code_delta = 0
-		sr.distance = 0
-		sr.score = kMinScore
-		hasher.FindLongestMatch(&params.dictionary, ringbuffer, ringbuffer_mask, dist_cache, position, max_length, max_distance, gap, params.dist.max_distance, sr)
-		if sr.score > kMinScore {
+		var max_distance uint = common.BrotliMinSizeT(position, max_backward_limit)
+		sr.Len = 0
+		sr.Len_code_delta = 0
+		sr.Distance = 0
+		sr.Score = kMinScore
+		handle.FindLongestMatch(params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, dist_cache, position, max_length, max_distance, gap, params.Dist.Max_distance, sr)
+		if sr.Score > kMinScore {
 			/* Found a match. Let's look for something even better ahead. */
 			var delayed_backward_references_in_row int = 0
 			max_length--
 			for ; ; max_length-- {
 				var cost_diff_lazy uint = 175
-				if params.quality < minQualityForExtensiveReferenceSearch {
-					sr2.len = brotli_min_size_t(sr.len-1, max_length)
+				if params.Quality < minQualityForExtensiveReferenceSearch {
+					sr2.Len = common.BrotliMinSizeT(sr.Len-1, max_length)
 				} else {
-					sr2.len = 0
+					sr2.Len = 0
 				}
-				sr2.len_code_delta = 0
-				sr2.distance = 0
-				sr2.score = kMinScore
-				max_distance = brotli_min_size_t(position+1, max_backward_limit)
-				hasher.FindLongestMatch(&params.dictionary, ringbuffer, ringbuffer_mask, dist_cache, position+1, max_length, max_distance, gap, params.dist.max_distance, sr2)
-				if sr2.score >= sr.score+cost_diff_lazy {
+				sr2.Len_code_delta = 0
+				sr2.Distance = 0
+				sr2.Score = kMinScore
+				max_distance = common.BrotliMinSizeT(position+1, max_backward_limit)
+				handle.FindLongestMatch(params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, dist_cache, position+1, max_length, max_distance, gap, params.Dist.Max_distance, sr2)
+				if sr2.Score >= sr.Score+cost_diff_lazy {
 					/* Ok, let's just write one byte for now and start a match from the
 					   next byte. */
 					position++
@@ -99,7 +103,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 					insert_length++
 					*sr = *sr2
 					delayed_backward_references_in_row++
-					if delayed_backward_references_in_row < 4 && position+hasher.HashTypeLength() < pos_end {
+					if delayed_backward_references_in_row < 4 && position+handle.HashTypeLength() < pos_end {
 						continue
 					}
 				}
@@ -107,21 +111,21 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 				break
 			}
 
-			apply_random_heuristics = position + 2*sr.len + random_heuristics_window_size
-			max_distance = brotli_min_size_t(position, max_backward_limit)
+			apply_random_heuristics = position + 2*sr.Len + random_heuristics_window_size
+			max_distance = common.BrotliMinSizeT(position, max_backward_limit)
 			{
 				/* The first 16 codes are special short-codes,
 				   and the minimum offset is 1. */
-				var distance_code uint = computeDistanceCode(sr.distance, max_distance+gap, dist_cache)
-				if (sr.distance <= (max_distance + gap)) && distance_code > 0 {
+				var distance_code uint = computeDistanceCode(sr.Distance, max_distance+gap, dist_cache)
+				if (sr.Distance <= (max_distance + gap)) && distance_code > 0 {
 					dist_cache[3] = dist_cache[2]
 					dist_cache[2] = dist_cache[1]
 					dist_cache[1] = dist_cache[0]
-					dist_cache[0] = int(sr.distance)
-					hasher.PrepareDistanceCache(dist_cache)
+					dist_cache[0] = int(sr.Distance)
+					handle.PrepareDistanceCache(dist_cache)
 				}
 
-				*commands = append(*commands, makeCommand(&params.dist, insert_length, sr.len, sr.len_code_delta, distance_code))
+				*commands = append(*commands, metablock.MakeCommand(&params.Dist, insert_length, sr.Len, sr.Len_code_delta, distance_code))
 			}
 
 			*num_literals += insert_length
@@ -132,15 +136,15 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 			   Avoid hash poisoning with RLE data. */
 			{
 				var range_start uint = position + 2
-				var range_end uint = brotli_min_size_t(position+sr.len, store_end)
-				if sr.distance < sr.len>>2 {
-					range_start = brotli_min_size_t(range_end, brotli_max_size_t(range_start, position+sr.len-(sr.distance<<2)))
+				var range_end uint = common.BrotliMinSizeT(position+sr.Len, store_end)
+				if sr.Distance < sr.Len>>2 {
+					range_start = common.BrotliMinSizeT(range_end, common.BrotliMaxSizeT(range_start, position+sr.Len-(sr.Distance<<2)))
 				}
 
-				hasher.StoreRange(ringbuffer, ringbuffer_mask, range_start, range_end)
+				handle.StoreRange(ringbuffer, ringbuffer_mask, range_start, range_end)
 			}
 
-			position += sr.len
+			position += sr.Len
 		} else {
 			insert_length++
 			position++
@@ -152,7 +156,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 			if position > apply_random_heuristics {
 				/* Going through uncompressible data, jump. */
 				if position > apply_random_heuristics+4*random_heuristics_window_size {
-					var kMargin uint = brotli_max_size_t(hasher.StoreLookahead()-1, 4)
+					var kMargin uint = common.BrotliMaxSizeT(handle.StoreLookahead()-1, 4)
 					/* It is quite a long time since we saw a copy, so we assume
 					   that this data is not compressible, and store hashes less
 					   often. Hashes of non compressible data are less likely to
@@ -160,16 +164,16 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 					   them to not to flood out the hash table of good compressible
 					   data. */
 
-					var pos_jump uint = brotli_min_size_t(position+16, pos_end-kMargin)
+					var pos_jump uint = common.BrotliMinSizeT(position+16, pos_end-kMargin)
 					for ; position < pos_jump; position += 4 {
-						hasher.Store(ringbuffer, ringbuffer_mask, position)
+						handle.Store(ringbuffer, ringbuffer_mask, position)
 						insert_length += 4
 					}
 				} else {
-					var kMargin uint = brotli_max_size_t(hasher.StoreLookahead()-1, 2)
-					var pos_jump uint = brotli_min_size_t(position+8, pos_end-kMargin)
+					var kMargin uint = common.BrotliMaxSizeT(handle.StoreLookahead()-1, 2)
+					var pos_jump uint = common.BrotliMinSizeT(position+8, pos_end-kMargin)
 					for ; position < pos_jump; position += 2 {
-						hasher.Store(ringbuffer, ringbuffer_mask, position)
+						handle.Store(ringbuffer, ringbuffer_mask, position)
 						insert_length += 2
 					}
 				}

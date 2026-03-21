@@ -1,22 +1,24 @@
 package brotli
 
+import "github.com/nijaru/brotli/internal/dictionary"
+
 /* Dictionary data (words and transforms) for 1 possible context */
 type encoderDictionary struct {
-	words                 *dictionary
+	words                 *dictionary.Dictionary
 	cutoffTransformsCount uint32
 	cutoffTransforms      uint64
 	hash_table            []uint16
 	buckets               []uint16
-	dict_words            []dictWord
+	dict_words            []dictionary.DictWord
 }
 
 func initEncoderDictionary(dict *encoderDictionary) {
-	dict.words = getDictionary()
+	dict.words = dictionary.GetDictionary()
 
-	dict.hash_table = kStaticDictionaryHash[:]
-	dict.buckets = kStaticDictionaryBuckets[:]
-	dict.dict_words = kStaticDictionaryWords[:]
+	dict.hash_table = dictionary.KStaticDictionaryHash[:]
+	dict.buckets = dictionary.KStaticDictionaryBuckets[:]
+	dict.dict_words = dictionary.KStaticDictionaryWords[:]
 
-	dict.cutoffTransformsCount = kCutoffTransformsCount
-	dict.cutoffTransforms = kCutoffTransforms
+	dict.cutoffTransformsCount = dictionary.KCutoffTransformsCount
+	dict.cutoffTransforms = dictionary.KCutoffTransforms
 }
