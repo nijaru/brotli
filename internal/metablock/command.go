@@ -1,0 +1,172 @@
+package metablock
+
+import (
+	"github.com/nijaru/brotli/internal/common"
+)
+
+/* Copyright 2013 Google Inc. All Rights Reserved.
+
+   Distributed under MIT license.
+   See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
+*/
+
+var kInsBase = []uint32{
+	0, 1, 2, 3, 4, 5, 6, 8, 10, 14, 18, 26, 34, 50, 66, 98, 130, 194, 322, 578, 1090, 2114, 6210, 22594,
+}
+
+var kInsExtra = []uint32{
+	0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9, 10, 12, 14, 24,
+}
+
+var kCopyBase = []uint32{
+	2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 18, 22, 30, 38, 54, 70, 102, 134, 198, 326, 582, 1094, 2118,
+}
+
+var kCopyExtra = []uint32{
+	0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9, 10, 24,
+}
+
+func GetInsertLengthCode(insertlen uint) uint16 {
+	if insertlen < 6 {
+		return uint16(insertlen)
+	} else if insertlen < 130 {
+		var nbits uint32 = common.Log2FloorNonZero(insertlen-2) - 1
+		return uint16((nbits << 1) + uint32((insertlen-2)>>nbits) + 2)
+	} else if insertlen < 2114 {
+		return uint16(common.Log2FloorNonZero(insertlen-66) + 10)
+	} else if insertlen < 6210 {
+		return 21
+	} else if insertlen < 22594 {
+		return 22
+	} else {
+		return 23
+	}
+}
+
+func GetCopyLengthCode(copylen uint) uint16 {
+	if copylen < 10 {
+		return uint16(copylen - 2)
+	} else if copylen < 134 {
+		var nbits uint32 = common.Log2FloorNonZero(copylen-6) - 1
+		return uint16((nbits << 1) + uint32((copylen-6)>>nbits) + 4)
+	} else if copylen < 2118 {
+		return uint16(common.Log2FloorNonZero(copylen-70) + 12)
+	} else {
+		return 23
+	}
+}
+
+func CombineLengthCodes(inscode uint16, copycode uint16, use_last_distance bool) uint16 {
+	var bits64 uint16 = uint16(copycode&0x7 | (inscode&0x7)<<3)
+	if use_last_distance && inscode < 8 && copycode < 16 {
+		if copycode < 8 {
+			return bits64
+		} else {
+			return bits64 | 64
+		}
+	} else {
+		/* Specification: 5 Encoding of ... (last table) */
+		/* offset = 2 * index, where index is in range [0..8] */
+		var offset uint32 = 2 * ((uint32(copycode) >> 3) + 3*(uint32(inscode)>>3))
+
+		/* All values in specification are K * 64,
+		   where   K = [2, 3, 6, 4, 5, 8, 7, 9, 10],
+		       i + 1 = [1, 2, 3, 4, 5, 6, 7, 8,  9],
+		   K - i - 1 = [1, 1, 3, 0, 0, 2, 0, 1,  2] = D.
+		   All values in D require only 2 bits to encode.
+		   Magic constant is shifted 6 bits left, to avoid final multiplication. */
+		offset = (offset << 5) + 0x40 + ((0x520D40 >> offset) & 0xC0)
+
+		return uint16(offset | uint32(bits64))
+	}
+}
+
+func GetLengthCode(insertlen uint, copylen uint, use_last_distance bool, code *uint16) {
+	var inscode uint16 = GetInsertLengthCode(insertlen)
+	var copycode uint16 = GetCopyLengthCode(copylen)
+	*code = CombineLengthCodes(inscode, copycode, use_last_distance)
+}
+
+func GetInsertBase(inscode uint16) uint32 {
+	return kInsBase[inscode]
+}
+
+func GetInsertExtra(inscode uint16) uint32 {
+	return kInsExtra[inscode]
+}
+
+func GetCopyBase(copycode uint16) uint32 {
+	return kCopyBase[copycode]
+}
+
+func GetCopyExtra(copycode uint16) uint32 {
+	return kCopyExtra[copycode]
+}
+
+type Command struct {
+	Insert_len_  uint32
+	Copy_len_    uint32
+	Dist_extra_  uint32
+	Cmd_prefix_  uint16
+	Dist_prefix_ uint16
+}
+
+/* distance_code is e.g. 0 for same-as-last short code, or 16 for offset 1. */
+func MakeCommand(dist *common.DistanceParams, insertlen uint, copylen uint, copylen_code_delta int, distance_code uint) (cmd Command) {
+	/* Don't rely on signed int representation, use honest casts. */
+	var delta uint32 = uint32(byte(int8(copylen_code_delta)))
+	cmd.Insert_len_ = uint32(insertlen)
+	cmd.Copy_len_ = uint32(uint32(copylen) | delta<<25)
+
+	/* The distance prefix and extra bits are stored in this Command as if
+	   npostfix and ndirect were 0, they are only recomputed later after the
+	   clustering if needed. */
+	common.PrefixEncodeCopyDistance(distance_code, uint(dist.Num_direct_distance_codes), uint(dist.Distance_postfix_bits), &cmd.Dist_prefix_, &cmd.Dist_extra_)
+	GetLengthCode(insertlen, uint(int(copylen)+copylen_code_delta), (cmd.Dist_prefix_&0x3FF == 0), &cmd.Cmd_prefix_)
+
+	return cmd
+}
+
+func MakeInsertCommand(insertlen uint) (cmd Command) {
+	cmd.Insert_len_ = uint32(insertlen)
+	cmd.Copy_len_ = 4 << 25
+	cmd.Dist_extra_ = 0
+	cmd.Dist_prefix_ = common.NumDistanceShortCodes
+	GetLengthCode(insertlen, 4, false, &cmd.Cmd_prefix_)
+	return cmd
+}
+
+func CommandRestoreDistanceCode(self *Command, dist *common.DistanceParams) uint32 {
+	if uint32(self.Dist_prefix_&0x3FF) < common.NumDistanceShortCodes+dist.Num_direct_distance_codes {
+		return uint32(self.Dist_prefix_) & 0x3FF
+	} else {
+		var dcode uint32 = uint32(self.Dist_prefix_) & 0x3FF
+		var nbits uint32 = uint32(self.Dist_prefix_) >> 10
+		var extra uint32 = self.Dist_extra_
+		var postfix_mask uint32 = (1 << dist.Distance_postfix_bits) - 1
+		var hcode uint32 = (dcode - dist.Num_direct_distance_codes - common.NumDistanceShortCodes) >> dist.Distance_postfix_bits
+		var lcode uint32 = (dcode - dist.Num_direct_distance_codes - common.NumDistanceShortCodes) & postfix_mask
+		var offset uint32 = ((2 + (hcode & 1)) << nbits) - 4
+		return ((offset + extra) << dist.Distance_postfix_bits) + lcode + dist.Num_direct_distance_codes + common.NumDistanceShortCodes
+	}
+}
+
+func CommandDistanceContext(self *Command) uint32 {
+	var r uint32 = uint32(self.Cmd_prefix_) >> 6
+	var c uint32 = uint32(self.Cmd_prefix_) & 7
+	if (r == 0 || r == 2 || r == 4 || r == 7) && (c <= 2) {
+		return c
+	}
+
+	return 3
+}
+
+func CommandCopyLen(self *Command) uint32 {
+	return self.Copy_len_ & 0x1FFFFFF
+}
+
+func CommandCopyLenCode(self *Command) uint32 {
+	var modifier uint32 = self.Copy_len_ >> 25
+	var delta int32 = int32(int8(byte(modifier | (modifier&0x40)<<1)))
+	return uint32(int32(self.Copy_len_&0x1FFFFFF) + delta)
+}
