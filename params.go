@@ -1,5 +1,7 @@
 package brotli
 
+import "github.com/nijaru/brotli/internal/common"
+
 /* Copyright 2017 Google Inc. All Rights Reserved.
 
    Distributed under MIT license.
@@ -33,5 +35,5 @@ type encoderParams struct {
 	large_window                     bool
 	hasher                           hasherParams
 	dist                             distanceParams
-	dictionary                       encoderDictionary
+	dictionary                       common.EncoderDictionary
 }

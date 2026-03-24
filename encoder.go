@@ -2,7 +2,6 @@ package brotli
 
 import (
 	"github.com/nijaru/brotli/internal/bitstream"
-	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/metablock"
 	"github.com/nijaru/brotli/matchfinder"
 )
@@ -11,7 +10,7 @@ import (
 type Encoder struct {
 	wroteHeader bool
 	bw          bitstream.BitWriter
-	distCache   []distanceCode
+	distCache   []metablock.DistanceCode
 }
 
 func (e *Encoder) Reset() {
@@ -49,7 +48,7 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	distanceCount := 0
 
 	if len(e.distCache) < len(matches) {
-		e.distCache = make([]distanceCode, len(matches))
+		e.distCache = make([]metablock.DistanceCode, len(matches))
 	}
 
 	// first pass: build the histograms
@@ -76,38 +75,38 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 		commandCount++
 
 		if command >= 128 && m.Length != 0 {
-			var distCode distanceCode
+			var distCode metablock.DistanceCode
 			switch m.Distance {
 			case d[3]:
-				distCode.code = 0
+				distCode.Code = 0
 			case d[2]:
-				distCode.code = 1
+				distCode.Code = 1
 			case d[1]:
-				distCode.code = 2
+				distCode.Code = 2
 			case d[0]:
-				distCode.code = 3
+				distCode.Code = 3
 			case d[3] - 1:
-				distCode.code = 4
+				distCode.Code = 4
 			case d[3] + 1:
-				distCode.code = 5
+				distCode.Code = 5
 			case d[3] - 2:
-				distCode.code = 6
+				distCode.Code = 6
 			case d[3] + 2:
-				distCode.code = 7
+				distCode.Code = 7
 			case d[3] - 3:
-				distCode.code = 8
+				distCode.Code = 8
 			case d[3] + 3:
-				distCode.code = 9
+				distCode.Code = 9
 
 				// In my testing, codes 10–15 actually reduced the compression ratio.
 
 			default:
-				distCode = getDistanceCode(m.Distance)
+				distCode = metablock.GetDistanceCode(m.Distance)
 			}
 			e.distCache[i] = distCode
-			distanceHisto[distCode.code]++
+			distanceHisto[distCode.Code]++
 			distanceCount++
-			if distCode.code != 0 {
+			if distCode.Code != 0 {
 				d[0], d[1], d[2], d[3] = d[1], d[2], d[3], m.Distance
 			}
 		}
@@ -155,9 +154,9 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 
 		if command >= 128 && m.Length != 0 {
 			distCode := e.distCache[i]
-			e.bw.WriteBits(uint(distanceDepths[distCode.code]), uint64(distanceBits[distCode.code]))
-			if distCode.nExtra > 0 {
-				e.bw.WriteBits(distCode.nExtra, distCode.extraBits)
+			e.bw.WriteBits(uint(distanceDepths[distCode.Code]), uint64(distanceBits[distCode.Code]))
+			if distCode.NExtra > 0 {
+				e.bw.WriteBits(distCode.NExtra, distCode.ExtraBits)
 			}
 		}
 
@@ -169,20 +168,4 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 		e.bw.JumpToByteBoundary()
 	}
 	return e.bw.Dst
-}
-
-type distanceCode struct {
-	code      int
-	nExtra    uint
-	extraBits uint64
-}
-
-func getDistanceCode(distance int) distanceCode {
-	d := distance + 3
-	nbits := common.Log2FloorNonZero(uint(d)) - 1
-	prefix := (d >> nbits) & 1
-	offset := (2 + prefix) << nbits
-	distcode := int(2*(nbits-1)) + prefix + 16
-	extra := d - offset
-	return distanceCode{distcode, uint(nbits), uint64(extra)}
 }

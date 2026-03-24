@@ -1,6 +1,11 @@
 package brotli
 
-import "io"
+import (
+	"io"
+
+	"github.com/nijaru/brotli/internal/bitstream"
+	"github.com/nijaru/brotli/internal/dictionary"
+)
 
 /* Copyright 2015 Google Inc. All Rights Reserved.
 
@@ -93,7 +98,7 @@ type Reader struct {
 
 	state        int
 	loop_counter int
-	br           bitReader
+	br           bitstream.BitReader
 	buffer       struct {
 		u64 uint64
 		u8  [8]byte
@@ -110,15 +115,15 @@ type Reader struct {
 	sub_loop_counter            uint32
 	ringbuffer                  []byte
 	ringbuffer_end              []byte
-	htree_command               []huffmanCode
+	htree_command               []bitstream.HuffmanCode
 	context_lookup              []byte
 	context_map_slice           []byte
 	dist_context_map_slice      []byte
-	literal_hgroup              huffmanTreeGroup
-	insert_copy_hgroup          huffmanTreeGroup
-	distance_hgroup             huffmanTreeGroup
-	block_type_trees            []huffmanCode
-	block_len_trees             []huffmanCode
+	literal_hgroup              bitstream.HuffmanTreeGroup
+	insert_copy_hgroup          bitstream.HuffmanTreeGroup
+	distance_hgroup             bitstream.HuffmanTreeGroup
+	block_type_trees            []bitstream.HuffmanCode
+	block_len_trees             []bitstream.HuffmanCode
 	trivial_literal_context     int
 	distance_context            int
 	meta_block_remaining_len    int
@@ -131,7 +136,7 @@ type Reader struct {
 	distance_postfix_mask       int
 	num_dist_htrees             uint32
 	dist_context_map            []byte
-	literal_htree               []huffmanCode
+	literal_htree               []bitstream.HuffmanCode
 	dist_htree_index            byte
 	repeat_code_len             uint32
 	prev_code_len               uint32
@@ -142,18 +147,18 @@ type Reader struct {
 	symbol                      uint32
 	repeat                      uint32
 	space                       uint32
-	table                       [32]huffmanCode
-	symbol_lists                symbolList
-	symbols_lists_array         [huffmanMaxCodeLength + 1 + numCommandSymbols]uint16
+	table                       [32]bitstream.HuffmanCode
+	symbol_lists                bitstream.SymbolList
+	symbols_lists_array         [bitstream.HuffmanMaxCodeLength + 1 + numCommandSymbols]uint16
 	next_symbol                 [32]int
 	code_length_code_lengths    [codeLengthCodes]byte
 	code_length_histo           [16]uint16
 	htree_index                 int
-	next                        []huffmanCode
+	next                        []bitstream.HuffmanCode
 	context_index               uint32
 	max_run_length_prefix       uint32
 	code                        uint32
-	context_map_table           [huffmanMaxSize272]huffmanCode
+	context_map_table           [bitstream.HuffmanMaxSize272]bitstream.HuffmanCode
 	substate_metablock_header   int
 	substate_tree_group         int
 	substate_context_map        int
@@ -173,15 +178,15 @@ type Reader struct {
 	num_literal_htrees          uint32
 	context_map                 []byte
 	context_modes               []byte
-	dictionary                  *dictionary
-	transforms                  *transforms
+	dictionary                  *dictionary.Dictionary
+	transforms                  *dictionary.Transforms
 	trivial_literal_contexts    [8]uint32
 }
 
 func decoderStateInit(s *Reader) bool {
 	s.error_code = 0 /* BROTLI_DECODER_NO_ERROR */
 
-	initBitReader(&s.br)
+	bitstream.InitBitReader(&s.br)
 	s.state = stateUninited
 	s.large_window = false
 	s.substate_metablock_header = stateMetablockHeaderNone
@@ -212,12 +217,12 @@ func decoderStateInit(s *Reader) bool {
 
 	s.sub_loop_counter = 0
 
-	s.literal_hgroup.codes = nil
-	s.literal_hgroup.htrees = nil
-	s.insert_copy_hgroup.codes = nil
-	s.insert_copy_hgroup.htrees = nil
-	s.distance_hgroup.codes = nil
-	s.distance_hgroup.htrees = nil
+	s.literal_hgroup.Codes = nil
+	s.literal_hgroup.Htrees = nil
+	s.insert_copy_hgroup.Codes = nil
+	s.insert_copy_hgroup.Htrees = nil
+	s.distance_hgroup.Codes = nil
+	s.distance_hgroup.Htrees = nil
 
 	s.is_last_metablock = 0
 	s.is_uncompressed = 0
@@ -235,11 +240,11 @@ func decoderStateInit(s *Reader) bool {
 	s.block_type_trees = nil
 	s.block_len_trees = nil
 
-	s.symbol_lists.storage = s.symbols_lists_array[:]
-	s.symbol_lists.offset = huffmanMaxCodeLength + 1
+	s.symbol_lists.Storage = s.symbols_lists_array[:]
+	s.symbol_lists.Offset = bitstream.HuffmanMaxCodeLength + 1
 
-	s.dictionary = getDictionary()
-	s.transforms = getTransforms()
+	s.dictionary = dictionary.GetDictionary()
+	s.transforms = dictionary.GetTransforms()
 
 	return true
 }
@@ -266,29 +271,29 @@ func decoderStateMetablockBegin(s *Reader) {
 	s.dist_context_map_slice = nil
 	s.dist_htree_index = 0
 	s.context_lookup = nil
-	s.literal_hgroup.codes = nil
-	s.literal_hgroup.htrees = nil
-	s.insert_copy_hgroup.codes = nil
-	s.insert_copy_hgroup.htrees = nil
-	s.distance_hgroup.codes = nil
-	s.distance_hgroup.htrees = nil
+	s.literal_hgroup.Codes = nil
+	s.literal_hgroup.Htrees = nil
+	s.insert_copy_hgroup.Codes = nil
+	s.insert_copy_hgroup.Htrees = nil
+	s.distance_hgroup.Codes = nil
+	s.distance_hgroup.Htrees = nil
 }
 
 func decoderStateCleanupAfterMetablock(s *Reader) {
 	s.context_modes = nil
 	s.context_map = nil
 	s.dist_context_map = nil
-	s.literal_hgroup.htrees = nil
-	s.insert_copy_hgroup.htrees = nil
-	s.distance_hgroup.htrees = nil
+	s.literal_hgroup.Htrees = nil
+	s.insert_copy_hgroup.Htrees = nil
+	s.distance_hgroup.Htrees = nil
 }
 
-func decoderHuffmanTreeGroupInit(s *Reader, group *huffmanTreeGroup, alphabet_size uint32, max_symbol uint32, ntrees uint32) bool {
-	var max_table_size uint = uint(kMaxHuffmanTableSize[(alphabet_size+31)>>5])
-	group.alphabet_size = uint16(alphabet_size)
-	group.max_symbol = uint16(max_symbol)
-	group.num_htrees = uint16(ntrees)
-	group.htrees = make([][]huffmanCode, ntrees)
-	group.codes = make([]huffmanCode, (uint(ntrees) * max_table_size))
-	return !(group.codes == nil)
+func decoderHuffmanTreeGroupInit(s *Reader, group *bitstream.HuffmanTreeGroup, alphabet_size uint32, max_symbol uint32, ntrees uint32) bool {
+	var max_table_size uint = uint(bitstream.KMaxHuffmanTableSize[(alphabet_size+31)>>5])
+	group.Alphabet_size = uint16(alphabet_size)
+	group.Max_symbol = uint16(max_symbol)
+	group.Num_htrees = uint16(ntrees)
+	group.Htrees = make([][]bitstream.HuffmanCode, ntrees)
+	group.Codes = make([]bitstream.HuffmanCode, (uint(ntrees) * max_table_size))
+	return !(group.Codes == nil)
 }

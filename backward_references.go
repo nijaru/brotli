@@ -41,7 +41,7 @@ func computeDistanceCode(distance uint, max_distance uint, dist_cache []int) uin
 
 var hasherSearchResultPool sync.Pool
 
-func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.HasherHandle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
+func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.Handle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
 	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
 	var insert_length uint = *last_insert_len
 	var pos_end uint = position + num_bytes
@@ -56,19 +56,19 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 	var gap uint = 0
 	/* Set maximum distance, see section 9.1. of the spec. */
 
-	const kMinScore uint = scoreBase + 100
+	const kMinScore uint = hasher.ScoreBase + 100
 
 	/* For speed up heuristics for random data. */
 
 	/* Minimum score to accept a backward reference. */
 	handle.PrepareDistanceCache(dist_cache)
-	sr2, _ := hasherSearchResultPool.Get().(*hasher.HasherSearchResult)
+	sr2, _ := hasherSearchResultPool.Get().(*hasher.SearchResult)
 	if sr2 == nil {
-		sr2 = &hasher.HasherSearchResult{}
+		sr2 = &hasher.SearchResult{}
 	}
-	sr, _ := hasherSearchResultPool.Get().(*hasher.HasherSearchResult)
+	sr, _ := hasherSearchResultPool.Get().(*hasher.SearchResult)
 	if sr == nil {
-		sr = &hasher.HasherSearchResult{}
+		sr = &hasher.SearchResult{}
 	}
 
 	for position+handle.HashTypeLength() < pos_end {
@@ -78,7 +78,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 		sr.Len_code_delta = 0
 		sr.Distance = 0
 		sr.Score = kMinScore
-		handle.FindLongestMatch(params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, dist_cache, position, max_length, max_distance, gap, params.Dist.Max_distance, sr)
+		handle.FindLongestMatch(&params.Dictionary, ringbuffer, ringbuffer_mask, dist_cache, position, max_length, max_distance, gap, params.Dist.Max_distance, sr)
 		if sr.Score > kMinScore {
 			/* Found a match. Let's look for something even better ahead. */
 			var delayed_backward_references_in_row int = 0
@@ -94,7 +94,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 				sr2.Distance = 0
 				sr2.Score = kMinScore
 				max_distance = common.BrotliMinSizeT(position+1, max_backward_limit)
-				handle.FindLongestMatch(params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, dist_cache, position+1, max_length, max_distance, gap, params.Dist.Max_distance, sr2)
+				handle.FindLongestMatch(&params.Dictionary, ringbuffer, ringbuffer_mask, dist_cache, position+1, max_length, max_distance, gap, params.Dist.Max_distance, sr2)
 				if sr2.Score >= sr.Score+cost_diff_lazy {
 					/* Ok, let's just write one byte for now and start a match from the
 					   next byte. */

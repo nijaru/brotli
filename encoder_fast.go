@@ -158,15 +158,15 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 
 		if m.Length != 0 {
 			// Write the distance code.
-			var distCode distanceCode
+			var distCode metablock.DistanceCode
 			if i == 0 || m.Distance != matches[i-1].Distance {
-				distCode = getDistanceCode(m.Distance)
+				distCode = metablock.GetDistanceCode(m.Distance)
 			}
-			e.bw.WriteBits(uint(distanceDepths[distCode.code]), uint64(distanceBits[distCode.code]))
-			if distCode.nExtra > 0 {
-				e.bw.WriteBits(distCode.nExtra, distCode.extraBits)
+			e.bw.WriteBits(uint(distanceDepths[distCode.Code]), uint64(distanceBits[distCode.Code]))
+			if distCode.NExtra > 0 {
+				e.bw.WriteBits(distCode.NExtra, distCode.ExtraBits)
 			}
-			e.distanceHisto[distCode.code]++
+			e.distanceHisto[distCode.Code]++
 
 			// Write a command for the remainder of the match (after the first two bytes
 			// from before), using the previous distance.

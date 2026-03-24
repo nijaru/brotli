@@ -665,7 +665,7 @@ func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte,
 		var max_distance uint = common.BrotliMinSizeT(pos, max_backward_limit)
 		var skip uint
 		var num_matches uint
-		num_matches = hasher.FindAllMatchesH10(handle, params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, pos, num_bytes-i, max_distance, gap, params, matches[lz_matches_offset:])
+		num_matches = hasher.FindAllMatchesH10(handle, &params.Dictionary, ringbuffer, ringbuffer_mask, pos, num_bytes-i, max_distance, gap, params, matches[lz_matches_offset:])
 		if num_matches > 0 && hasher.BackwardMatchLength(&matches[num_matches-1]) > max_zopfli_len {
 			matches[0] = matches[num_matches-1]
 			num_matches = 1
@@ -708,7 +708,7 @@ func createZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []
 	nodes = nil
 }
 
-func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.HasherHandle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
+func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.Handle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
 	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
 	var num_matches []uint32 = make([]uint32, num_bytes)
 	var matches_size uint = 4 * num_bytes
@@ -758,7 +758,7 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 			matches_size = new_size
 		}
 
-		num_found_matches = hasher.FindAllMatchesH10(handle.(*hasher.H10), params.Dictionary.(*common.EncoderDictionary), ringbuffer, ringbuffer_mask, pos, max_length, max_distance, gap, params, matches[cur_match_pos+shadow_matches:])
+		num_found_matches = hasher.FindAllMatchesH10(handle.(*hasher.H10), &params.Dictionary, ringbuffer, ringbuffer_mask, pos, max_length, max_distance, gap, params, matches[cur_match_pos+shadow_matches:])
 		cur_match_end = cur_match_pos + num_found_matches
 		for j = cur_match_pos; j+1 < cur_match_end; j++ {
 			common.Assert(hasher.BackwardMatchLength(&matches[j]) <= hasher.BackwardMatchLength(&matches[j+1]))

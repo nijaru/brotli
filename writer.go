@@ -58,9 +58,9 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 // instead. This permits reusing a Writer rather than allocating a new one.
 func (w *Writer) Reset(dst io.Writer) {
 	encoderInitState(w)
-	w.params.quality = w.options.Quality
+	w.params.Quality = w.options.Quality
 	if w.options.LGWin > 0 {
-		w.params.lgwin = uint(w.options.LGWin)
+		w.params.Lgwin = uint(w.options.LGWin)
 	}
 	w.dst = dst
 	w.err = nil

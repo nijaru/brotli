@@ -1,5 +1,9 @@
 package brotli
 
+import (
+	"github.com/nijaru/brotli/internal/common"
+)
+
 const fastOnePassCompressionQuality = 0
 
 const fastTwoPassCompressionQuality = 1
@@ -48,8 +52,8 @@ const maxZopfliLenQuality11 = 325
 /* Do not thoroughly search when a long copy is found. */
 const longCopyQuickStep = 16384
 
-func maxZopfliLen(params *encoderParams) uint {
-	if params.quality <= 10 {
+func maxZopfliLen(params *common.EncoderParams) uint {
+	if params.Quality <= 10 {
 		return maxZopfliLenQuality10
 	} else {
 		return maxZopfliLenQuality11
@@ -57,46 +61,46 @@ func maxZopfliLen(params *encoderParams) uint {
 }
 
 /* Number of best candidates to evaluate to expand Zopfli chain. */
-func maxZopfliCandidates(params *encoderParams) uint {
-	if params.quality <= 10 {
+func maxZopfliCandidates(params *common.EncoderParams) uint {
+	if params.Quality <= 10 {
 		return 1
 	} else {
 		return 5
 	}
 }
 
-func sanitizeParams(params *encoderParams) {
-	params.quality = brotli_min_int(maxQuality, brotli_max_int(minQuality, params.quality))
-	if params.quality <= maxQualityForStaticEntropyCodes {
-		params.large_window = false
+func sanitizeParams(params *common.EncoderParams) {
+	params.Quality = brotli_min_int(maxQuality, brotli_max_int(minQuality, params.Quality))
+	if params.Quality <= maxQualityForStaticEntropyCodes {
+		params.Large_window = false
 	}
 
-	if params.lgwin < minWindowBits {
-		params.lgwin = minWindowBits
+	if params.Lgwin < minWindowBits {
+		params.Lgwin = minWindowBits
 	} else {
 		var max_lgwin int
-		if params.large_window {
+		if params.Large_window {
 			max_lgwin = largeMaxWindowBits
 		} else {
 			max_lgwin = maxWindowBits
 		}
-		if params.lgwin > uint(max_lgwin) {
-			params.lgwin = uint(max_lgwin)
+		if params.Lgwin > uint(max_lgwin) {
+			params.Lgwin = uint(max_lgwin)
 		}
 	}
 }
 
 /* Returns optimized lg_block value. */
-func computeLgBlock(params *encoderParams) int {
-	var lgblock int = params.lgblock
-	if params.quality == fastOnePassCompressionQuality || params.quality == fastTwoPassCompressionQuality {
-		lgblock = int(params.lgwin)
-	} else if params.quality < minQualityForBlockSplit {
+func computeLgBlock(params *common.EncoderParams) int {
+	var lgblock int = params.Lgblock
+	if params.Quality == fastOnePassCompressionQuality || params.Quality == fastTwoPassCompressionQuality {
+		lgblock = int(params.Lgwin)
+	} else if params.Quality < minQualityForBlockSplit {
 		lgblock = 14
 	} else if lgblock == 0 {
 		lgblock = 16
-		if params.quality >= 9 && params.lgwin > uint(lgblock) {
-			lgblock = brotli_min_int(18, int(params.lgwin))
+		if params.Quality >= 9 && params.Lgwin > uint(lgblock) {
+			lgblock = brotli_min_int(18, int(params.Lgwin))
 		}
 	} else {
 		lgblock = brotli_min_int(maxInputBlockBits, brotli_max_int(minInputBlockBits, lgblock))
@@ -113,11 +117,11 @@ Returns log2 of the size of main ring buffer area.
 	read_block_size_bits + 1 bits because the copy tail length needs to be
 	smaller than ring-buffer size.
 */
-func computeRbBits(params *encoderParams) int {
-	return 1 + brotli_max_int(int(params.lgwin), params.lgblock)
+func computeRbBits(params *common.EncoderParams) int {
+	return 1 + brotli_max_int(int(params.Lgwin), params.Lgblock)
 }
 
-func maxMetablockSize(params *encoderParams) uint {
+func maxMetablockSize(params *common.EncoderParams) uint {
 	var bits int = brotli_min_int(computeRbBits(params), maxInputBlockBits)
 	return uint(1) << uint(bits)
 }
@@ -131,59 +135,59 @@ When searching for backward references and have not seen matches for a long
 	After 4x more literals stride by 16 bytes, every put 4-th byte to hasher.
 	Applied only to qualities 2 to 9.
 */
-func literalSpreeLengthForSparseSearch(params *encoderParams) uint {
-	if params.quality < 9 {
+func literalSpreeLengthForSparseSearch(params *common.EncoderParams) uint {
+	if params.Quality < 9 {
 		return 64
 	} else {
 		return 512
 	}
 }
 
-func chooseHasher(params *encoderParams, hparams *hasherParams) {
-	if params.quality > 9 {
+func chooseHasher(params *common.EncoderParams, hparams *hasherParams) {
+	if params.Quality > 9 {
 		hparams.type_ = 10
-	} else if params.quality == 4 && params.size_hint >= 1<<20 {
+	} else if params.Quality == 4 && params.Size_hint >= 1<<20 {
 		hparams.type_ = 54
-	} else if params.quality < 5 {
-		hparams.type_ = params.quality
-	} else if params.lgwin <= 16 {
-		if params.quality < 7 {
+	} else if params.Quality < 5 {
+		hparams.type_ = params.Quality
+	} else if params.Lgwin <= 16 {
+		if params.Quality < 7 {
 			hparams.type_ = 40
-		} else if params.quality < 9 {
+		} else if params.Quality < 9 {
 			hparams.type_ = 41
 		} else {
 			hparams.type_ = 42
 		}
-	} else if params.size_hint >= 1<<20 && params.lgwin >= 19 {
+	} else if params.Size_hint >= 1<<20 && params.Lgwin >= 19 {
 		hparams.type_ = 6
-		hparams.block_bits = params.quality - 1
+		hparams.block_bits = params.Quality - 1
 		hparams.bucket_bits = 15
 		hparams.hash_len = 5
-		if params.quality < 7 {
+		if params.Quality < 7 {
 			hparams.num_last_distances_to_check = 4
-		} else if params.quality < 9 {
+		} else if params.Quality < 9 {
 			hparams.num_last_distances_to_check = 10
 		} else {
 			hparams.num_last_distances_to_check = 16
 		}
 	} else {
 		hparams.type_ = 5
-		hparams.block_bits = params.quality - 1
-		if params.quality < 7 {
+		hparams.block_bits = params.Quality - 1
+		if params.Quality < 7 {
 			hparams.bucket_bits = 14
 		} else {
 			hparams.bucket_bits = 15
 		}
-		if params.quality < 7 {
+		if params.Quality < 7 {
 			hparams.num_last_distances_to_check = 4
-		} else if params.quality < 9 {
+		} else if params.Quality < 9 {
 			hparams.num_last_distances_to_check = 10
 		} else {
 			hparams.num_last_distances_to_check = 16
 		}
 	}
 
-	if params.lgwin > 24 {
+	if params.Lgwin > 24 {
 		/* Different hashers for large window brotli: not for qualities <= 2,
 		   these are too fast for large window. Not for qualities >= 10: their
 		   hasher already works well with large window. So the changes are:
