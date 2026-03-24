@@ -103,6 +103,23 @@ func GetCopyExtra(copycode uint16) uint32 {
 	return kCopyExtra[copycode]
 }
 
+type DistanceCode struct {
+	Code      int
+	NExtra    uint
+	ExtraBits uint64
+}
+
+func GetDistanceCode(distance int) DistanceCode {
+	d := distance + 3
+	nbits := common.Log2FloorNonZero(uint(d)) - 1
+	prefix := (d >> nbits) & 1
+	offset := (2 + prefix) << nbits
+	distcode := int(2*(nbits-1)) + prefix + 16
+	extra := d - offset
+	return DistanceCode{distcode, uint(nbits), uint64(extra)}
+}
+
+
 type Command struct {
 	Insert_len_  uint32
 	Copy_len_    uint32

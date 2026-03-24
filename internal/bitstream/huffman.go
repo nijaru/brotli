@@ -12,14 +12,14 @@ import (
 
 /* Utilities for building Huffman decoding tables. */
 
-const huffmanMaxCodeLength = 15
+const HuffmanMaxCodeLength = 15
 
 /*
 Maximum possible Huffman table size for an alphabet size of (index * 32),
 
 	max code length 15 and root table bits 8.
 */
-var kMaxHuffmanTableSize = []uint16{
+var KMaxHuffmanTableSize = []uint16{
 	256,
 	402,
 	436,
@@ -60,25 +60,25 @@ var kMaxHuffmanTableSize = []uint16{
 }
 
 /* BROTLI_NUM_BLOCK_LEN_SYMBOLS == 26 */
-const huffmanMaxSize26 = 396
+const HuffmanMaxSize26 = 396
 
 /* BROTLI_MAX_BLOCK_TYPE_SYMBOLS == 258 */
-const huffmanMaxSize258 = 632
+const HuffmanMaxSize258 = 632
 
 /* BROTLI_MAX_CONTEXT_MAP_SYMBOLS == 272 */
-const huffmanMaxSize272 = 646
+const HuffmanMaxSize272 = 646
 
-const huffmanMaxCodeLengthCodeLength = 5
+const HuffmanMaxCodeLengthCodeLength = 5
 
 type HuffmanCode struct {
 	Bits  byte
 	Value uint16
 }
 
-func ConstructHuffmanCode(bits byte, value uint16) HuffmanCode {
+func ConstructHuffmanCode(bits byte, Value uint16) HuffmanCode {
 	var h HuffmanCode
 	h.Bits = bits
-	h.Value = value
+	h.Value = Value
 	return h
 }
 
@@ -148,7 +148,7 @@ Returns the table width of the next 2nd level table. |count| is the histogram
 */
 func NextTableBitSize(count []uint16, len int, root_bits int) int {
 	var left int = 1 << uint(len-root_bits)
-	for len < huffmanMaxCodeLength {
+	for len < HuffmanMaxCodeLength {
 		left -= int(count[len])
 		if left <= 0 {
 			break
@@ -168,7 +168,7 @@ func BuildCodeLengthsHuffmanTable(table []HuffmanCode, code_lengths []byte, coun
 	var step int
 	var table_size int
 	var sorted [common.CodeLengthCodes]int
-	var offset [huffmanMaxCodeLengthCodeLength + 1]int
+	var offset [HuffmanMaxCodeLengthCodeLength + 1]int
 	var bits int
 	var bits_count int
 
@@ -177,7 +177,7 @@ func BuildCodeLengthsHuffmanTable(table []HuffmanCode, code_lengths []byte, coun
 
 	bits = 1
 	var i int
-	for i = 0; i < huffmanMaxCodeLengthCodeLength; i++ {
+	for i = 0; i < HuffmanMaxCodeLengthCodeLength; i++ {
 		symbol += int(count[bits])
 		offset[bits] = symbol
 		bits++
@@ -201,7 +201,7 @@ func BuildCodeLengthsHuffmanTable(table []HuffmanCode, code_lengths []byte, coun
 		}
 	}
 
-	table_size = 1 << huffmanMaxCodeLengthCodeLength
+	table_size = 1 << HuffmanMaxCodeLengthCodeLength
 
 	/* Special case: all symbols but one have 0 code length. */
 	if offset[0] == 0 {
@@ -231,7 +231,7 @@ func BuildCodeLengthsHuffmanTable(table []HuffmanCode, code_lengths []byte, coun
 		step <<= 1
 		key_step >>= 1
 		bits++
-		if bits > huffmanMaxCodeLengthCodeLength {
+		if bits > HuffmanMaxCodeLengthCodeLength {
 			break
 		}
 	}
@@ -257,7 +257,7 @@ func BuildHuffmanTable(root_table []HuffmanCode, root_bits int, symbol_lists Sym
 	for symbol_lists.Get(max_length) == 0xFFFF {
 		max_length--
 	}
-	max_length += huffmanMaxCodeLength + 1
+	max_length += HuffmanMaxCodeLength + 1
 
 	table = root_table
 	table_bits = root_bits
@@ -276,7 +276,7 @@ func BuildHuffmanTable(root_table []HuffmanCode, root_bits int, symbol_lists Sym
 	bits = 1
 	step = 2
 	for {
-		symbol = bits - (huffmanMaxCodeLength + 1)
+		symbol = bits - (HuffmanMaxCodeLength + 1)
 		for bits_count = int(count[bits]); bits_count != 0; bits_count-- {
 			symbol = int(symbol_lists.Get(symbol))
 			code = ConstructHuffmanCode(byte(bits), uint16(symbol))
@@ -306,7 +306,7 @@ func BuildHuffmanTable(root_table []HuffmanCode, root_bits int, symbol_lists Sym
 	len = root_bits + 1
 	step = 2
 	for ; len <= max_length; len++ {
-		symbol = len - (huffmanMaxCodeLength + 1)
+		symbol = len - (HuffmanMaxCodeLength + 1)
 		for ; count[len] != 0; count[len]-- {
 			if sub_key == reverseBitsLowest<<1 {
 				table = table[table_size:]

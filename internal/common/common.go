@@ -110,6 +110,48 @@ func Assert(cond bool) {
 	}
 }
 
+type PrefixCodeRange struct {
+	Offset uint32
+	Nbits  uint32
+}
+
+var KBlockLengthPrefixCode = [NumBlockLenSymbols]PrefixCodeRange{
+	PrefixCodeRange{1, 2},
+	PrefixCodeRange{5, 2},
+	PrefixCodeRange{9, 2},
+	PrefixCodeRange{13, 2},
+	PrefixCodeRange{17, 3},
+	PrefixCodeRange{25, 3},
+	PrefixCodeRange{33, 3},
+	PrefixCodeRange{41, 3},
+	PrefixCodeRange{49, 4},
+	PrefixCodeRange{65, 4},
+	PrefixCodeRange{81, 4},
+	PrefixCodeRange{97, 4},
+	PrefixCodeRange{113, 5},
+	PrefixCodeRange{145, 5},
+	PrefixCodeRange{177, 5},
+	PrefixCodeRange{209, 5},
+	PrefixCodeRange{241, 6},
+	PrefixCodeRange{305, 6},
+	PrefixCodeRange{369, 7},
+	PrefixCodeRange{497, 8},
+	PrefixCodeRange{753, 9},
+	PrefixCodeRange{1265, 10},
+	PrefixCodeRange{2289, 11},
+	PrefixCodeRange{4337, 12},
+	PrefixCodeRange{8433, 13},
+	PrefixCodeRange{16625, 24},
+}
+
+func BrotliMinFloat(a float32, b float32) float32 {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
 func BrotliMinSizeT(a uint, b uint) uint {
 	if a < b {
 		return a
