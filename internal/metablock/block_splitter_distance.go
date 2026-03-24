@@ -317,6 +317,8 @@ func clusterBlocksDistance(data []uint16, length uint, num_blocks uint, block_id
 	all_histograms = nil
 	common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, num_blocks)
 	common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, num_blocks)
+	split.Types = split.Types[:num_blocks]
+	split.Lengths = split.Lengths[:num_blocks]
 	{
 		var cur_length uint32 = 0
 		var block_idx uint = 0
@@ -353,6 +355,8 @@ func splitByteVectorDistance(data []uint16, length uint, distances_per_histogram
 	} else if length < kMinLengthForBlockSplitting {
 		common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, split.Num_blocks+1)
 		common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, split.Num_blocks+1)
+		split.Types = split.Types[:split.Num_blocks+1]
+		split.Lengths = split.Lengths[:split.Num_blocks+1]
 		split.Num_types = 1
 		split.Types[split.Num_blocks] = 0
 		split.Lengths[split.Num_blocks] = uint32(length)

@@ -46,6 +46,8 @@ func initBlockSplitterDistance(self *blockSplitterDistance, alphabet_size uint, 
 	self.merge_last_count_ = 0
 	common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, max_num_blocks)
 	common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, max_num_blocks)
+	split.Types = split.Types[:max_num_blocks]
+	split.Lengths = split.Lengths[:max_num_blocks]
 	self.split_.Num_blocks = max_num_blocks
 	*histograms_size = max_num_types
 	if histograms == nil || cap(*histograms) < int(*histograms_size) {

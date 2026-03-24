@@ -44,13 +44,14 @@ func initBlockSplitterCommand(self *blockSplitterCommand, alphabet_size uint, mi
 	self.block_size_ = 0
 	self.curr_histogram_ix_ = 0
 	self.merge_last_count_ = 0
-	
-	// Assuming these are moved to common or metablock. 
-	// For now, let's keep them as is or find them. 
+
+	// Assuming these are moved to common or metablock.
+	// For now, let's keep them as is or find them.
 	// They were in util.go usually.
 	common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, max_num_blocks)
 	common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, max_num_blocks)
-	
+	split.Types = split.Types[:max_num_blocks]
+	split.Lengths = split.Lengths[:max_num_blocks]
 	self.split_.Num_blocks = max_num_blocks
 	*histograms_size = max_num_types
 	if histograms == nil || cap(*histograms) < int(*histograms_size) {
@@ -71,7 +72,7 @@ func blockSplitterFinishBlockCommand(self *blockSplitterCommand, is_final bool) 
 	var split *BlockSplit = self.split_
 	var last_entropy []float64 = self.last_entropy_[:]
 	var histograms []common.HistogramCommand = self.histograms_
-	
+
 	if self.block_size_ < self.min_block_size_ {
 		self.block_size_ = self.min_block_size_
 	}
