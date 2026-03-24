@@ -143,7 +143,7 @@ func estimateBitCostsForLiteralsUTF8(pos uint, len uint, mask uint, data []byte,
 }
 
 func EstimateBitCostsForLiterals(pos uint, len uint, mask uint, data []byte, cost []float32) {
-	if IsMostlyUTF8(data, pos, mask, uint(len), kMinUTF8Ratio) {
+	if IsMostlyUTF8(data, pos, mask, uint(len), KMinUTF8Ratio) {
 		estimateBitCostsForLiteralsUTF8(pos, uint(len), mask, data, cost)
 		return
 	} else {

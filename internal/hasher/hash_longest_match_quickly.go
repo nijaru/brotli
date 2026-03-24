@@ -115,18 +115,18 @@ func (*hashLongestMatchQuickly) PrepareDistanceCache(distance_cache []int) {
    Does not look for matches further away than max_backward.
    Writes the best match into |out|.
    |out|->score is updated only if a better match is found. */
-func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *hasherSearchResult) {
-	var best_len_in uint = out.len
+func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *SearchResult) {
+	var best_len_in uint = out.Len
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var key uint32 = h.HashBytes(data[cur_ix_masked:])
 	var compare_char int = int(data[cur_ix_masked+best_len_in])
-	var min_score uint = out.score
-	var best_score uint = out.score
+	var min_score uint = out.Score
+	var best_score uint = out.Score
 	var best_len uint = best_len_in
 	var cached_backward uint = uint(distance_cache[0])
 	var prev_ix uint = cur_ix - cached_backward
 	var bucket []uint32
-	out.len_code_delta = 0
+	out.Len_code_delta = 0
 	if prev_ix < cur_ix {
 		prev_ix &= uint(uint32(ring_buffer_mask))
 		if compare_char == int(data[prev_ix+best_len]) {
@@ -136,9 +136,9 @@ func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDic
 				if best_score < score {
 					best_score = score
 					best_len = uint(len)
-					out.len = uint(len)
-					out.distance = cached_backward
-					out.score = best_score
+					out.Len = uint(len)
+					out.Distance = cached_backward
+					out.Score = best_score
 					compare_char = int(data[cur_ix_masked+best_len])
 					if h.bucketSweep == 1 {
 						h.buckets[key] = uint32(cur_ix)
@@ -171,9 +171,9 @@ func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDic
 		if len >= 4 {
 			var score uint = backwardReferenceScore(uint(len), backward)
 			if best_score < score {
-				out.len = uint(len)
-				out.distance = backward
-				out.score = score
+				out.Len = uint(len)
+				out.Distance = backward
+				out.Score = score
 				return
 			}
 		}
@@ -200,16 +200,16 @@ func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDic
 				if best_score < score {
 					best_score = score
 					best_len = uint(len)
-					out.len = best_len
-					out.distance = backward
-					out.score = score
+					out.Len = best_len
+					out.Distance = backward
+					out.Score = score
 					compare_char = int(data[cur_ix_masked+best_len])
 				}
 			}
 		}
 	}
 
-	if h.useDictionary && min_score == out.score {
+	if h.useDictionary && min_score == out.Score {
 		searchInStaticDictionary(dictionary, h, data[cur_ix_masked:], max_length, max_backward+gap, max_distance, out, true)
 	}
 

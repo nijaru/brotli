@@ -8,7 +8,7 @@ package context
 
 /* Heuristics for deciding about the UTF8-ness of strings. */
 
-const kMinUTF8Ratio float64 = 0.75
+const KMinUTF8Ratio float64 = 0.75
 
 /*
 Returns 1 if at least min_fraction of the bytes between pos and

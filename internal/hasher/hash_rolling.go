@@ -123,7 +123,7 @@ func (h *hashRolling) StitchToPreviousBlock(num_bytes uint, position uint, ringb
 func (*hashRolling) PrepareDistanceCache(distance_cache []int) {
 }
 
-func (h *hashRolling) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *hasherSearchResult) {
+func (h *hashRolling) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *SearchResult) {
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var pos uint = h.next_ix
 
@@ -154,13 +154,13 @@ func (h *hashRolling) FindLongestMatch(dictionary *common.EncoderDictionary, dat
 				if backward <= max_backward {
 					var found_ix_masked uint = found_ix & ring_buffer_mask
 					var len uint = common.FindMatchLengthWithLimit(data[found_ix_masked:], data[cur_ix_masked:], max_length)
-					if len >= 4 && len > out.len {
+					if len >= 4 && len > out.Len {
 						var score uint = backwardReferenceScore(uint(len), backward)
-						if score > out.score {
-							out.len = uint(len)
-							out.distance = backward
-							out.score = score
-							out.len_code_delta = 0
+						if score > out.Score {
+							out.Len = uint(len)
+							out.Distance = backward
+							out.Score = score
+							out.Len_code_delta = 0
 						}
 					}
 				}

@@ -27,7 +27,7 @@ func (*h5) StoreLookahead() uint {
 
 /* HashBytes is the function that chooses the bucket to place the address in. */
 func hashBytesH5(data []byte, shift int) uint32 {
-	var h uint32 = binary.LittleEndian.Uint32(data) * kHashMul32
+	var h uint32 = binary.LittleEndian.Uint32(data) * KHashMul32
 
 	/* The higher bits contain more mixture from the multiplication,
 	   so we take our results from there. */
@@ -114,19 +114,19 @@ func (h *h5) PrepareDistanceCache(distance_cache []int) {
    Does not look for matches further away than max_backward.
    Writes the best match into |out|.
    |out|->score is updated only if a better match is found. */
-func (h *h5) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *hasherSearchResult) {
+func (h *h5) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *SearchResult) {
 	var num []uint16 = h.num
 	var buckets []uint32 = h.buckets
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
-	var min_score uint = out.score
-	var best_score uint = out.score
-	var best_len uint = out.len
+	var min_score uint = out.Score
+	var best_score uint = out.Score
+	var best_len uint = out.Len
 	var i uint
 	var bucket []uint32
 	/* Don't accept a short copy from far away. */
-	out.len = 0
+	out.Len = 0
 
-	out.len_code_delta = 0
+	out.Len_code_delta = 0
 
 	/* Try last distance first. */
 	for i = 0; i < uint(h.params.Num_last_distances_to_check); i++ {
@@ -159,9 +159,9 @@ func (h *h5) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte,
 					if best_score < score {
 						best_score = score
 						best_len = uint(len)
-						out.len = best_len
-						out.distance = backward
-						out.score = best_score
+						out.Len = best_len
+						out.Distance = backward
+						out.Score = best_score
 					}
 				}
 			}
@@ -199,9 +199,9 @@ func (h *h5) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte,
 					if best_score < score {
 						best_score = score
 						best_len = uint(len)
-						out.len = best_len
-						out.distance = backward
-						out.score = best_score
+						out.Len = best_len
+						out.Distance = backward
+						out.Score = best_score
 					}
 				}
 			}
@@ -211,7 +211,7 @@ func (h *h5) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte,
 		num[key]++
 	}
 
-	if min_score == out.score {
+	if min_score == out.Score {
 		searchInStaticDictionary(dictionary, h, data[cur_ix_masked:], max_length, max_backward+gap, max_distance, out, false)
 	}
 }
