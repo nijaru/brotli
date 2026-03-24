@@ -468,9 +468,7 @@ func writeMetaBlockInternal(data []byte, mask uint, last_flush_pos uint64, bytes
 	assert(*storage_ix <= 14)
 	last_bytes = uint16(storage[1])<<8 | uint16(storage[0])
 	last_bytes_bits = byte(*storage_ix)
-	if params.Quality <= maxQualityForStaticEntropyCodes {
-		bitstream.StoreMetaBlockFast(data, uint(wrapped_last_flush_pos), bytes, mask, is_last, params, commands, storage_ix, storage)
-	} else if params.Quality < minQualityForBlockSplit {
+	if params.Quality < minQualityForBlockSplit {
 		bitstream.StoreMetaBlockTrivial(data, uint(wrapped_last_flush_pos), bytes, mask, is_last, params, commands, storage_ix, storage)
 	} else {
 		mb := metablock.GetMetaBlockSplit()
@@ -534,7 +532,7 @@ func chooseDistanceParams(params *common.EncoderParams) {
 		}
 	}
 
-metablock.InitDistanceParams(params, distance_postfix_bits, num_direct_distance_codes)
+	metablock.InitDistanceParams(params, distance_postfix_bits, num_direct_distance_codes)
 }
 
 func ensureInitialized(s *Writer) bool {
@@ -838,7 +836,8 @@ func encodeData(s *Writer, is_last bool, force_flush bool) bool {
 		}
 	}
 
-hasher.InitOrStitchToPreviousBlock(&s.hasher_, data, uint(mask), &s.params, uint(wrapped_last_processed_pos), uint(bytes), is_last)
+	chooseHasher(&s.params, &s.params.Hasher)
+	hasher.InitOrStitchToPreviousBlock(&s.hasher_, data, uint(mask), &s.params, uint(wrapped_last_processed_pos), uint(bytes), is_last)
 
 	literal_context_mode = chooseContextMode(&s.params, data, uint(wrapPosition(s.last_flush_pos_)), uint(mask), uint(s.input_pos_-s.last_flush_pos_))
 

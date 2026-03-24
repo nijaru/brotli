@@ -143,47 +143,47 @@ func literalSpreeLengthForSparseSearch(params *common.EncoderParams) uint {
 	}
 }
 
-func chooseHasher(params *common.EncoderParams, hparams *hasherParams) {
+func chooseHasher(params *common.EncoderParams, hparams *common.HasherParams) {
 	if params.Quality > 9 {
-		hparams.type_ = 10
+		hparams.Type_ = 10
 	} else if params.Quality == 4 && params.Size_hint >= 1<<20 {
-		hparams.type_ = 54
+		hparams.Type_ = 54
 	} else if params.Quality < 5 {
-		hparams.type_ = params.Quality
+		hparams.Type_ = params.Quality
 	} else if params.Lgwin <= 16 {
 		if params.Quality < 7 {
-			hparams.type_ = 40
+			hparams.Type_ = 40
 		} else if params.Quality < 9 {
-			hparams.type_ = 41
+			hparams.Type_ = 41
 		} else {
-			hparams.type_ = 42
+			hparams.Type_ = 42
 		}
 	} else if params.Size_hint >= 1<<20 && params.Lgwin >= 19 {
-		hparams.type_ = 6
-		hparams.block_bits = params.Quality - 1
-		hparams.bucket_bits = 15
-		hparams.hash_len = 5
+		hparams.Type_ = 6
+		hparams.Block_bits = params.Quality - 1
+		hparams.Bucket_bits = 15
+		hparams.Hash_len = 5
 		if params.Quality < 7 {
-			hparams.num_last_distances_to_check = 4
+			hparams.Num_last_distances_to_check = 4
 		} else if params.Quality < 9 {
-			hparams.num_last_distances_to_check = 10
+			hparams.Num_last_distances_to_check = 10
 		} else {
-			hparams.num_last_distances_to_check = 16
+			hparams.Num_last_distances_to_check = 16
 		}
 	} else {
-		hparams.type_ = 5
-		hparams.block_bits = params.Quality - 1
+		hparams.Type_ = 5
+		hparams.Block_bits = params.Quality - 1
 		if params.Quality < 7 {
-			hparams.bucket_bits = 14
+			hparams.Bucket_bits = 14
 		} else {
-			hparams.bucket_bits = 15
+			hparams.Bucket_bits = 15
 		}
 		if params.Quality < 7 {
-			hparams.num_last_distances_to_check = 4
+			hparams.Num_last_distances_to_check = 4
 		} else if params.Quality < 9 {
-			hparams.num_last_distances_to_check = 10
+			hparams.Num_last_distances_to_check = 10
 		} else {
-			hparams.num_last_distances_to_check = 16
+			hparams.Num_last_distances_to_check = 16
 		}
 	}
 
@@ -194,16 +194,16 @@ func chooseHasher(params *common.EncoderParams, hparams *hasherParams) {
 		   H3 --> H35: for quality 3.
 		   H54 --> H55: for quality 4 with size hint > 1MB
 		   H6 --> H65: for qualities 5, 6, 7, 8, 9. */
-		if hparams.type_ == 3 {
-			hparams.type_ = 35
+		if hparams.Type_ == 3 {
+			hparams.Type_ = 35
 		}
 
-		if hparams.type_ == 54 {
-			hparams.type_ = 55
+		if hparams.Type_ == 54 {
+			hparams.Type_ = 55
 		}
 
-		if hparams.type_ == 6 {
-			hparams.type_ = 65
+		if hparams.Type_ == 6 {
+			hparams.Type_ = 65
 		}
 	}
 }

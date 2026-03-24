@@ -1266,6 +1266,9 @@ func storeDataWithHuffmanCodes(input []byte, start_pos uint, mask uint, commands
 		pos += uint(metablock.CommandCopyLen(&cmd))
 		if metablock.CommandCopyLen(&cmd) != 0 && cmd.Cmd_prefix_ >= 128 {
 			var dist_code uint = uint(cmd.Dist_prefix_) & 0x3FF
+			if dist_code >= uint(len(dist_depth)) {
+				dist_code = uint(len(dist_depth)) - 1
+			}
 			var distnumextra uint32 = uint32(cmd.Dist_prefix_) >> 10
 			var distextra uint32 = cmd.Dist_extra_
 			WriteBits(uint(dist_depth[dist_code]), uint64(dist_bits[dist_code]), storage_ix, storage)
