@@ -505,6 +505,13 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 				   the maximum length is long enough, try only one maximum length. */
 				max_match_len = hasher.BackwardMatchLength(&match)
 
+				/* For dictionary matches, skip if the output length would exceed
+				   the remaining metablock space. The decoder uses the output length
+				   for metablock accounting, so overflows cannot be tolerated. */
+				if is_dictionary_match && max_match_len > max_len {
+					continue
+				}
+
 				if len < max_match_len && (is_dictionary_match || max_match_len > max_zopfli_len) {
 					len = max_match_len
 				}
@@ -567,11 +574,11 @@ func zopfliCreateCommands(num_bytes uint, block_start uint, nodes []zopfliNode, 
 			insert_length += *last_insert_len
 			*last_insert_len = 0
 		}
+		var distance uint = uint(zopfliNodeCopyDistance(next))
+		var len_code uint = uint(zopfliNodeLengthCode(next))
+		var max_distance uint = common.BrotliMinSizeT(block_start+pos, max_backward_limit)
+		var is_dictionary bool = (distance > max_distance+gap)
 		{
-			var distance uint = uint(zopfliNodeCopyDistance(next))
-			var len_code uint = uint(zopfliNodeLengthCode(next))
-			var max_distance uint = common.BrotliMinSizeT(block_start+pos, max_backward_limit)
-			var is_dictionary bool = (distance > max_distance+gap)
 			var dist_code uint = uint(zopfliNodeDistanceCode(next))
 			*commands = append(*commands, metablock.MakeCommand(&params.Dist, insert_length, copy_length, int(len_code)-int(copy_length), dist_code))
 
