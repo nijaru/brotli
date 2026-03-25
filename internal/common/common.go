@@ -240,14 +240,15 @@ func PrefixEncodeCopyDistance(distance_code uint, num_direct_distance_codes uint
 		*extra_bits = 0
 		return
 	} else {
-		var dist uint = (uint(1) << (distance_postfix_bits + 2)) + (distance_code - num_direct_distance_codes - NumDistanceShortCodes)
-		var nbits uint32 = Log2FloorNonZero(dist) - 1 - uint32(distance_postfix_bits)
-		var postfix_mask uint32 = (uint32(1) << distance_postfix_bits) - 1
-		var hcode uint32 = uint32(dist>>nbits) - 4
-		var lcode uint32 = uint32(dist) & postfix_mask
-		var offset uint32 = ((2 + (hcode & 1)) << nbits) - 4
-		*code = uint16(uint32(NumDistanceShortCodes) + uint32(num_direct_distance_codes) + ((hcode<<distance_postfix_bits)|lcode) + (nbits-1)<<(distance_postfix_bits+2))
-		*extra_bits = uint32(dist>>distance_postfix_bits) - offset
+		var dist uint = (uint(1) << (distance_postfix_bits + 2)) + (distance_code - NumDistanceShortCodes - num_direct_distance_codes)
+		var bucket uint = uint(Log2FloorNonZero(dist) - 1)
+		var postfix_mask uint = (uint(1) << distance_postfix_bits) - 1
+		var postfix uint = dist & postfix_mask
+		var prefix uint = (dist >> bucket) & 1
+		var offset uint = (2 + prefix) << bucket
+		var nbits uint = bucket - distance_postfix_bits
+		*code = uint16(nbits<<10 | (NumDistanceShortCodes + num_direct_distance_codes + ((2*(nbits-1) + prefix) << distance_postfix_bits) + postfix))
+		*extra_bits = uint32((dist - offset) >> distance_postfix_bits)
 		return
 	}
 }
