@@ -99,7 +99,7 @@ func testStaticDictionaryItem(dict *common.EncoderDictionary, item uint, data []
 	var score uint
 	len = item & 0x1F
 	word_idx = item >> 5
-	
+
 	words := dict.Words.(*dictionary.Dictionary)
 	offset = uint(words.Offsets_by_length[len]) + len*word_idx
 	if len > max_length {
@@ -163,18 +163,22 @@ func searchInStaticDictionary(dict *common.EncoderDictionary, handle Handle, dat
 }
 
 type BackwardMatch struct {
-	Distance uint32
-	Length   uint32
+	Distance        uint32
+	Length          uint32
 	distance        uint32
 	length_and_code uint32
 }
 
 func initBackwardMatch(self *BackwardMatch, dist uint, len uint) {
+	self.Distance = uint32(dist)
+	self.Length = uint32(len)
 	self.distance = uint32(dist)
 	self.length_and_code = uint32(len << 5)
 }
 
 func initDictionaryBackwardMatch(self *BackwardMatch, dist uint, len uint, len_code uint) {
+	self.Distance = uint32(dist)
+	self.Length = uint32(len)
 	self.distance = uint32(dist)
 	var tmp uint
 	if len == len_code {

@@ -482,7 +482,11 @@ func updateNodes(num_bytes uint, block_start uint, pos uint, ringbuffer []byte, 
 			for j = 0; j < num_matches; j++ {
 				var match hasher.BackwardMatch = matches[j]
 				var dist uint = uint(match.Distance)
-				var is_dictionary_match bool = (dist > max_distance+gap)
+				var dictionary_start uint = common.BrotliMinSizeT(block_start+pos, max_backward_limit)
+				var is_dictionary_match bool = (dist > dictionary_start+gap)
+				if is_dictionary_match && dist > params.Dist.Max_distance {
+					continue
+				}
 				var dist_code uint = dist + common.NumDistanceShortCodes - 1
 				var dist_symbol uint16
 				var distextra uint32
