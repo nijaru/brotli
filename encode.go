@@ -1197,7 +1197,7 @@ func encoderCompressStream(s *Writer, op int, available_in *uint, next_in *[]byt
 		   finished and there is no pending flush request. */
 		if s.stream_state_ == streamProcessing {
 			if remaining_block_size == 0 || op != int(operationProcess) {
-				var is_last bool = ((*available_in == 0) && op == int(operationFinish))
+				var is_last bool = ((*available_in == 0) && op == int(operationFinish) && unprocessedInputSize(s) == 0)
 				var force_flush bool = ((*available_in == 0) && op == int(operationFlush))
 				var result bool
 				updateSizeHint(s, *available_in)
