@@ -118,8 +118,8 @@ func initContextBlockSplitter(self *contextBlockSplitter, alphabet_size uint, nu
 
 	max_num_types = min(max_num_blocks, self.max_block_types_+1)
 
-	common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, max_num_blocks)
-	common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, max_num_blocks)
+	common.EnsureCapacity(&split.Types, &split.Types_alloc_size, max_num_blocks)
+	common.EnsureCapacity(&split.Lengths, &split.Lengths_alloc_size, max_num_blocks)
 	split.Types = split.Types[:max_num_blocks]
 	split.Lengths = split.Lengths[:max_num_blocks]
 	split.Num_blocks = max_num_blocks

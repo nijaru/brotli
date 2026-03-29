@@ -162,7 +162,7 @@ func FindMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
 	return matched
 }
 
-func BrotliEnsureCapacityUint8(s *[]byte, offset *uint, capacity uint) {
+func EnsureCapacity[T any](s *[]T, offset *uint, capacity uint) {
 	if *offset+capacity > uint(cap(*s)) {
 		var new_size uint = uint(cap(*s))
 		if new_size == 0 {
@@ -172,23 +172,7 @@ func BrotliEnsureCapacityUint8(s *[]byte, offset *uint, capacity uint) {
 				new_size *= 2
 			}
 		}
-		var new_s []byte = make([]byte, new_size)
-		copy(new_s, *s)
-		*s = new_s
-	}
-}
-
-func BrotliEnsureCapacityUint32(s *[]uint32, offset *uint, capacity uint) {
-	if *offset+capacity > uint(cap(*s)) {
-		var new_size uint = uint(cap(*s))
-		if new_size == 0 {
-			new_size = capacity
-		} else {
-			for new_size < *offset+capacity {
-				new_size *= 2
-			}
-		}
-		var new_s []uint32 = make([]uint32, new_size)
+		new_s := make([]T, new_size)
 		copy(new_s, *s)
 		*s = new_s
 	}

@@ -241,7 +241,7 @@ func clusterBlocksLiteral(data []byte, length uint, num_blocks uint, block_ids [
 			all_histograms_capacity = _new_size
 		}
 
-		common.BrotliEnsureCapacityUint32(&cluster_size, &cluster_size_size, num_new_clusters)
+		common.EnsureCapacity(&cluster_size, &cluster_size_size, num_new_clusters)
 		for j = 0; j < num_new_clusters; j++ {
 			all_histograms[all_histograms_size] = histograms[new_clusters[j]]
 			all_histograms_size++
@@ -316,8 +316,8 @@ func clusterBlocksLiteral(data []byte, length uint, num_blocks uint, block_ids [
 
 	clusters = nil
 	all_histograms = nil
-	common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, num_blocks)
-	common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, num_blocks)
+	common.EnsureCapacity(&split.Types, &split.Types_alloc_size, num_blocks)
+	common.EnsureCapacity(&split.Lengths, &split.Lengths_alloc_size, num_blocks)
 	split.Types = split.Types[:num_blocks]
 	split.Lengths = split.Lengths[:num_blocks]
 	{
@@ -354,8 +354,8 @@ func splitByteVectorLiteral(data []byte, length uint, literals_per_histogram uin
 		split.Num_types = 1
 		return
 	} else if length < kMinLengthForBlockSplitting {
-		common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, split.Num_blocks+1)
-		common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, split.Num_blocks+1)
+		common.EnsureCapacity(&split.Types, &split.Types_alloc_size, split.Num_blocks+1)
+		common.EnsureCapacity(&split.Lengths, &split.Lengths_alloc_size, split.Num_blocks+1)
 		split.Types = split.Types[:split.Num_blocks+1]
 		split.Lengths = split.Lengths[:split.Num_blocks+1]
 		split.Num_types = 1
