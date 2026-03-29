@@ -197,9 +197,7 @@ func getHashTable(s *Writer, quality int, input_size uint, table_size *uint) []i
 	}
 
 	*table_size = htsize
-	for i := 0; i < int(htsize); i++ {
-		table[i] = 0
-	}
+	clear(table[:htsize])
 	return table
 }
 
@@ -700,9 +698,7 @@ func copyInputToRingBuffer(s *Writer, input_size uint, input_buffer []byte) {
 		   memory. Due to performance reasons, hashing reads data using a
 		   LOAD64, which can go 7 bytes beyond the bytes written in the
 		   ring-buffer. */
-		for i := 0; i < int(7); i++ {
-			ringbuffer_.Buffer_[ringbuffer_.Pos_:][i] = 0
-		}
+		clear(ringbuffer_.Buffer_[ringbuffer_.Pos_:][:7])
 	}
 }
 

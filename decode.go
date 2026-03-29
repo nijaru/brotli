@@ -1011,9 +1011,7 @@ func decodeContextMap(context_map_size uint32, num_htrees *uint32, context_map_a
 		}
 
 		if *num_htrees <= 1 {
-			for i := 0; i < int(context_map_size); i++ {
-				(*context_map_arg)[i] = 0
-			}
+			clear((*context_map_arg)[:context_map_size])
 			return decoderSuccess
 		}
 
