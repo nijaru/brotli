@@ -70,7 +70,7 @@ func maxZopfliCandidates(params *common.EncoderParams) uint {
 }
 
 func sanitizeParams(params *common.EncoderParams) {
-	params.Quality = brotli_min_int(maxQuality, brotli_max_int(minQuality, params.Quality))
+	params.Quality = min(maxQuality, max(minQuality, params.Quality))
 	if params.Quality <= maxQualityForStaticEntropyCodes {
 		params.Large_window = false
 	}
@@ -100,10 +100,10 @@ func computeLgBlock(params *common.EncoderParams) int {
 	} else if lgblock == 0 {
 		lgblock = 16
 		if params.Quality >= 9 && params.Lgwin > uint(lgblock) {
-			lgblock = brotli_min_int(18, int(params.Lgwin))
+			lgblock = min(18, int(params.Lgwin))
 		}
 	} else {
-		lgblock = brotli_min_int(maxInputBlockBits, brotli_max_int(minInputBlockBits, lgblock))
+		lgblock = min(maxInputBlockBits, max(minInputBlockBits, lgblock))
 	}
 
 	return lgblock
@@ -118,11 +118,11 @@ Returns log2 of the size of main ring buffer area.
 	smaller than ring-buffer size.
 */
 func computeRbBits(params *common.EncoderParams) int {
-	return 1 + brotli_max_int(int(params.Lgwin), params.Lgblock)
+	return 1 + max(int(params.Lgwin), params.Lgblock)
 }
 
 func maxMetablockSize(params *common.EncoderParams) uint {
-	var bits int = brotli_min_int(computeRbBits(params), maxInputBlockBits)
+	var bits int = min(computeRbBits(params), maxInputBlockBits)
 	return uint(1) << uint(bits)
 }
 

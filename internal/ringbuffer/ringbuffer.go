@@ -36,8 +36,11 @@ func RingBufferSetup(params *common.EncoderParams, rb *RingBuffer) {
 
 const kSlackForEightByteHashingEverywhere uint = 7
 
-/* Allocates or re-allocates data_ to the given length + plus some slack
-   region before and after. Fills the slack regions with zeros. */
+/*
+Allocates or re-allocates data_ to the given length + plus some slack
+
+	region before and after. Fills the slack regions with zeros.
+*/
 func RingBufferInitBuffer(buflen uint32, rb *RingBuffer) {
 	var new_data []byte
 	var i uint
@@ -66,7 +69,7 @@ func RingBufferWriteTail(bytes []byte, n uint, rb *RingBuffer) {
 	if uint32(masked_pos) < rb.Tail_size_ {
 		/* Just fill the tail buffer with the beginning data. */
 		var p uint = uint(rb.Size_ + uint32(masked_pos))
-		copy(rb.Buffer_[p:], bytes[:common.BrotliMinSizeT(n, uint(rb.Tail_size_-uint32(masked_pos)))])
+		copy(rb.Buffer_[p:], bytes[:min(n, uint(rb.Tail_size_-uint32(masked_pos)))])
 	}
 }
 
@@ -109,7 +112,7 @@ func RingBufferWrite(bytes []byte, n uint, rb *RingBuffer) {
 		} else {
 			/* Split into two writes.
 			   Copy into the end of the buffer, including the tail buffer. */
-			copy(rb.Buffer_[masked_pos:], bytes[:common.BrotliMinSizeT(n, uint(rb.Total_size_-uint32(masked_pos)))])
+			copy(rb.Buffer_[masked_pos:], bytes[:min(n, uint(rb.Total_size_-uint32(masked_pos)))])
 
 			/* Copy into the beginning of the buffer */
 			copy(rb.Buffer_, bytes[rb.Size_-uint32(masked_pos):][:uint32(n)-(rb.Size_-uint32(masked_pos))])

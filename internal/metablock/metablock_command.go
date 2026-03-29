@@ -30,7 +30,7 @@ type blockSplitterCommand struct {
 
 func initBlockSplitterCommand(self *blockSplitterCommand, alphabet_size uint, min_block_size uint, split_threshold float64, num_symbols uint, split *BlockSplit, histograms *[]common.HistogramCommand, histograms_size *uint) {
 	var max_num_blocks uint = num_symbols/min_block_size + 1
-	var max_num_types uint = common.BrotliMinSizeT(max_num_blocks, common.MaxNumberOfBlockTypes+1)
+	var max_num_types uint = min(max_num_blocks, common.MaxNumberOfBlockTypes+1)
 	/* We have to allocate one more histogram than the maximum number of block
 	   types for the current histogram when the meta-block is too big. */
 	self.alphabet_size_ = alphabet_size

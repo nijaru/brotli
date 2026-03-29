@@ -782,7 +782,7 @@ func runLengthCodeZeros(in_size uint, v []uint32, out_size *uint, max_run_length
 			reps++
 		}
 
-		max_reps = common.BrotliMaxUint32T(reps, max_reps)
+		max_reps = max(reps, max_reps)
 	}
 
 	if max_reps > 0 {
@@ -790,7 +790,7 @@ func runLengthCodeZeros(in_size uint, v []uint32, out_size *uint, max_run_length
 	} else {
 		max_prefix = 0
 	}
-	max_prefix = common.BrotliMinUint32T(max_prefix, *max_run_length_prefix)
+	max_prefix = min(max_prefix, *max_run_length_prefix)
 	*max_run_length_prefix = max_prefix
 	*out_size = 0
 	for i = 0; i < in_size; {

@@ -554,7 +554,7 @@ func ensureInitialized(s *Writer) bool {
 	{
 		var lgwin int = int(s.params.Lgwin)
 		if s.params.Quality == fastOnePassCompressionQuality || s.params.Quality == fastTwoPassCompressionQuality {
-			lgwin = brotli_max_int(lgwin, 18)
+			lgwin = max(lgwin, 18)
 		}
 
 		encodeWindowBits(lgwin, s.params.Large_window, &s.last_bytes_, &s.last_bytes_bits_)
@@ -991,7 +991,7 @@ func checkFlushComplete(s *Writer) {
 
 func encoderCompressStreamFast(s *Writer, op int, available_in *uint, next_in *[]byte) bool {
 	var block_size_limit uint = uint(1) << s.params.Lgwin
-	var buf_size uint = common.BrotliMinSizeT(kCompressFragmentTwoPassBlockSize, common.BrotliMinSizeT(*available_in, block_size_limit))
+	var buf_size uint = min(kCompressFragmentTwoPassBlockSize, min(*available_in, block_size_limit))
 	var command_buf []uint32 = nil
 	var literal_buf []byte = nil
 	if s.params.Quality != fastOnePassCompressionQuality && s.params.Quality != fastTwoPassCompressionQuality {
@@ -1021,7 +1021,7 @@ func encoderCompressStreamFast(s *Writer, op int, available_in *uint, next_in *[
 		   finished, there is no pending flush request, and there is either
 		   additional input or pending operation. */
 		if s.stream_state_ == streamProcessing && (*available_in != 0 || op != int(operationProcess)) {
-			var block_size uint = common.BrotliMinSizeT(block_size_limit, *available_in)
+			var block_size uint = min(block_size_limit, *available_in)
 			var is_last bool = (*available_in == block_size) && (op == int(operationFinish))
 			var force_flush bool = (*available_in == block_size) && (op == int(operationFlush))
 			var max_out_size uint = 2*block_size + 503
@@ -1115,7 +1115,7 @@ func processMetadata(s *Writer, available_in *uint, next_in *[]byte) bool {
 			}
 
 			/* This guarantees progress in "TakeOutput" workflow. */
-			var c uint32 = common.BrotliMinUint32T(s.remaining_metadata_bytes_, 16)
+			var c uint32 = min(s.remaining_metadata_bytes_, 16)
 			copy(s.tiny_buf_.u8[:], (*next_in)[:c])
 			*next_in = (*next_in)[c:]
 			*available_in -= uint(c)
@@ -1181,7 +1181,7 @@ func encoderCompressStream(s *Writer, op int, available_in *uint, next_in *[]byt
 		var remaining_block_size uint = remainingInputBlockSize(s)
 
 		if remaining_block_size != 0 && *available_in != 0 {
-			var copy_input_size uint = common.BrotliMinSizeT(remaining_block_size, *available_in)
+			var copy_input_size uint = min(remaining_block_size, *available_in)
 			copyInputToRingBuffer(s, copy_input_size, *next_in)
 			*next_in = (*next_in)[copy_input_size:]
 			*available_in -= copy_input_size

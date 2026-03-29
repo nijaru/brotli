@@ -1,8 +1,8 @@
 package bitstream
 
 import (
-	"math"
 	"github.com/nijaru/brotli/internal/common"
+	"math"
 )
 
 /* Copyright 2010 Google Inc. All Rights Reserved.
@@ -127,10 +127,7 @@ func CreateHuffmanTree(data []uint32, length uint, tree_limit int, tree []Huffma
 		for i = length; i != 0; {
 			i--
 			if data[i] != 0 {
-				var count uint32 = common.BrotliMinUint32T(data[i], count_limit) // Wait, it was max in original? 
-				// Let's check original. 
-				// var count uint32 = common.BrotliMaxUint32T(data[i], count_limit)
-				// My bad, let me use a local max if not in common.
+				var count uint32 = min(data[i], count_limit)
 				if data[i] > count_limit {
 					count = data[i]
 				} else {

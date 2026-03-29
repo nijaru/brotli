@@ -144,46 +144,6 @@ var KBlockLengthPrefixCode = [NumBlockLenSymbols]PrefixCodeRange{
 	PrefixCodeRange{16625, 24},
 }
 
-func BrotliMinFloat(a float32, b float32) float32 {
-	if a < b {
-		return a
-	} else {
-		return b
-	}
-}
-
-func BrotliMinSizeT(a uint, b uint) uint {
-	if a < b {
-		return a
-	} else {
-		return b
-	}
-}
-
-func BrotliMaxSizeT(a uint, b uint) uint {
-	if a > b {
-		return a
-	} else {
-		return b
-	}
-}
-
-func BrotliMinUint32T(a uint32, b uint32) uint32 {
-	if a < b {
-		return a
-	} else {
-		return b
-	}
-}
-
-func BrotliMaxUint32T(a uint32, b uint32) uint32 {
-	if a > b {
-		return a
-	} else {
-		return b
-	}
-}
-
 func ComputeRbBits(params *EncoderParams) int {
 	window_bits := int(params.Lgwin)
 	if params.Large_window && window_bits > 24 {

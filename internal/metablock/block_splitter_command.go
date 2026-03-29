@@ -180,7 +180,7 @@ func clusterBlocksCommand(data []uint16, length uint, num_blocks uint, block_ids
 	var cluster_size_capacity uint = expected_num_clusters
 	var cluster_size []uint32 = make([]uint32, cluster_size_capacity)
 	var num_clusters uint = 0
-	var histograms []common.HistogramCommand = make([]common.HistogramCommand, common.BrotliMinSizeT(num_blocks, histogramsPerBatch))
+	var histograms []common.HistogramCommand = make([]common.HistogramCommand, min(num_blocks, histogramsPerBatch))
 	var max_num_pairs uint = histogramsPerBatch * histogramsPerBatch / 2
 	var pairs_capacity uint = max_num_pairs + 1
 	var pairs []HistogramPair = make([]HistogramPair, pairs_capacity)
@@ -208,7 +208,7 @@ func clusterBlocksCommand(data []uint16, length uint, num_blocks uint, block_ids
 	}
 
 	for i = 0; i < num_blocks; i += histogramsPerBatch {
-		var num_to_combine uint = common.BrotliMinSizeT(num_blocks-i, histogramsPerBatch)
+		var num_to_combine uint = min(num_blocks-i, histogramsPerBatch)
 		var num_new_clusters uint
 		var j uint
 		for j = 0; j < num_to_combine; j++ {
@@ -258,7 +258,7 @@ func clusterBlocksCommand(data []uint16, length uint, num_blocks uint, block_ids
 
 	histograms = nil
 
-	max_num_pairs = common.BrotliMinSizeT(64*num_clusters, (num_clusters/2)*num_clusters)
+	max_num_pairs = min(64*num_clusters, (num_clusters/2)*num_clusters)
 	if pairs_capacity < max_num_pairs+1 {
 		pairs = make([]HistogramPair, (max_num_pairs + 1))
 	}

@@ -30,7 +30,7 @@ type blockSplitterDistance struct {
 
 func initBlockSplitterDistance(self *blockSplitterDistance, alphabet_size uint, min_block_size uint, split_threshold float64, num_symbols uint, split *BlockSplit, histograms *[]common.HistogramDistance, histograms_size *uint) {
 	var max_num_blocks uint = num_symbols/min_block_size + 1
-	var max_num_types uint = common.BrotliMinSizeT(max_num_blocks, common.MaxNumberOfBlockTypes+1)
+	var max_num_types uint = min(max_num_blocks, common.MaxNumberOfBlockTypes+1)
 	/* We have to allocate one more histogram than the maximum number of block
 	   types for the current histogram when the meta-block is too big. */
 	self.alphabet_size_ = alphabet_size
@@ -68,7 +68,7 @@ func blockSplitterFinishBlockDistance(self *blockSplitterDistance, is_final bool
 	var split *BlockSplit = self.split_
 	var last_entropy []float64 = self.last_entropy_[:]
 	var histograms []common.HistogramDistance = self.histograms_
-	self.block_size_ = common.BrotliMaxSizeT(self.block_size_, self.min_block_size_)
+	self.block_size_ = max(self.block_size_, self.min_block_size_)
 	if self.num_blocks_ == 0 {
 		/* Create first block. */
 		split.Lengths[0] = uint32(self.block_size_)

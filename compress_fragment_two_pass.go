@@ -259,7 +259,7 @@ func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr 
 	   previous copy. Bytes between "next_emit" and the start of the next copy or
 	   the end of the input will be emitted as literal bytes. */
 	if block_size >= kInputMarginBytes {
-		var len_limit uint = common.BrotliMinSizeT(block_size-min_match, input_size-kInputMarginBytes)
+		var len_limit uint = min(block_size-min_match, input_size-kInputMarginBytes)
 		var ip_limit int = int(len_limit)
 		/* For the last block, we need to keep a 16 bytes margin so that we can be
 		   sure that all distances are at most window size - 16.
@@ -570,7 +570,7 @@ func compressFragmentTwoPassImpl(input []byte, input_size uint, is_last bool, co
 	var base_ip []byte = input
 
 	for input_size > 0 {
-		var block_size uint = common.BrotliMinSizeT(input_size, kCompressFragmentTwoPassBlockSize)
+		var block_size uint = min(input_size, kCompressFragmentTwoPassBlockSize)
 		var commands []uint32 = command_buf
 		var literals []byte = literal_buf
 		var num_literals uint

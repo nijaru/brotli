@@ -83,7 +83,7 @@ Stores the hash of the next 4 bytes and in a single tree-traversal, the
 */
 func storeAndFindMatchesH10(self *H10, data []byte, cur_ix uint, ring_buffer_mask uint, max_length uint, max_backward uint, best_len *uint, matches []BackwardMatch) []BackwardMatch {
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
-	var max_comp_len uint = common.BrotliMinSizeT(max_length, 128)
+	var max_comp_len uint = min(max_length, 128)
 	var should_reroot_tree bool = (max_length >= 128)
 	var key uint32 = hashBytesH10(data[cur_ix_masked:])
 	var forest []uint32 = self.forest
@@ -110,7 +110,7 @@ func storeAndFindMatchesH10(self *H10, data []byte, cur_ix uint, ring_buffer_mas
 			break
 		}
 		{
-			var cur_len uint = common.BrotliMinSizeT(best_len_left, best_len_right)
+			var cur_len uint = min(best_len_left, best_len_right)
 			var len uint
 			len = cur_len + common.FindMatchLengthWithLimit(data[cur_ix_masked+cur_len:], data[prev_ix_masked+cur_len:], max_length-cur_len)
 			if matches != nil && len > *best_len {
@@ -211,7 +211,7 @@ func FindAllMatchesH10(handle *H10, dict *common.EncoderDictionary, data []byte,
 			minlen = 4
 		}
 		if dictionary.FindAllStaticDictionaryMatches(params, data[cur_ix_masked:], minlen, max_length, dict_matches[0:]) {
-			var maxlen uint = common.BrotliMinSizeT(dictionary.MaxStaticDictionaryMatchLen, max_length)
+			var maxlen uint = min(dictionary.MaxStaticDictionaryMatchLen, max_length)
 			var l uint
 			for l = minlen; l <= maxlen; l++ {
 				var dict_id uint32 = dict_matches[l]
@@ -262,7 +262,7 @@ func (h *H10) StoreRange(data []byte, mask uint, ix_start uint, ix_end uint) {
 func (h *H10) StitchToPreviousBlock(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint) {
 	if num_bytes >= h.HashTypeLength()-1 && position >= 128 {
 		var i_start uint = position - 128 + 1
-		var i_end uint = common.BrotliMinSizeT(position, i_start+num_bytes)
+		var i_end uint = min(position, i_start+num_bytes)
 		/* Store the last `128 - 1` positions in the hasher.
 		   These could not be calculated before, since they require knowledge
 		   of both the previous and the current block. */

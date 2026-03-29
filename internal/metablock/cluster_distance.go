@@ -285,7 +285,7 @@ func ClusterHistogramsDistance(in []common.HistogramDistance, in_size uint, max_
 	}
 
 	for i = 0; i < in_size; i += max_input_histograms {
-		var num_to_combine uint = common.BrotliMinSizeT(in_size-i, max_input_histograms)
+		var num_to_combine uint = min(in_size-i, max_input_histograms)
 		var num_new_clusters uint
 		var j uint
 		for j = 0; j < num_to_combine; j++ {
@@ -298,7 +298,7 @@ func ClusterHistogramsDistance(in []common.HistogramDistance, in_size uint, max_
 	{
 		/* For the second pass, we limit the total number of histogram pairs.
 		   After this limit is reached, we only keep searching for the best pair. */
-		var max_num_pairs uint = common.BrotliMinSizeT(64*num_clusters, (num_clusters/2)*num_clusters)
+		var max_num_pairs uint = min(64*num_clusters, (num_clusters/2)*num_clusters)
 		if pairs_capacity < (max_num_pairs + 1) {
 			var _new_size uint
 			if pairs_capacity == 0 {

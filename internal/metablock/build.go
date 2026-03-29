@@ -116,7 +116,7 @@ func initContextBlockSplitter(self *contextBlockSplitter, alphabet_size uint, nu
 	self.curr_histogram_ix_ = 0
 	self.merge_last_count_ = 0
 
-	max_num_types = common.BrotliMinSizeT(max_num_blocks, self.max_block_types_+1)
+	max_num_types = min(max_num_blocks, self.max_block_types_+1)
 
 	common.BrotliEnsureCapacityUint8(&split.Types, &split.Types_alloc_size, max_num_blocks)
 	common.BrotliEnsureCapacityUint32(&split.Lengths, &split.Lengths_alloc_size, max_num_blocks)

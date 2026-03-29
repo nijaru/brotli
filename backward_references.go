@@ -73,7 +73,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 
 	for position+handle.HashTypeLength() < pos_end {
 		var max_length uint = pos_end - position
-		var max_distance uint = common.BrotliMinSizeT(position, max_backward_limit)
+		var max_distance uint = min(position, max_backward_limit)
 		sr.Len = 0
 		sr.Len_code_delta = 0
 		sr.Distance = 0
@@ -86,14 +86,14 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 			for ; ; max_length-- {
 				var cost_diff_lazy uint = 175
 				if params.Quality < minQualityForExtensiveReferenceSearch {
-					sr2.Len = common.BrotliMinSizeT(sr.Len-1, max_length)
+					sr2.Len = min(sr.Len-1, max_length)
 				} else {
 					sr2.Len = 0
 				}
 				sr2.Len_code_delta = 0
 				sr2.Distance = 0
 				sr2.Score = kMinScore
-				max_distance = common.BrotliMinSizeT(position+1, max_backward_limit)
+				max_distance = min(position+1, max_backward_limit)
 				handle.FindLongestMatch(&params.Dictionary, ringbuffer, ringbuffer_mask, dist_cache, position+1, max_length, max_distance, gap, params.Dist.Max_distance, sr2)
 				if sr2.Score >= sr.Score+cost_diff_lazy {
 					/* Ok, let's just write one byte for now and start a match from the
@@ -112,7 +112,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 			}
 
 			apply_random_heuristics = position + 2*sr.Len + random_heuristics_window_size
-			max_distance = common.BrotliMinSizeT(position, max_backward_limit)
+			max_distance = min(position, max_backward_limit)
 			{
 				/* The first 16 codes are special short-codes,
 				   and the minimum offset is 1. */
@@ -136,9 +136,9 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 			   Avoid hash poisoning with RLE data. */
 			{
 				var range_start uint = position + 2
-				var range_end uint = common.BrotliMinSizeT(position+sr.Len, store_end)
+				var range_end uint = min(position+sr.Len, store_end)
 				if sr.Distance < sr.Len>>2 {
-					range_start = common.BrotliMinSizeT(range_end, common.BrotliMaxSizeT(range_start, position+sr.Len-(sr.Distance<<2)))
+					range_start = min(range_end, max(range_start, position+sr.Len-(sr.Distance<<2)))
 				}
 
 				handle.StoreRange(ringbuffer, ringbuffer_mask, range_start, range_end)
@@ -156,7 +156,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 			if position > apply_random_heuristics {
 				/* Going through uncompressible data, jump. */
 				if position > apply_random_heuristics+4*random_heuristics_window_size {
-					var kMargin uint = common.BrotliMaxSizeT(handle.StoreLookahead()-1, 4)
+					var kMargin uint = max(handle.StoreLookahead()-1, 4)
 					/* It is quite a long time since we saw a copy, so we assume
 					   that this data is not compressible, and store hashes less
 					   often. Hashes of non compressible data are less likely to
@@ -164,14 +164,14 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 					   them to not to flood out the hash table of good compressible
 					   data. */
 
-					var pos_jump uint = common.BrotliMinSizeT(position+16, pos_end-kMargin)
+					var pos_jump uint = min(position+16, pos_end-kMargin)
 					for ; position < pos_jump; position += 4 {
 						handle.Store(ringbuffer, ringbuffer_mask, position)
 						insert_length += 4
 					}
 				} else {
-					var kMargin uint = common.BrotliMaxSizeT(handle.StoreLookahead()-1, 2)
-					var pos_jump uint = common.BrotliMinSizeT(position+8, pos_end-kMargin)
+					var kMargin uint = max(handle.StoreLookahead()-1, 2)
+					var pos_jump uint = min(position+8, pos_end-kMargin)
 					for ; position < pos_jump; position += 2 {
 						handle.Store(ringbuffer, ringbuffer_mask, position)
 						insert_length += 2

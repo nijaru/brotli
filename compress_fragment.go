@@ -53,7 +53,7 @@ func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_
 	}
 	for i = 0; i < 256; i++ {
 		if histogram[i] != 0 {
-			var adjust uint32 = 1 + 2*common.BrotliMinUint32T(histogram[i], 11)
+			var adjust uint32 = 1 + 2*min(histogram[i], 11)
 			histogram[i] += adjust
 			histogram_total += uint(adjust)
 		}
@@ -97,7 +97,7 @@ func buildAndStoreLiteralPrefixCode(input []byte, input_size uint, depths []byte
 		for i = 0; i < 256; i++ {
 			/* We weigh the first 11 samples with weight 3 to account for the
 			   balancing effect of the LZ77 phase on the histogram. */
-			var adjust uint32 = 2 * common.BrotliMinUint32T(histogram[i], 11)
+			var adjust uint32 = 2 * min(histogram[i], 11)
 			histogram[i] += adjust
 			histogram_total += uint(adjust)
 		}
@@ -114,7 +114,7 @@ func buildAndStoreLiteralPrefixCode(input []byte, input_size uint, depths []byte
 			   weigh the first 11 samples with weight 3 to account for the balancing
 			   effect of the LZ77 phase on the histogram (more frequent symbols are
 			   more likely to be in backward references instead as literals). */
-			var adjust uint32 = 1 + 2*common.BrotliMinUint32T(histogram[i], 11)
+			var adjust uint32 = 1 + 2*min(histogram[i], 11)
 			histogram[i] += adjust
 			histogram_total += uint(adjust)
 		}
@@ -340,7 +340,7 @@ func updateBits(n_bits uint, bits uint32, pos uint, array []byte) {
 	for n_bits > 0 {
 		var byte_pos uint = pos >> 3
 		var n_unchanged_bits uint = pos & 7
-		var n_changed_bits uint = common.BrotliMinSizeT(n_bits, 8-n_unchanged_bits)
+		var n_changed_bits uint = min(n_bits, 8-n_unchanged_bits)
 		var total_bits uint = n_unchanged_bits + n_changed_bits
 		var mask uint32 = (^((1 << total_bits) - 1)) | ((1 << n_unchanged_bits) - 1)
 		var unchanged_bits uint32 = uint32(array[byte_pos]) & mask
@@ -540,7 +540,7 @@ func compressFragmentFastImpl(in []byte, input_size uint, is_last bool, table []
 	const kInputMarginBytes uint = common.WindowGap
 	const kMinMatchLen uint = 5
 	var metablock_start int = input
-	var block_size uint = common.BrotliMinSizeT(input_size, compressFragmentFastImpl_kFirstBlockSize)
+	var block_size uint = min(input_size, compressFragmentFastImpl_kFirstBlockSize)
 	var total_block_size uint = block_size
 	var mlen_storage_ix uint = *storage_ix + 3
 	var lit_depth [256]byte
@@ -589,7 +589,7 @@ emit_commands:
 	ip_end = int(uint(input) + block_size)
 
 	if block_size >= kInputMarginBytes {
-		var len_limit uint = common.BrotliMinSizeT(block_size-kMinMatchLen, input_size-kInputMarginBytes)
+		var len_limit uint = min(block_size-kMinMatchLen, input_size-kInputMarginBytes)
 		var ip_limit int = int(uint(input) + len_limit)
 		/* For the last block, we need to keep a 16 bytes margin so that we can be
 		   sure that all distances are at most window size - 16.
@@ -763,7 +763,7 @@ emit_remainder:
 	assert(next_emit <= ip_end)
 	input += int(block_size)
 	input_size -= block_size
-	block_size = common.BrotliMinSizeT(input_size, compressFragmentFastImpl_kMergeBlockSize)
+	block_size = min(input_size, compressFragmentFastImpl_kMergeBlockSize)
 
 	/* Decide if we want to continue this meta-block instead of emitting the
 	   last insert-only command. */
@@ -800,7 +800,7 @@ emit_remainder:
 next_block:
 	if input_size > 0 {
 		metablock_start = input
-		block_size = common.BrotliMinSizeT(input_size, compressFragmentFastImpl_kFirstBlockSize)
+		block_size = min(input_size, compressFragmentFastImpl_kFirstBlockSize)
 		total_block_size = block_size
 
 		/* Save the bit position of the MLEN field of the meta-block header, so that

@@ -29,7 +29,7 @@ func hash(data []byte) uint32 {
 }
 
 func addMatch(distance uint, len uint, len_code uint, matches []uint32) {
-	var match uint32 = uint32(distance << 5) + uint32(len_code)
+	var match uint32 = uint32(distance<<5) + uint32(len_code)
 	if match < matches[len] {
 		matches[len] = match
 	}
@@ -37,7 +37,7 @@ func addMatch(distance uint, len uint, len_code uint, matches []uint32) {
 
 func dictMatchLength(dict *Dictionary, data []byte, id uint, len uint, maxlen uint) uint {
 	var offset uint = uint(dict.Offsets_by_length[len]) + len*id
-	return common.FindMatchLengthWithLimit(dict.Data[offset:], data, common.BrotliMinSizeT(uint(len), maxlen))
+	return common.FindMatchLengthWithLimit(dict.Data[offset:], data, min(uint(len), maxlen))
 }
 
 func isMatch(d *Dictionary, w DictWord, data []byte, max_length uint) bool {
@@ -665,4 +665,3 @@ func FindAllStaticDictionaryMatches(dict *common.EncoderParams, data []byte, min
 
 	return has_found_match
 }
-
