@@ -31,11 +31,11 @@ type Handle interface {
 	Store(data []byte, mask uint, ix uint)
 }
 
-const kCutoffTransformsCount uint32 = 10
+const KCutoffTransformsCount uint32 = 10
 
 /*   0,  12,   27,    23,    42,    63,    56,    48,    59,    64 */
 /* 0+0, 4+8, 8+19, 12+11, 16+26, 20+43, 24+32, 28+20, 32+27, 36+28 */
-const kCutoffTransforms uint64 = 0x071B520ADA2D3200
+const KCutoffTransforms uint64 = 0x071B520ADA2D3200
 
 type SearchResult struct {
 	Len            uint

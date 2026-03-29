@@ -3,6 +3,7 @@ package brotli
 import (
 	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/dictionary"
+	"github.com/nijaru/brotli/internal/hasher"
 )
 
 func initEncoderDictionary(dict *common.EncoderDictionary) {
@@ -14,4 +15,6 @@ func initEncoderDictionary(dict *common.EncoderDictionary) {
 		dict_words[i] = w
 	}
 	dict.Dict_words = dict_words
+	dict.CutoffTransformsCount = hasher.KCutoffTransformsCount
+	dict.CutoffTransforms = hasher.KCutoffTransforms
 }
