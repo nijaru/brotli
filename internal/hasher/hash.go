@@ -267,11 +267,11 @@ func NewHasher(typ int) Handle {
 			useDictionary: true,
 		}
 	case 5:
-		return new(h5)
+		return &h5{}
 	case 6:
-		return new(h6)
+		return &h6{}
 	case 10:
-		return new(H10)
+		return &H10{}
 	case 35:
 		return &hashComposite{
 			ha: NewHasher(3),

@@ -116,7 +116,7 @@ func TestWriterV2(t *testing.T) {
 		input := []byte("<html><body><H1>Hello world</H1></body></html>")
 		out := bytes.Buffer{}
 		e := NewWriterV2(&out, level)
-		in := bytes.NewReader([]byte(input))
+		in := bytes.NewReader(input)
 		n, err := io.Copy(e, in)
 		if err != nil {
 			t.Errorf("Copy Error: %v", err)

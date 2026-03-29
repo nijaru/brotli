@@ -47,7 +47,7 @@ func NewWriterLevel(dst io.Writer, level int) *Writer {
 
 // NewWriterOptions is like NewWriter but specifies WriterOptions
 func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
-	w := new(Writer)
+	w := &Writer{}
 	w.options = options
 	w.Reset(dst)
 	return w

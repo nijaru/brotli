@@ -8,7 +8,7 @@ import (
 type decodeError int
 
 func (err decodeError) Error() string {
-	return "brotli: " + string(decoderErrorString(int(err)))
+	return "brotli: " + decoderErrorString(int(err))
 }
 
 var errExcessiveInput = errors.New("brotli: excessive input")
@@ -21,7 +21,7 @@ const readBufSize = 32 * 1024
 
 // NewReader creates a new Reader reading the given reader.
 func NewReader(src io.Reader) *Reader {
-	r := new(Reader)
+	r := &Reader{}
 	r.Reset(src)
 	return r
 }
