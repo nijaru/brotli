@@ -94,14 +94,11 @@ type EncoderParams struct {
 }
 
 type EncoderDictionary struct {
-	// We might need to move dictionary and dictWord as well.
-	// For now using any to avoid immediate cyclic dependencies if we move them later.
 	Words                 any
 	CutoffTransformsCount uint32
 	CutoffTransforms      uint64
 	Hash_table            []uint16
 	Buckets               []uint16
-	Dict_words            []any
 }
 
 func Assert(cond bool) {
