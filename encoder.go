@@ -11,15 +11,15 @@ type Encoder struct {
 	wroteHeader bool
 	bw          bitstream.BitWriter
 	distCache   []metablock.DistanceCode
-	dist_rb     [4]int
-	dist_rb_idx int
+	distRb     [4]int
+	distRbIdx int
 }
 
 func (e *Encoder) Reset() {
 	e.wroteHeader = false
 	e.bw = bitstream.BitWriter{}
-	e.dist_rb = [4]int{16, 15, 11, 4}
-	e.dist_rb_idx = 0
+	e.distRb = [4]int{16, 15, 11, 4}
+	e.distRbIdx = 0
 }
 
 func (e *Encoder) Close() error {
@@ -33,8 +33,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	if !e.wroteHeader {
 		e.bw.WriteBits(4, 15)
 		e.wroteHeader = true
-		e.dist_rb = [4]int{16, 15, 11, 4}
-		e.dist_rb_idx = 0
+		e.distRb = [4]int{16, 15, 11, 4}
+		e.distRbIdx = 0
 	}
 
 	if len(src) == 0 {
@@ -60,8 +60,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	// first pass: build the histograms
 	pos := 0
 
-	d := e.dist_rb
-	d_idx := e.dist_rb_idx
+	d := e.distRb
+	d_idx := e.distRbIdx
 	for i, m := range matches {
 		if m.Unmatched > 0 {
 			for _, c := range src[pos : pos+m.Unmatched] {
@@ -143,8 +143,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	bitstream.BuildAndStoreHuffmanTreeFastBW(distanceHisto[:], uint(distanceCount), 6, distanceDepths[:], distanceBits[:], &e.bw)
 
 	pos = 0
-	d = e.dist_rb
-	d_idx = e.dist_rb_idx
+	d = e.distRb
+	d_idx = e.distRbIdx
 	for i, m := range matches {
 		insertCode := metablock.GetInsertLengthCode(uint(m.Unmatched))
 		copyCode := metablock.GetCopyLengthCode(uint(m.Length))
@@ -185,8 +185,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 		pos += m.Unmatched + m.Length
 	}
 
-	e.dist_rb = d
-	e.dist_rb_idx = d_idx
+	e.distRb = d
+	e.distRbIdx = d_idx
 
 	if lastBlock {
 		e.bw.WriteBits(2, 3) // islast + isempty

@@ -9,9 +9,7 @@ package bitstream
 /* Write bits into a byte array. */
 
 type BitWriter struct {
-	Dst []byte
-
-	// Data waiting to be written is the low nbits of bits.
+	Dst   []byte
 	Bits  uint64
 	Nbits uint
 }
@@ -28,9 +26,13 @@ func (w *BitWriter) WriteBits(nb uint, b uint64) {
 
 func (w *BitWriter) WriteSingleBit(bit bool) {
 	if bit {
-		w.WriteBits(1, 1)
-	} else {
-		w.WriteBits(1, 0)
+		w.Bits |= 1 << w.Nbits
+	}
+	w.Nbits++
+	if w.Nbits >= 8 {
+		w.Dst = append(w.Dst, byte(w.Bits))
+		w.Bits >>= 8
+		w.Nbits -= 8
 	}
 }
 
@@ -39,7 +41,7 @@ func (w *BitWriter) JumpToByteBoundary() {
 	for w.Nbits != 0 {
 		dst = append(dst, byte(w.Bits))
 		w.Bits >>= 8
-		if w.Nbits > 8 { // Avoid underflow
+		if w.Nbits > 8 {
 			w.Nbits -= 8
 		} else {
 			w.Nbits = 0

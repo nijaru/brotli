@@ -10,7 +10,11 @@
 // representation to allow mixing and matching compression components.
 package matchfinder
 
-import "io"
+import (
+	"encoding/binary"
+	"io"
+	"math/bits"
+)
 
 // A Match is the basic unit of LZ77 compression.
 type Match struct {
@@ -110,4 +114,39 @@ func (w *Writer) Reset(newDest io.Writer) {
 	w.outBuf = w.outBuf[:0]
 	w.matches = w.matches[:0]
 	w.Dest = newDest
+}
+
+// extendMatch returns the largest k such that k <= len(src) and that
+// src[i:i+k-j] and src[j:k] have the same contents.
+//
+// It assumes that:
+//
+//	0 <= i && i < j && j <= len(src)
+func extendMatch(src []byte, i, j int) int {
+	for j+8 < len(src) {
+		iBytes := binary.LittleEndian.Uint64(src[i:])
+		jBytes := binary.LittleEndian.Uint64(src[j:])
+		if iBytes != jBytes {
+			return j + bits.TrailingZeros64(iBytes^jBytes)>>3
+		}
+		i, j = i+8, j+8
+	}
+	for ; j < len(src) && src[i] == src[j]; i, j = i+1, j+1 {
+	}
+	return j
+}
+
+// Given a 4-byte match at src[start] and src[candidate], extendMatch2 extends it
+// upward as far as possible, and downward no farther than to min.
+func extendMatch2(src []byte, start, candidate, min int) absoluteMatch {
+	end := extendMatch(src, candidate+4, start+4)
+	for start > min && candidate > 0 && src[start-1] == src[candidate-1] {
+		start--
+		candidate--
+	}
+	return absoluteMatch{
+		Start: start,
+		End:   end,
+		Match: candidate,
+	}
 }

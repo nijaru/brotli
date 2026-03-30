@@ -9,7 +9,7 @@ package brotli
 type cmdLutElement struct {
 	insert_len_extra_bits byte
 	copy_len_extra_bits   byte
-	distance_code         int8
+	distanceCode         int8
 	context               byte
 	insert_len_offset     uint16
 	copy_len_offset       uint16

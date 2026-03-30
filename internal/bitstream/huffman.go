@@ -86,11 +86,11 @@ func ConstructHuffmanCode(bits byte, Value uint16) HuffmanCode {
 /* max_symbol is needed due to simple codes since log2(alphabet_size) could be
    greater than log2(max_symbol). */
 type HuffmanTreeGroup struct {
-	Htrees        [][]HuffmanCode
+	HTrees        [][]HuffmanCode
 	Codes         []HuffmanCode
-	Alphabet_size uint16
-	Max_symbol    uint16
-	Num_htrees    uint16
+	AlphabetSize uint16
+	MaxSymbol    uint16
+	NumHTrees    uint16
 }
 
 const reverseBitsMax = 8

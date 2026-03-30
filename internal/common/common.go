@@ -39,8 +39,8 @@ const MaxNpostfix = 3
 const MaxNdirect = 120
 const MaxDistanceBits = 24
 
-func DistanceAlphabetSize(NPOSTFIX uint, NDIRECT uint, MAXNBITS uint) uint {
-	return NumDistanceShortCodes + NDIRECT + uint(MAXNBITS<<(NPOSTFIX+1))
+func DistanceAlphabetSize(npostfix, ndirect, maxnbits uint) uint {
+	return NumDistanceShortCodes + ndirect + uint(maxnbits<<(npostfix+1))
 }
 
 /* numDistanceSymbols == 1128 */
@@ -56,49 +56,10 @@ const LiteralContextBits = 6
 const DistanceContextBits = 2
 
 /* 9.1. Format of the Stream Header */
-/* Number of slack bytes for window size. Don't confuse
-   with BROTLI_NUM_DISTANCE_SHORT_CODES. */
 const WindowGap = 16
 
-func MaxBackwardLimit(W uint) uint {
-	return (uint(1) << W) - WindowGap
-}
-
-type HasherParams struct {
-	Type_                       int
-	Bucket_bits                 int
-	Block_bits                  int
-	Hash_len                    int
-	Num_last_distances_to_check int
-}
-
-type DistanceParams struct {
-	Distance_postfix_bits     uint32
-	Num_direct_distance_codes uint32
-	Alphabet_size             uint32
-	Max_distance              uint
-}
-
-/* Parameters for the Brotli encoder with chosen quality levels. */
-type EncoderParams struct {
-	Mode                             int
-	Quality                          int
-	Lgwin                            uint
-	Lgblock                          int
-	Size_hint                        uint
-	Disable_literal_context_modeling bool
-	Large_window                     bool
-	Hasher                           HasherParams
-	Dist                             DistanceParams
-	Dictionary                       EncoderDictionary
-}
-
-type EncoderDictionary struct {
-	Words                 any
-	CutoffTransformsCount uint32
-	CutoffTransforms      uint64
-	Hash_table            []uint16
-	Buckets               []uint16
+func MaxBackwardLimit(w uint) uint {
+	return (uint(1) << w) - WindowGap
 }
 
 func Assert(cond bool) {
@@ -113,83 +74,15 @@ type PrefixCodeRange struct {
 }
 
 var KBlockLengthPrefixCode = [NumBlockLenSymbols]PrefixCodeRange{
-	PrefixCodeRange{1, 2},
-	PrefixCodeRange{5, 2},
-	PrefixCodeRange{9, 2},
-	PrefixCodeRange{13, 2},
-	PrefixCodeRange{17, 3},
-	PrefixCodeRange{25, 3},
-	PrefixCodeRange{33, 3},
-	PrefixCodeRange{41, 3},
-	PrefixCodeRange{49, 4},
-	PrefixCodeRange{65, 4},
-	PrefixCodeRange{81, 4},
-	PrefixCodeRange{97, 4},
-	PrefixCodeRange{113, 5},
-	PrefixCodeRange{145, 5},
-	PrefixCodeRange{177, 5},
-	PrefixCodeRange{209, 5},
-	PrefixCodeRange{241, 6},
-	PrefixCodeRange{305, 6},
-	PrefixCodeRange{369, 7},
-	PrefixCodeRange{497, 8},
-	PrefixCodeRange{753, 9},
-	PrefixCodeRange{1265, 10},
-	PrefixCodeRange{2289, 11},
-	PrefixCodeRange{4337, 12},
-	PrefixCodeRange{8433, 13},
-	PrefixCodeRange{16625, 24},
-}
-
-func ComputeRbBits(params *EncoderParams) int {
-	window_bits := int(params.Lgwin)
-	if params.Large_window && window_bits > 24 {
-		window_bits = 24
-	}
-	return window_bits
+	{1, 2}, {5, 2}, {9, 2}, {13, 2}, {17, 3}, {25, 3}, {33, 3}, {41, 3}, {49, 4}, {65, 4}, {81, 4}, {97, 4}, {113, 5}, {145, 5}, {177, 5}, {209, 5}, {241, 6}, {305, 6}, {369, 7}, {497, 8}, {753, 9}, {1265, 10}, {2289, 11}, {4337, 12}, {8433, 13}, {16625, 24},
 }
 
 const HqZopflificationQuality = 10
 
-func FindMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
+func FindMatchLengthWithLimit(s1, s2 []byte, limit uint) uint {
 	matched := uint(0)
 	for matched < limit && s1[matched] == s2[matched] {
 		matched++
 	}
 	return matched
-}
-
-func EnsureCapacity[T any](s *[]T, offset *uint, capacity uint) {
-	if *offset+capacity > uint(cap(*s)) {
-		var new_size uint = uint(cap(*s))
-		if new_size == 0 {
-			new_size = capacity
-		} else {
-			for new_size < *offset+capacity {
-				new_size *= 2
-			}
-		}
-		new_s := make([]T, new_size)
-		copy(new_s, *s)
-		*s = new_s
-	}
-}
-
-func PrefixEncodeCopyDistance(distance_code uint, num_direct_distance_codes uint, distance_postfix_bits uint, code *uint16, extra_bits *uint32) {
-	if distance_code < NumDistanceShortCodes+num_direct_distance_codes {
-		*code = uint16(distance_code)
-		*extra_bits = 0
-		return
-	} else {
-		var dist uint = (uint(1) << (distance_postfix_bits + 2)) + (distance_code - NumDistanceShortCodes - num_direct_distance_codes)
-		var bucket uint = uint(Log2FloorNonZero(dist) - 1)
-		var postfix_mask uint = (uint(1) << distance_postfix_bits) - 1
-		var postfix uint = dist & postfix_mask
-		var prefix uint = (dist >> bucket) & 1
-		var offset uint = (2 + prefix) << bucket
-		var nbits uint = bucket - distance_postfix_bits
-		*code = uint16(nbits<<10 | (NumDistanceShortCodes + num_direct_distance_codes + ((2*(nbits-1) + prefix) << distance_postfix_bits) + postfix))
-		*extra_bits = uint32((dist - offset) >> distance_postfix_bits)
-		return
-	}
 }

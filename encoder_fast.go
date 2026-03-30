@@ -20,13 +20,13 @@ type FastEncoder struct {
 	bw            bitstream.BitWriter
 	commandHisto  [704]uint32
 	distanceHisto [64]uint32
-	dist_rb       [4]int
+	distRb       [4]int
 }
 
 func (e *FastEncoder) Reset() {
 	e.wroteHeader = false
 	e.bw = bitstream.BitWriter{}
-	e.dist_rb = [4]int{16, 15, 11, 4}
+	e.distRb = [4]int{16, 15, 11, 4}
 }
 
 func (e *FastEncoder) Close() error {
@@ -40,7 +40,7 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 	if !e.wroteHeader {
 		e.bw.WriteBits(4, 15)
 		e.wroteHeader = true
-		e.dist_rb = [4]int{16, 15, 11, 4}
+		e.distRb = [4]int{16, 15, 11, 4}
 	}
 
 	if len(src) == 0 {
@@ -61,7 +61,7 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 
 	// First pass: build histograms
 	pos := 0
-	d := e.dist_rb
+	d := e.distRb
 	for _, m := range matches {
 		for _, c := range src[pos : pos+m.Unmatched] {
 			literalHisto[c]++
@@ -146,7 +146,7 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 
 	// Second pass: write data
 	pos = 0
-	d = e.dist_rb
+	d = e.distRb
 	for _, m := range matches {
 		lengthFinished := false
 		var command int
@@ -214,7 +214,7 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 		pos += m.Unmatched + m.Length
 	}
 
-	e.dist_rb = d
+	e.distRb = d
 
 	if lastBlock {
 		e.bw.WriteBits(2, 3) // islast + isempty

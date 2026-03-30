@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/bits"
-	"runtime"
 )
 
 // M4 is an implementation of the MatchFinder
@@ -283,57 +282,3 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 }
 
 const hashMul64 = 0x1E35A7BD1E35A7BD
-
-// extendMatch returns the largest k such that k <= len(src) and that
-// src[i:i+k-j] and src[j:k] have the same contents.
-//
-// It assumes that:
-//
-//	0 <= i && i < j && j <= len(src)
-func extendMatch(src []byte, i, j int) int {
-	switch runtime.GOARCH {
-	case "amd64", "arm64":
-		// As long as we are 8 or more bytes before the end of src, we can load and
-		// compare 8 bytes at a time. If those 8 bytes are equal, repeat.
-		for j+8 < len(src) {
-			iBytes := binary.LittleEndian.Uint64(src[i:])
-			jBytes := binary.LittleEndian.Uint64(src[j:])
-			if iBytes != jBytes {
-				// If those 8 bytes were not equal, XOR the two 8 byte values, and return
-				// the index of the first byte that differs. The BSF instruction finds the
-				// least significant 1 bit, the amd64 architecture is little-endian, and
-				// the shift by 3 converts a bit index to a byte index.
-				return j + bits.TrailingZeros64(iBytes^jBytes)>>3
-			}
-			i, j = i+8, j+8
-		}
-	case "386":
-		// On a 32-bit CPU, we do it 4 bytes at a time.
-		for j+4 < len(src) {
-			iBytes := binary.LittleEndian.Uint32(src[i:])
-			jBytes := binary.LittleEndian.Uint32(src[j:])
-			if iBytes != jBytes {
-				return j + bits.TrailingZeros32(iBytes^jBytes)>>3
-			}
-			i, j = i+4, j+4
-		}
-	}
-	for ; j < len(src) && src[i] == src[j]; i, j = i+1, j+1 {
-	}
-	return j
-}
-
-// Given a 4-byte match at src[start] and src[candidate], extendMatch2 extends it
-// upward as far as possible, and downward no farther than to min.
-func extendMatch2(src []byte, start, candidate, min int) absoluteMatch {
-	end := extendMatch(src, candidate+4, start+4)
-	for start > min && candidate > 0 && src[start-1] == src[candidate-1] {
-		start--
-		candidate--
-	}
-	return absoluteMatch{
-		Start: start,
-		End:   end,
-		Match: candidate,
-	}
-}
