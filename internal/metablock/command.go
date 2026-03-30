@@ -81,12 +81,6 @@ func CombineLengthCodes(inscode uint16, copycode uint16, use_last_distance bool)
 	}
 }
 
-func GetLengthCode(insertlen uint, copylen uint, use_last_distance bool, code *uint16) {
-	var inscode uint16 = GetInsertLengthCode(insertlen)
-	var copycode uint16 = GetCopyLengthCode(copylen)
-	*code = CombineLengthCodes(inscode, copycode, use_last_distance)
-}
-
 func GetInsertBase(inscode uint16) uint32 {
 	return kInsBase[inscode]
 }

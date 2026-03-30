@@ -12,12 +12,14 @@ type Encoder struct {
 	bw          bitstream.BitWriter
 	distCache   []metablock.DistanceCode
 	dist_rb     [4]int
+	dist_rb_idx int
 }
 
 func (e *Encoder) Reset() {
 	e.wroteHeader = false
 	e.bw = bitstream.BitWriter{}
 	e.dist_rb = [4]int{16, 15, 11, 4}
+	e.dist_rb_idx = 0
 }
 
 func (e *Encoder) Close() error {
@@ -32,6 +34,7 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 		e.bw.WriteBits(4, 15)
 		e.wroteHeader = true
 		e.dist_rb = [4]int{16, 15, 11, 4}
+		e.dist_rb_idx = 0
 	}
 
 	if len(src) == 0 {
@@ -57,8 +60,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	// first pass: build the histograms
 	pos := 0
 
-	// d is the ring buffer of the last 4 distances.
 	d := e.dist_rb
+	d_idx := e.dist_rb_idx
 	for i, m := range matches {
 		if m.Unmatched > 0 {
 			for _, c := range src[pos : pos+m.Unmatched] {
@@ -70,40 +73,43 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 		insertCode := metablock.GetInsertLengthCode(uint(m.Unmatched))
 		copyCode := metablock.GetCopyLengthCode(uint(m.Length))
 		if m.Length == 0 {
-			// If the stream ends with unmatched bytes, we need a dummy copy length.
 			copyCode = 2
 		}
-		// Use an implicit distance command if m.Length is 0 to avoid writing a distance code.
-		command := metablock.CombineLengthCodes(insertCode, copyCode, (i > 0 && m.Distance == matches[i-1].Distance) || m.Length == 0)
+
+		// Calculate what distances are in the cache
+		d3 := d[(d_idx-1)&3]
+		d2 := d[(d_idx-2)&3]
+		d1 := d[(d_idx-3)&3]
+		d0 := d[(d_idx-4)&3]
+
+		useLastDistance := m.Distance == d3 || m.Length == 0
+		command := metablock.CombineLengthCodes(insertCode, copyCode, useLastDistance)
 		commandHisto[command]++
 		commandCount++
 
 		if command >= 128 && m.Length != 0 {
 			var distCode metablock.DistanceCode
 			switch m.Distance {
-			case d[3]:
+			case d3:
 				distCode.Code = 0
-			case d[2]:
+			case d2:
 				distCode.Code = 1
-			case d[1]:
+			case d1:
 				distCode.Code = 2
-			case d[0]:
+			case d0:
 				distCode.Code = 3
-			case d[3] - 1:
+			case d3 - 1:
 				distCode.Code = 4
-			case d[3] + 1:
+			case d3 + 1:
 				distCode.Code = 5
-			case d[3] - 2:
+			case d3 - 2:
 				distCode.Code = 6
-			case d[3] + 2:
+			case d3 + 2:
 				distCode.Code = 7
-			case d[3] - 3:
+			case d3 - 3:
 				distCode.Code = 8
-			case d[3] + 3:
+			case d3 + 3:
 				distCode.Code = 9
-
-				// In my testing, codes 10–15 actually reduced the compression ratio.
-
 			default:
 				distCode = metablock.GetDistanceCode(m.Distance)
 			}
@@ -111,17 +117,10 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 			distanceHisto[distCode.Code]++
 			distanceCount++
 
-			// Update the distance cache.
-			if distCode.Code == 0 {
-				// No change.
-			} else if distCode.Code == 1 {
-				d[3], d[2] = d[2], d[3]
-			} else if distCode.Code == 2 {
-				d[3], d[2], d[1] = d[1], d[3], d[2]
-			} else if distCode.Code == 3 {
-				d[3], d[2], d[1], d[0] = d[0], d[3], d[2], d[1]
-			} else {
-				d[0], d[1], d[2], d[3] = d[1], d[2], d[3], m.Distance
+			// Update the distance cache using decoder logic.
+			if distCode.Code != 0 {
+				d[d_idx&3] = m.Distance
+				d_idx++
 			}
 		}
 
@@ -144,15 +143,18 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	bitstream.BuildAndStoreHuffmanTreeFastBW(distanceHisto[:], uint(distanceCount), 6, distanceDepths[:], distanceBits[:], &e.bw)
 
 	pos = 0
+	d = e.dist_rb
+	d_idx = e.dist_rb_idx
 	for i, m := range matches {
 		insertCode := metablock.GetInsertLengthCode(uint(m.Unmatched))
 		copyCode := metablock.GetCopyLengthCode(uint(m.Length))
 		if m.Length == 0 {
-			// If the stream ends with unmatched bytes, we need a dummy copy length.
 			copyCode = 2
 		}
-		// Use an implicit distance command if m.Length is 0 to avoid writing a distance code.
-		command := metablock.CombineLengthCodes(insertCode, copyCode, (i > 0 && m.Distance == matches[i-1].Distance) || m.Length == 0)
+		
+		d3 := d[(d_idx-1)&3]
+		useLastDistance := m.Distance == d3 || m.Length == 0
+		command := metablock.CombineLengthCodes(insertCode, copyCode, useLastDistance)
 		e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 		if metablock.GetInsertExtra(insertCode) > 0 {
 			e.bw.WriteBits(uint(metablock.GetInsertExtra(insertCode)), uint64(m.Unmatched)-uint64(metablock.GetInsertBase(insertCode)))
@@ -173,15 +175,28 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 			if distCode.NExtra > 0 {
 				e.bw.WriteBits(distCode.NExtra, distCode.ExtraBits)
 			}
+
+			if distCode.Code != 0 {
+				d[d_idx&3] = m.Distance
+				d_idx++
+			}
 		}
 
 		pos += m.Unmatched + m.Length
 	}
 
 	e.dist_rb = d
+	e.dist_rb_idx = d_idx
 
 	if lastBlock {
 		e.bw.WriteBits(2, 3) // islast + isempty
+		e.bw.JumpToByteBoundary()
+	} else {
+		// Empty metadata metablock to force byte alignment.
+		e.bw.WriteBits(1, 0) // islast = 0
+		e.bw.WriteBits(2, 3) // mnibbles = 3 (metadata)
+		e.bw.WriteBits(2, 0) // msizenibbles = 0
+		e.bw.WriteBits(1, 0) // reserved = 0
 		e.bw.JumpToByteBoundary()
 	}
 	return e.bw.Dst

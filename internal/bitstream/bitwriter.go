@@ -19,16 +19,10 @@ type BitWriter struct {
 func (w *BitWriter) WriteBits(nb uint, b uint64) {
 	w.Bits |= b << w.Nbits
 	w.Nbits += nb
-	if w.Nbits >= 32 {
-		bits := w.Bits
-		w.Bits >>= 32
-		w.Nbits -= 32
-		w.Dst = append(w.Dst,
-			byte(bits),
-			byte(bits>>8),
-			byte(bits>>16),
-			byte(bits>>24),
-		)
+	for w.Nbits >= 8 {
+		w.Dst = append(w.Dst, byte(w.Bits))
+		w.Bits >>= 8
+		w.Nbits -= 8
 	}
 }
 

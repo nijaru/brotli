@@ -41,25 +41,6 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 		e.bw.WriteBits(4, 15)
 		e.wroteHeader = true
 		e.dist_rb = [4]int{16, 15, 11, 4}
-
-		// Fill the histograms with default statistics.
-		// ... (rest of the initialization)
-		for i := range 24 {
-			e.commandHisto[metablock.CombineLengthCodes(uint16(i), 0, false)] = uint32(2000 / (i + 1) / (i + 1))
-		}
-		e.commandHisto[metablock.CombineLengthCodes(0, 0, true)] = 50
-		for i := 1; i < 24; i++ {
-			e.commandHisto[metablock.CombineLengthCodes(0, uint16(i), i < 16)] = uint32(800 / i)
-		}
-		for insertCode := range 6 {
-			for copyCode := 2; copyCode < 8; copyCode++ {
-				e.commandHisto[128+insertCode<<3+copyCode] = uint32(343 / (insertCode + 1) / (insertCode + 1) / copyCode)
-			}
-		}
-		e.distanceHisto[0] = 100
-		for i := 16; i < 64; i++ {
-			e.distanceHisto[i] = max(uint32(gaussianProbability(float64(i), 32, 8)*10000), 1)
-		}
 	}
 
 	if len(src) == 0 {
@@ -72,8 +53,80 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 	}
 
 	var literalHisto [256]uint32
-	for _, c := range src {
-		literalHisto[c]++
+	var commandHisto [704]uint32
+	var distanceHisto [64]uint32
+	literalCount := 0
+	commandCount := 0
+	distanceCount := 0
+
+	// First pass: build histograms
+	pos := 0
+	d := e.dist_rb
+	for _, m := range matches {
+		for _, c := range src[pos : pos+m.Unmatched] {
+			literalHisto[c]++
+		}
+		literalCount += m.Unmatched
+
+		var command int
+		lengthFinished := false
+		if m.Unmatched < 6 {
+			if m.Length < 10 && m.Length != 0 {
+				command = m.Unmatched<<3 + m.Length - 2 + 128
+				lengthFinished = true
+			} else {
+				if m.Length == 0 {
+					command = m.Unmatched << 3
+				} else {
+					command = m.Unmatched<<3 + 128
+				}
+			}
+			commandHisto[command]++
+			commandCount++
+		} else {
+			insertCode := metablock.GetInsertLengthCode(uint(m.Unmatched))
+			command = int(metablock.CombineLengthCodes(insertCode, 0, m.Length == 0))
+			commandHisto[command]++
+			commandCount++
+		}
+
+		if command >= 128 && m.Length != 0 {
+			var distCode metablock.DistanceCode
+			if m.Distance == d[3] {
+				distCode.Code = 0
+			} else {
+				distCode = metablock.GetDistanceCode(m.Distance)
+			}
+			distanceHisto[distCode.Code]++
+			distanceCount++
+
+			if distCode.Code != 0 {
+				d[0], d[1], d[2], d[3] = d[1], d[2], d[3], m.Distance
+			}
+		}
+
+		if m.Length != 0 {
+			switch {
+			case lengthFinished:
+			case m.Length < 12:
+				command := m.Length - 4
+				commandHisto[command]++
+				commandCount++
+			case m.Length < 72:
+				copyCode := metablock.GetCopyLengthCode(uint(m.Length - 2))
+				command := metablock.CombineLengthCodes(0, copyCode, true)
+				commandHisto[command]++
+				commandCount++
+			default:
+				copyCode := metablock.GetCopyLengthCode(uint(m.Length - 2))
+				command := metablock.CombineLengthCodes(0, copyCode, false)
+				commandHisto[command]++
+				commandCount++
+				distanceHisto[0]++
+				distanceCount++
+			}
+		}
+		pos += m.Unmatched + m.Length
 	}
 
 	bitstream.StoreMetaBlockHeaderBW(uint(len(src)), false, &e.bw)
@@ -81,72 +134,41 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 
 	var literalDepths [256]byte
 	var literalBits [256]uint16
-	bitstream.BuildAndStoreHuffmanTreeFastBW(literalHisto[:], uint(len(src)), 8, literalDepths[:], literalBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(literalHisto[:], uint(literalCount), 8, literalDepths[:], literalBits[:], &e.bw)
 
 	var commandDepths [704]byte
 	var commandBits [704]uint16
-	commandCount := 0
-	for _, n := range e.commandHisto {
-		commandCount += int(n)
-	}
-	bitstream.BuildAndStoreHuffmanTreeFastBW(e.commandHisto[:], uint(commandCount), 10, commandDepths[:], commandBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(commandHisto[:], uint(commandCount), 10, commandDepths[:], commandBits[:], &e.bw)
 
 	var distanceDepths [64]byte
 	var distanceBits [64]uint16
-	distanceCount := 0
-	for _, n := range e.distanceHisto {
-		distanceCount += int(n)
-	}
-	bitstream.BuildAndStoreHuffmanTreeFastBW(e.distanceHisto[:], uint(distanceCount), 6, distanceDepths[:], distanceBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(distanceHisto[:], uint(distanceCount), 6, distanceDepths[:], distanceBits[:], &e.bw)
 
-	// Reset the statistics, starting with a count of 1 for each symbol we might use.
-	for i := range 24 {
-		e.commandHisto[metablock.CombineLengthCodes(uint16(i), 0, false)] = 1
-	}
-	for i := range 24 {
-		e.commandHisto[metablock.CombineLengthCodes(0, uint16(i), i < 16)] = 1
-	}
-	for insertCode := range 6 {
-		for copyCode := 2; copyCode < 8; copyCode++ {
-			e.commandHisto[128+insertCode<<3+copyCode] = 1
-		}
-	}
-	e.distanceHisto[0] = 1
-	for i := 16; i < 64; i++ {
-		e.distanceHisto[i] = 1
-	}
-
-	pos := 0
-	d := e.dist_rb
+	// Second pass: write data
+	pos = 0
+	d = e.dist_rb
 	for _, m := range matches {
 		lengthFinished := false
 		var command int
-		// Write a command with the appropriate insert length, and a copy length of 2.
 		if m.Unmatched < 6 {
 			if m.Length < 10 && m.Length != 0 {
-				// We can use a combined insert/copy code with no extra bits.
 				command = m.Unmatched<<3 + m.Length - 2 + 128
 				lengthFinished = true
 			} else {
 				if m.Length == 0 {
-					// Use an implicit distance command to avoid writing a distance code.
 					command = m.Unmatched << 3
 				} else {
 					command = m.Unmatched<<3 + 128
 				}
 			}
 			e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
-			e.commandHisto[command]++
 		} else {
 			insertCode := metablock.GetInsertLengthCode(uint(m.Unmatched))
-			// Use an implicit distance command if m.Length is 0.
 			command = int(metablock.CombineLengthCodes(insertCode, 0, m.Length == 0))
 			e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 			e.bw.WriteBits(uint(metablock.GetInsertExtra(insertCode)), uint64(m.Unmatched)-uint64(metablock.GetInsertBase(insertCode)))
-			e.commandHisto[command]++
 		}
 
-		// Write the literals, if any.
 		if m.Unmatched > 0 {
 			for _, c := range src[pos : pos+m.Unmatched] {
 				e.bw.WriteBits(uint(literalDepths[c]), uint64(literalBits[c]))
@@ -154,7 +176,6 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 		}
 
 		if command >= 128 && m.Length != 0 {
-			// Write the distance code for the copy-2 (or longer if combined) match.
 			var distCode metablock.DistanceCode
 			if m.Distance == d[3] {
 				distCode.Code = 0
@@ -165,51 +186,45 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 			if distCode.NExtra > 0 {
 				e.bw.WriteBits(distCode.NExtra, distCode.ExtraBits)
 			}
-			e.distanceHisto[distCode.Code]++
-
-			// Update distance cache.
-			if distCode.Code == 0 {
-				// No change.
-			} else {
+			if distCode.Code != 0 {
 				d[0], d[1], d[2], d[3] = d[1], d[2], d[3], m.Distance
 			}
 		}
 
 		if m.Length != 0 {
-			// Write a command for the remainder of the match (after the first two bytes
-			// from before), using the previous distance.
 			switch {
 			case lengthFinished:
-				// We don't need to finish the length.
 			case m.Length < 12:
 				command := m.Length - 4
 				e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
-				e.commandHisto[command]++
 			case m.Length < 72:
 				copyCode := metablock.GetCopyLengthCode(uint(m.Length - 2))
 				command := metablock.CombineLengthCodes(0, copyCode, true)
 				e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 				e.bw.WriteBits(uint(metablock.GetCopyExtra(copyCode)), uint64(m.Length-2)-uint64(metablock.GetCopyBase(copyCode)))
-				e.commandHisto[command]++
 			default:
 				copyCode := metablock.GetCopyLengthCode(uint(m.Length - 2))
 				command := metablock.CombineLengthCodes(0, copyCode, false)
 				e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 				e.bw.WriteBits(uint(metablock.GetCopyExtra(copyCode)), uint64(m.Length-2)-uint64(metablock.GetCopyBase(copyCode)))
 				e.bw.WriteBits(uint(distanceDepths[0]), uint64(distanceBits[0]))
-				e.commandHisto[command]++
-				e.distanceHisto[0]++
 			}
 		}
 
 		pos += m.Unmatched + m.Length
 	}
 
-
 	e.dist_rb = d
 
 	if lastBlock {
 		e.bw.WriteBits(2, 3) // islast + isempty
+		e.bw.JumpToByteBoundary()
+	} else {
+		// Empty metadata metablock to force byte alignment.
+		e.bw.WriteBits(1, 0) // islast = 0
+		e.bw.WriteBits(2, 3) // mnibbles = 3 (metadata)
+		e.bw.WriteBits(2, 0) // msizenibbles = 0
+		e.bw.WriteBits(1, 0) // reserved = 0
 		e.bw.JumpToByteBoundary()
 	}
 	return e.bw.Dst

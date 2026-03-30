@@ -8,25 +8,6 @@ import (
 
 const maxHuffmanTreeSize = 2*common.NumCommandSymbols + 1
 
-func blockLengthPrefixCode(len uint32) uint32 {
-	var code uint32
-	if len >= 177 {
-		if len >= 753 {
-			code = 20
-		} else {
-			code = 14
-		}
-	} else if len >= 41 {
-		code = 7
-	} else {
-		code = 0
-	}
-	for code < (common.NumBlockLenSymbols-1) && len >= common.KBlockLengthPrefixCode[code+1].Offset {
-		code++
-	}
-	return code
-}
-
 func encodeMlen(length uint, bits *uint64, numbits *uint, nibblesbits *uint64) {
 	var lg uint
 	if length == 1 {

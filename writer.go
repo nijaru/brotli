@@ -77,6 +77,11 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 // its original state from NewWriter or NewWriterLevel, but writing to dst
 // instead. This permits reusing a Writer rather than allocating a new one.
 func (w *Writer) Reset(dst io.Writer) {
+	if w.w.MatchFinder == nil {
+		w.w.MatchFinder = getMatchFinder(DefaultCompression)
+		w.w.Encoder = &Encoder{}
+		w.w.BlockSize = 1 << 16
+	}
 	w.w.Reset(dst)
 	w.dst = dst
 	w.err = nil
