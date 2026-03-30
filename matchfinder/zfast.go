@@ -148,10 +148,8 @@ mainLoop:
 			cv = binary.LittleEndian.Uint64(src[s:])
 		}
 
-		// A 4-byte match has been found. We'll later see if more than
-		// 4 bytes.
-		offset2 = offset1
-		offset1 = s - t
+		// A 4-byte match has been found. We'll later see if more than 4 bytes.
+		offset1, offset2 = s-t, offset1
 
 		end := extendMatch(src, int(t+4), int(s+4))
 		for t > 0 && s > nextEmit && src[t-1] == src[s-1] {
@@ -184,6 +182,7 @@ mainLoop:
 			})
 			s = int32(end)
 			nextEmit = s
+			//lint:ignore SA4006 offset2 used next iteration in "check offset 2" block
 			offset1, offset2 = offset2, offset1
 			if s >= sLimit {
 				break mainLoop

@@ -20,11 +20,13 @@ type FastEncoder struct {
 	bw            bitstream.BitWriter
 	commandHisto  [704]uint32
 	distanceHisto [64]uint32
+	dist_rb       [4]int
 }
 
 func (e *FastEncoder) Reset() {
 	e.wroteHeader = false
 	e.bw = bitstream.BitWriter{}
+	e.dist_rb = [4]int{16, 15, 11, 4}
 }
 
 func (e *FastEncoder) Close() error {
@@ -38,34 +40,22 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 	if !e.wroteHeader {
 		e.bw.WriteBits(4, 15)
 		e.wroteHeader = true
+		e.dist_rb = [4]int{16, 15, 11, 4}
 
 		// Fill the histograms with default statistics.
-
-		// For the command codes we're using for insert lengths (insert + 2-byte copy),
-		// fill the histogram with a Zipf-squared distribution.
+		// ... (rest of the initialization)
 		for i := range 24 {
 			e.commandHisto[metablock.CombineLengthCodes(uint16(i), 0, false)] = uint32(2000 / (i + 1) / (i + 1))
 		}
-
-		// For the command codes we're using for copy lengths (0 insert + copy
-		// (length - 2), with repeat distance),
-		// fill the histogram with Zipf distribution starting at code 1 (match length 5),
-		// but a smaller frequency for code 0.
 		e.commandHisto[metablock.CombineLengthCodes(0, 0, true)] = 50
 		for i := 1; i < 24; i++ {
 			e.commandHisto[metablock.CombineLengthCodes(0, uint16(i), i < 16)] = uint32(800 / i)
 		}
-
-		// Fill in the combined codes for short insert and copy lengths.
 		for insertCode := range 6 {
-			copyCode := 2
-			e.commandHisto[128+insertCode<<3+copyCode] = uint32(100 / (insertCode + 1) / (insertCode + 1) / copyCode)
-			for copyCode := 3; copyCode < 8; copyCode++ {
+			for copyCode := 2; copyCode < 8; copyCode++ {
 				e.commandHisto[128+insertCode<<3+copyCode] = uint32(343 / (insertCode + 1) / (insertCode + 1) / copyCode)
 			}
 		}
-
-		// Fill e.distanceHisto with a normal distribution.
 		e.distanceHisto[0] = 100
 		for i := 16; i < 64; i++ {
 			e.distanceHisto[i] = max(uint32(gaussianProbability(float64(i), 32, 8)*10000), 1)
@@ -127,23 +117,30 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 	}
 
 	pos := 0
-	for i, m := range matches {
+	d := e.dist_rb
+	for _, m := range matches {
 		lengthFinished := false
+		var command int
 		// Write a command with the appropriate insert length, and a copy length of 2.
 		if m.Unmatched < 6 {
-			var command int
 			if m.Length < 10 && m.Length != 0 {
 				// We can use a combined insert/copy code with no extra bits.
 				command = m.Unmatched<<3 + m.Length - 2 + 128
 				lengthFinished = true
 			} else {
-				command = m.Unmatched<<3 + 128
+				if m.Length == 0 {
+					// Use an implicit distance command to avoid writing a distance code.
+					command = m.Unmatched << 3
+				} else {
+					command = m.Unmatched<<3 + 128
+				}
 			}
 			e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 			e.commandHisto[command]++
 		} else {
 			insertCode := metablock.GetInsertLengthCode(uint(m.Unmatched))
-			command := metablock.CombineLengthCodes(insertCode, 0, false)
+			// Use an implicit distance command if m.Length is 0.
+			command = int(metablock.CombineLengthCodes(insertCode, 0, m.Length == 0))
 			e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 			e.bw.WriteBits(uint(metablock.GetInsertExtra(insertCode)), uint64(m.Unmatched)-uint64(metablock.GetInsertBase(insertCode)))
 			e.commandHisto[command]++
@@ -156,10 +153,12 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 			}
 		}
 
-		if m.Length != 0 {
-			// Write the distance code.
+		if command >= 128 && m.Length != 0 {
+			// Write the distance code for the copy-2 (or longer if combined) match.
 			var distCode metablock.DistanceCode
-			if i == 0 || m.Distance != matches[i-1].Distance {
+			if m.Distance == d[3] {
+				distCode.Code = 0
+			} else {
 				distCode = metablock.GetDistanceCode(m.Distance)
 			}
 			e.bw.WriteBits(uint(distanceDepths[distCode.Code]), uint64(distanceBits[distCode.Code]))
@@ -168,6 +167,15 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 			}
 			e.distanceHisto[distCode.Code]++
 
+			// Update distance cache.
+			if distCode.Code == 0 {
+				// No change.
+			} else {
+				d[0], d[1], d[2], d[3] = d[1], d[2], d[3], m.Distance
+			}
+		}
+
+		if m.Length != 0 {
 			// Write a command for the remainder of the match (after the first two bytes
 			// from before), using the previous distance.
 			switch {
@@ -196,6 +204,9 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 
 		pos += m.Unmatched + m.Length
 	}
+
+
+	e.dist_rb = d
 
 	if lastBlock {
 		e.bw.WriteBits(2, 3) // islast + isempty

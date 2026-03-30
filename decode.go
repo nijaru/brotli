@@ -3,8 +3,17 @@ package brotli
 import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/common"
+	"github.com/nijaru/brotli/internal/context"
 	"github.com/nijaru/brotli/internal/dictionary"
 )
+
+func getContextLUT(mode int) context.ContextLUT {
+	return context.GetContextLUT(mode)
+}
+
+func getContext(p1 byte, p2 byte, lut context.ContextLUT) byte {
+	return context.GetContext(p1, p2, lut)
+}
 
 /* Copyright 2013 Google Inc. All Rights Reserved.
 

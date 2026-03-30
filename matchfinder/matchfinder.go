@@ -86,6 +86,16 @@ func (w *Writer) writeBlock(p []byte, lastBlock bool) (n int, err error) {
 	return len(p), w.err
 }
 
+// Flush writes out any buffered data without closing the stream.
+// The data is written as a non-final block.
+func (w *Writer) Flush() error {
+	if len(w.inBuf) > 0 {
+		w.writeBlock(w.inBuf, false)
+		w.inBuf = w.inBuf[:0]
+	}
+	return w.err
+}
+
 func (w *Writer) Close() error {
 	w.writeBlock(w.inBuf, true)
 	w.inBuf = w.inBuf[:0]

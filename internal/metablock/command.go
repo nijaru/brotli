@@ -110,80 +110,14 @@ type DistanceCode struct {
 }
 
 func GetDistanceCode(distance int) DistanceCode {
-	d := distance + 3
-	nbits := common.Log2FloorNonZero(uint(d)) - 1
+	d := uint(distance + 3)
+	nbits := uint32(0)
+	if d > 1 {
+		nbits = common.Log2FloorNonZero(d) - 1
+	}
 	prefix := (d >> nbits) & 1
 	offset := (2 + prefix) << nbits
-	distcode := int(2*(nbits-1)) + prefix + 16
-	extra := d - offset
+	distcode := int(2*int32(nbits-1)) + int(prefix) + 16
+	extra := int(d) - int(offset)
 	return DistanceCode{distcode, uint(nbits), uint64(extra)}
-}
-
-
-type Command struct {
-	Insert_len_  uint32
-	Copy_len_    uint32
-	Dist_extra_  uint32
-	Cmd_prefix_  uint16
-	Dist_prefix_ uint16
-}
-
-/* distance_code is e.g. 0 for same-as-last short code, or 16 for offset 1. */
-func MakeCommand(dist *common.DistanceParams, insertlen uint, copylen uint, copylen_code_delta int, distance_code uint) (cmd Command) {
-	/* Don't rely on signed int representation, use honest casts. */
-	var delta uint32 = uint32(byte(int8(copylen_code_delta)))
-	cmd.Insert_len_ = uint32(insertlen)
-	cmd.Copy_len_ = uint32(uint32(copylen) | delta<<25)
-
-	/* The distance prefix and extra bits are stored in this Command as if
-	   npostfix and ndirect were 0, they are only recomputed later after the
-	   clustering if needed. */
-	common.PrefixEncodeCopyDistance(distance_code, uint(dist.Num_direct_distance_codes), uint(dist.Distance_postfix_bits), &cmd.Dist_prefix_, &cmd.Dist_extra_)
-	GetLengthCode(insertlen, uint(int(copylen)+copylen_code_delta), (cmd.Dist_prefix_&0x3FF == 0), &cmd.Cmd_prefix_)
-
-	return cmd
-}
-
-func MakeInsertCommand(insertlen uint) (cmd Command) {
-	cmd.Insert_len_ = uint32(insertlen)
-	cmd.Copy_len_ = 4 << 25
-	cmd.Dist_extra_ = 0
-	cmd.Dist_prefix_ = common.NumDistanceShortCodes
-	GetLengthCode(insertlen, 4, false, &cmd.Cmd_prefix_)
-	return cmd
-}
-
-func CommandRestoreDistanceCode(self *Command, dist *common.DistanceParams) uint32 {
-	if uint32(self.Dist_prefix_&0x3FF) < common.NumDistanceShortCodes+dist.Num_direct_distance_codes {
-		return uint32(self.Dist_prefix_) & 0x3FF
-	} else {
-		var dcode uint32 = uint32(self.Dist_prefix_) & 0x3FF
-		var nbits uint32 = uint32(self.Dist_prefix_) >> 10
-		var extra uint32 = self.Dist_extra_
-		var postfix_mask uint32 = (1 << dist.Distance_postfix_bits) - 1
-		var hcode uint32 = (dcode - dist.Num_direct_distance_codes - common.NumDistanceShortCodes) >> dist.Distance_postfix_bits
-		var lcode uint32 = (dcode - dist.Num_direct_distance_codes - common.NumDistanceShortCodes) & postfix_mask
-		var offset uint32 = ((2 + (hcode & 1)) << nbits) - 4
-		return ((offset + extra) << dist.Distance_postfix_bits) + lcode + dist.Num_direct_distance_codes + common.NumDistanceShortCodes
-	}
-}
-
-func CommandDistanceContext(self *Command) uint32 {
-	var r uint32 = uint32(self.Cmd_prefix_) >> 6
-	var c uint32 = uint32(self.Cmd_prefix_) & 7
-	if (r == 0 || r == 2 || r == 4 || r == 7) && (c <= 2) {
-		return c
-	}
-
-	return 3
-}
-
-func CommandCopyLen(self *Command) uint32 {
-	return self.Copy_len_ & 0x1FFFFFF
-}
-
-func CommandCopyLenCode(self *Command) uint32 {
-	var modifier uint32 = self.Copy_len_ >> 25
-	var delta int32 = int32(int8(byte(modifier | (modifier&0x40)<<1)))
-	return uint32(int32(self.Copy_len_&0x1FFFFFF) + delta)
 }

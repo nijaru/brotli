@@ -25,13 +25,19 @@ func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) 
 	switch encoding {
 	case "br":
 		w.Header().Set("Content-Encoding", "br")
-		return NewWriterV2(w, level)
+		return NewWriterLevel(w, level)
 	case "gzip":
 		w.Header().Set("Content-Encoding", "gzip")
 		return flate.NewGZIPWriter(w, level)
 	}
 	return nopCloser{w}
 }
+
+type nopCloser struct {
+	io.Writer
+}
+
+func (nopCloser) Close() error { return nil }
 
 // negotiateContentEncoding returns the best offered content encoding for the
 // request's Accept-Encoding header. If two offers match with equal weight and

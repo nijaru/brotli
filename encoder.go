@@ -11,11 +11,13 @@ type Encoder struct {
 	wroteHeader bool
 	bw          bitstream.BitWriter
 	distCache   []metablock.DistanceCode
+	dist_rb     [4]int
 }
 
 func (e *Encoder) Reset() {
 	e.wroteHeader = false
 	e.bw = bitstream.BitWriter{}
+	e.dist_rb = [4]int{16, 15, 11, 4}
 }
 
 func (e *Encoder) Close() error {
@@ -29,6 +31,7 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	if !e.wroteHeader {
 		e.bw.WriteBits(4, 15)
 		e.wroteHeader = true
+		e.dist_rb = [4]int{16, 15, 11, 4}
 	}
 
 	if len(src) == 0 {
@@ -55,7 +58,7 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 	pos := 0
 
 	// d is the ring buffer of the last 4 distances.
-	d := [4]int{-10, -10, -10, -10}
+	d := e.dist_rb
 	for i, m := range matches {
 		if m.Unmatched > 0 {
 			for _, c := range src[pos : pos+m.Unmatched] {
@@ -70,7 +73,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 			// If the stream ends with unmatched bytes, we need a dummy copy length.
 			copyCode = 2
 		}
-		command := metablock.CombineLengthCodes(insertCode, copyCode, i > 0 && m.Distance == matches[i-1].Distance)
+		// Use an implicit distance command if m.Length is 0 to avoid writing a distance code.
+		command := metablock.CombineLengthCodes(insertCode, copyCode, (i > 0 && m.Distance == matches[i-1].Distance) || m.Length == 0)
 		commandHisto[command]++
 		commandCount++
 
@@ -106,7 +110,17 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 			e.distCache[i] = distCode
 			distanceHisto[distCode.Code]++
 			distanceCount++
-			if distCode.Code != 0 {
+
+			// Update the distance cache.
+			if distCode.Code == 0 {
+				// No change.
+			} else if distCode.Code == 1 {
+				d[3], d[2] = d[2], d[3]
+			} else if distCode.Code == 2 {
+				d[3], d[2], d[1] = d[1], d[3], d[2]
+			} else if distCode.Code == 3 {
+				d[3], d[2], d[1], d[0] = d[0], d[3], d[2], d[1]
+			} else {
 				d[0], d[1], d[2], d[3] = d[1], d[2], d[3], m.Distance
 			}
 		}
@@ -137,7 +151,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 			// If the stream ends with unmatched bytes, we need a dummy copy length.
 			copyCode = 2
 		}
-		command := metablock.CombineLengthCodes(insertCode, copyCode, i > 0 && m.Distance == matches[i-1].Distance)
+		// Use an implicit distance command if m.Length is 0 to avoid writing a distance code.
+		command := metablock.CombineLengthCodes(insertCode, copyCode, (i > 0 && m.Distance == matches[i-1].Distance) || m.Length == 0)
 		e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 		if metablock.GetInsertExtra(insertCode) > 0 {
 			e.bw.WriteBits(uint(metablock.GetInsertExtra(insertCode)), uint64(m.Unmatched)-uint64(metablock.GetInsertBase(insertCode)))
@@ -162,6 +177,8 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, la
 
 		pos += m.Unmatched + m.Length
 	}
+
+	e.dist_rb = d
 
 	if lastBlock {
 		e.bw.WriteBits(2, 3) // islast + isempty
