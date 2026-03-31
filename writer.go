@@ -16,7 +16,7 @@ const (
 // WriterOptions configures Writer.
 type WriterOptions struct {
 	// Quality controls the compression-speed vs compression-density trade-offs.
-	// The higher the quality, the slower the compression. Range is 0 to 9.
+	// The higher the quality, the slower the compression. Range is 0 to 11.
 	Quality int
 	// LGWin is the base 2 logarithm of the sliding window size.
 	// Range is 10 to 24. 0 indicates automatic configuration based on Quality.
@@ -27,9 +27,10 @@ var errWriterClosed = fmt.Errorf("brotli: Writer is closed")
 
 // Writer compresses data and writes the compressed output to an io.Writer.
 type Writer struct {
-	w   matchfinder.Writer
-	dst io.Writer
-	err error
+	w       matchfinder.Writer
+	dst     io.Writer
+	options WriterOptions
+	err     error
 }
 
 // Writes to the returned writer are compressed and written to dst.
@@ -54,20 +55,32 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 	if options.Quality < 0 {
 		options.Quality = 0
 	}
-	if options.Quality > 9 {
-		options.Quality = 9
+	if options.Quality > 11 {
+		options.Quality = 11
+	}
+
+	quality := options.Quality
+	if quality > 9 {
+		// We don't support levels 10 and 11 yet (Zopfli).
+		quality = 9
+	}
+
+	lgWin := 16 // Default 64 KB block size for low-latency streaming
+	if options.LGWin > 0 {
+		lgWin = options.LGWin
 	}
 
 	w := &Writer{
 		w: matchfinder.Writer{
 			Dest:        dst,
-			MatchFinder: getMatchFinder(options.Quality),
+			MatchFinder: getMatchFinder(quality, options.LGWin),
 			Encoder:     &Encoder{},
-			BlockSize:   1 << 16,
+			BlockSize:   1 << uint(lgWin),
 		},
-		dst: dst,
+		dst:     dst,
+		options: options,
 	}
-	if options.Quality < 1 {
+	if quality < 1 {
 		w.w.Encoder = &FastEncoder{}
 	}
 	return w
@@ -78,9 +91,16 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 // instead. This permits reusing a Writer rather than allocating a new one.
 func (w *Writer) Reset(dst io.Writer) {
 	if w.w.MatchFinder == nil {
-		w.w.MatchFinder = getMatchFinder(DefaultCompression)
+		w.w.MatchFinder = getMatchFinder(w.options.Quality, w.options.LGWin)
 		w.w.Encoder = &Encoder{}
-		w.w.BlockSize = 1 << 16
+		if w.options.Quality < 1 {
+			w.w.Encoder = &FastEncoder{}
+		}
+		lgWin := 16
+		if w.options.LGWin > 0 {
+			lgWin = w.options.LGWin
+		}
+		w.w.BlockSize = 1 << uint(lgWin)
 	}
 	w.w.Reset(dst)
 	w.dst = dst
@@ -124,52 +144,62 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return w.w.Write(p)
 }
 
-func getMatchFinder(level int) matchfinder.MatchFinder {
+func getMatchFinder(level int, lgwin int) matchfinder.MatchFinder {
+	maxDistance := 1 << 20 // 1 MB default
+	if lgwin > 0 {
+		maxDistance = 1 << uint(lgwin)
+	}
+
 	switch level {
 	case 0, 1:
-		return &matchfinder.ZFast{MaxDistance: 1 << 20}
+		return &matchfinder.ZFast{MaxDistance: maxDistance}
 	case 2:
-		return &matchfinder.ZDFast{MaxDistance: 1 << 20}
+		return &matchfinder.ZDFast{MaxDistance: maxDistance}
 	case 3:
-		return &matchfinder.ZM{MaxDistance: 1 << 20}
+		return &matchfinder.ZM{MaxDistance: maxDistance}
 	case 4:
-		return &matchfinder.Trio{MaxDistance: 1 << 20}
+		return &matchfinder.Trio{MaxDistance: maxDistance}
 	case 5, 6:
-		return &matchfinder.Bargain1{MaxDistance: 1 << 20}
+		return &matchfinder.Bargain1{MaxDistance: maxDistance}
 	case 7:
-		return &matchfinder.Bargain2{MaxDistance: 1 << 20, Skip: true}
+		return &matchfinder.Bargain2{MaxDistance: maxDistance, Skip: true}
 	case 8:
-		return &matchfinder.Bargain2{MaxDistance: 1 << 20}
+		return &matchfinder.Bargain2{MaxDistance: maxDistance}
 	case 9:
-		return &matchfinder.Bargain3{MaxDistance: 1 << 20}
+		return &matchfinder.Bargain3{MaxDistance: maxDistance}
 	}
-	return &matchfinder.Bargain3{MaxDistance: 1 << 20}
+	return &matchfinder.Bargain3{MaxDistance: maxDistance}
 }
 
 // NewParallelWriter creates a Writer that uses multiple goroutines to
 // compress blocks in parallel.
-func NewParallelWriter(dst io.Writer, level int, concurrency int) *matchfinder.ParallelWriter {
-	if level < 0 {
-		level = 0
-	} else if level > 9 {
-		level = 9
+func NewParallelWriter(dst io.Writer, options WriterOptions, concurrency int) *matchfinder.ParallelWriter {
+	if options.Quality < 0 {
+		options.Quality = 0
+	} else if options.Quality > 9 {
+		options.Quality = 9
+	}
+
+	lgWin := 16
+	if options.LGWin > 0 {
+		lgWin = options.LGWin
 	}
 
 	w := &matchfinder.ParallelWriter{
 		Dest: dst,
 		MatchFinder: func() matchfinder.MatchFinder {
-			if level >= 5 && level <= 6 {
+			if options.Quality >= 5 && options.Quality <= 6 {
 				return matchfinder.GetBargain1()
 			}
-			return getMatchFinder(level)
+			return getMatchFinder(options.Quality, options.LGWin)
 		},
 		Encoder: func() matchfinder.Encoder {
-			if level < 1 {
+			if options.Quality < 1 {
 				return matchfinder.GetFastEncoder(func() matchfinder.Encoder { return &FastEncoder{} })
 			}
 			return matchfinder.GetEncoder(func() matchfinder.Encoder { return &Encoder{} })
 		},
-		BlockSize:   1 << 16,
+		BlockSize:   1 << uint(lgWin),
 		Concurrency: concurrency,
 	}
 	return w

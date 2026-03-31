@@ -1035,7 +1035,7 @@ func TestV2FalseMatchZeroVal(t *testing.T) {
 
 	for level := 0; level <= 9; level++ {
 		var buf bytes.Buffer
-		w := NewWriterV2(&buf, level)
+		w := NewWriterLevel(&buf, level)
 		w.Write(data)
 		w.Close()
 
@@ -1056,7 +1056,7 @@ func BenchmarkParallelEncode(b *testing.B) {
 	}
 
 	for b.Loop() {
-		w := NewParallelWriter(io.Discard, 6, 8)
+		w := NewParallelWriter(io.Discard, WriterOptions{Quality: 6}, 8)
 		w.Write(data)
 		w.Close()
 	}

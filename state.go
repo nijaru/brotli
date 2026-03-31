@@ -165,7 +165,7 @@ type Reader struct {
 	substateUncompressed       int
 	substateHuffman            int
 	substateDecodeUint8       int
-	substate_read_blockLength  int
+	substateReadBlockLength  int
 	isLastMetablock           uint
 	isUncompressed             uint
 	isMetadata                 uint
@@ -174,8 +174,8 @@ type Reader struct {
 	largeWindow                bool
 	sizeNibbles                uint
 	windowBits                 uint32
-	new_ringbufferSize         int
-	num_literalHTrees          uint32
+	newRingbufferSize         int
+	numLiteralHTrees          uint32
 	contextMap                 []byte
 	contextModes               []byte
 	dictionary                  *dictionary.Dictionary
@@ -195,7 +195,7 @@ func decoderStateInit(s *Reader) bool {
 	s.substateUncompressed = stateUncompressedNone
 	s.substateHuffman = stateHuffmanNone
 	s.substateDecodeUint8 = stateDecodeUint8None
-	s.substate_read_blockLength = stateReadBlockLengthNone
+	s.substateReadBlockLength = stateReadBlockLengthNone
 
 	s.bufferLength = 0
 	s.loopCounter = 0
@@ -206,7 +206,7 @@ func decoderStateInit(s *Reader) bool {
 	s.blockTypeTrees = nil
 	s.blockLenTrees = nil
 	s.ringbufferSize = 0
-	s.new_ringbufferSize = 0
+	s.newRingbufferSize = 0
 	s.ringbufferMask = 0
 
 	s.contextMap = nil

@@ -904,7 +904,7 @@ WARNING: if state is not BROTLI_STATE_READ_BLOCK_LENGTH_NONE, then
 */
 func safeReadBlockLength(s *Reader, result *uint32, table []bitstream.HuffmanCode, br *bitstream.BitReader) bool {
 	var index uint32
-	if s.substate_read_blockLength == stateReadBlockLengthNone {
+	if s.substateReadBlockLength == stateReadBlockLengthNone {
 		if !safeReadSymbol(table, br, &index) {
 			return false
 		}
@@ -916,12 +916,12 @@ func safeReadBlockLength(s *Reader, result *uint32, table []bitstream.HuffmanCod
 		var nbits uint32 = common.KBlockLengthPrefixCode[index].Nbits
 		if !bitstream.SafeReadBits(br, nbits, &bits) {
 			s.blockLengthIndex = index
-			s.substate_read_blockLength = stateReadBlockLengthSuffix
+			s.substateReadBlockLength = stateReadBlockLengthSuffix
 			return false
 		}
 
 		*result = common.KBlockLengthPrefixCode[index].Offset + bits
-		s.substate_read_blockLength = stateReadBlockLengthNone
+		s.substateReadBlockLength = stateReadBlockLengthNone
 		return true
 	}
 }
@@ -1166,7 +1166,7 @@ func decodeBlockTypeAndLength(safe int, s *Reader, tree_type int) bool {
 			return false
 		}
 		if !safeReadBlockLength(s, &s.blockLength[tree_type], len_tree, br) {
-			s.substate_read_blockLength = stateReadBlockLengthNone
+			s.substateReadBlockLength = stateReadBlockLengthNone
 			bitstream.BitReaderRestoreState(br, &memento)
 			return false
 		}
@@ -1377,24 +1377,24 @@ Allocates ring-buffer.
 */
 func ensureRingBuffer(s *Reader) bool {
 	var old_ringbuffer []byte
-	if s.ringbufferSize == s.new_ringbufferSize {
+	if s.ringbufferSize == s.newRingbufferSize {
 		return true
 	}
-	spaceNeeded := int(s.new_ringbufferSize) + int(kRingBufferWriteAheadSlack)
+	spaceNeeded := int(s.newRingbufferSize) + int(kRingBufferWriteAheadSlack)
 	if len(s.ringbuffer) < spaceNeeded {
 		old_ringbuffer = s.ringbuffer
 		s.ringbuffer = make([]byte, spaceNeeded)
 	}
 
-	s.ringbuffer[s.new_ringbufferSize-2] = 0
-	s.ringbuffer[s.new_ringbufferSize-1] = 0
+	s.ringbuffer[s.newRingbufferSize-2] = 0
+	s.ringbuffer[s.newRingbufferSize-1] = 0
 
 	if old_ringbuffer != nil {
 		copy(s.ringbuffer, old_ringbuffer[:uint(s.pos)])
 	}
 
-	s.ringbufferSize = s.new_ringbufferSize
-	s.ringbufferMask = s.new_ringbufferSize - 1
+	s.ringbufferSize = s.newRingbufferSize
+	s.ringbufferMask = s.newRingbufferSize - 1
 	s.ringbufferEnd = s.ringbuffer[s.ringbufferSize:]
 
 	return true
@@ -1465,7 +1465,7 @@ Calculates the smallest feasible ring buffer.
 */
 func calculateRingBufferSize(s *Reader) {
 	var window_size int = 1 << s.windowBits
-	var new_ringbufferSize int = window_size
+	var newRingbufferSize int = window_size
 	var min_size int
 	/* We need at least 2 bytes of ring buffer size to get the last two
 	   bytes for context from there */
@@ -1501,12 +1501,12 @@ func calculateRingBufferSize(s *Reader) {
 		/* Reduce ring buffer size to save memory when server is unscrupulous.
 		   In worst case memory usage might be 1.5x bigger for a short period of
 		   ring buffer reallocation. */
-		for new_ringbufferSize>>1 >= min_size {
-			new_ringbufferSize >>= 1
+		for newRingbufferSize>>1 >= min_size {
+			newRingbufferSize >>= 1
 		}
 	}
 
-	s.new_ringbufferSize = new_ringbufferSize
+	s.newRingbufferSize = newRingbufferSize
 }
 
 /* Reads 1..256 2-bit context modes. */
@@ -2416,7 +2416,7 @@ func decoderDecompressStream(s *Reader, available_in *uint, next_in *[]byte, ava
 			fallthrough
 
 		case stateContextMap1:
-			result = decodeContextMap(s.numBlockTypes[0]<<literalContextBits, &s.num_literalHTrees, &s.contextMap, s)
+			result = decodeContextMap(s.numBlockTypes[0]<<literalContextBits, &s.numLiteralHTrees, &s.contextMap, s)
 
 			if result != decoderSuccess {
 				break
@@ -2444,7 +2444,7 @@ func decoderDecompressStream(s *Reader, available_in *uint, next_in *[]byte, ava
 					break
 				}
 
-				if !decoderHuffmanTreeGroupInit(s, &s.literalHGroup, numLiteralSymbols, numLiteralSymbols, s.num_literalHTrees) {
+				if !decoderHuffmanTreeGroupInit(s, &s.literalHGroup, numLiteralSymbols, numLiteralSymbols, s.numLiteralHTrees) {
 					allocation_success = false
 				}
 
