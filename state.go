@@ -106,22 +106,22 @@ type Reader struct {
 	bufferLength               uint32
 	pos                         int
 	maxBackwardDistance       int
-	max_distance                int
+	maxDistance                int
 	ringbufferSize             int
 	ringbufferMask             int
 	distRbIdx                 int
 	distRb                     [4]int
 	errorCode                  int
-	sub_loopCounter            uint32
+	subLoopCounter            uint32
 	ringbuffer                  []byte
 	ringbufferEnd              []byte
 	htreeCommand               []bitstream.HuffmanCode
 	contextLookup              []byte
 	contextMapSlice           []byte
-	dist_contextMapSlice      []byte
-	literal_hgroup              bitstream.HuffmanTreeGroup
-	insert_copy_hgroup          bitstream.HuffmanTreeGroup
-	distance_hgroup             bitstream.HuffmanTreeGroup
+	distContextMapSlice      []byte
+	literalHGroup              bitstream.HuffmanTreeGroup
+	insertCopyHGroup          bitstream.HuffmanTreeGroup
+	distanceHGroup             bitstream.HuffmanTreeGroup
 	blockTypeTrees            []bitstream.HuffmanCode
 	blockLenTrees             []bitstream.HuffmanCode
 	trivialLiteralContext     int
@@ -213,16 +213,16 @@ func decoderStateInit(s *Reader) bool {
 	s.contextModes = nil
 	s.distContextMap = nil
 	s.contextMapSlice = nil
-	s.dist_contextMapSlice = nil
+	s.distContextMapSlice = nil
 
-	s.sub_loopCounter = 0
+	s.subLoopCounter = 0
 
-	s.literal_hgroup.Codes = nil
-	s.literal_hgroup.HTrees = nil
-	s.insert_copy_hgroup.Codes = nil
-	s.insert_copy_hgroup.HTrees = nil
-	s.distance_hgroup.Codes = nil
-	s.distance_hgroup.HTrees = nil
+	s.literalHGroup.Codes = nil
+	s.literalHGroup.HTrees = nil
+	s.insertCopyHGroup.Codes = nil
+	s.insertCopyHGroup.HTrees = nil
+	s.distanceHGroup.Codes = nil
+	s.distanceHGroup.HTrees = nil
 
 	s.isLastMetablock = 0
 	s.isUncompressed = 0
@@ -231,7 +231,7 @@ func decoderStateInit(s *Reader) bool {
 	s.cannyRingbufferAllocation = 1
 
 	s.windowBits = 0
-	s.max_distance = 0
+	s.maxDistance = 0
 	s.distRb[0] = 16
 	s.distRb[1] = 15
 	s.distRb[2] = 11
@@ -268,24 +268,24 @@ func decoderStateMetablockBegin(s *Reader) {
 	s.distContextMap = nil
 	s.contextMapSlice = nil
 	s.literalHTree = nil
-	s.dist_contextMapSlice = nil
+	s.distContextMapSlice = nil
 	s.distHTreeIndex = 0
 	s.contextLookup = nil
-	s.literal_hgroup.Codes = nil
-	s.literal_hgroup.HTrees = nil
-	s.insert_copy_hgroup.Codes = nil
-	s.insert_copy_hgroup.HTrees = nil
-	s.distance_hgroup.Codes = nil
-	s.distance_hgroup.HTrees = nil
+	s.literalHGroup.Codes = nil
+	s.literalHGroup.HTrees = nil
+	s.insertCopyHGroup.Codes = nil
+	s.insertCopyHGroup.HTrees = nil
+	s.distanceHGroup.Codes = nil
+	s.distanceHGroup.HTrees = nil
 }
 
 func decoderStateCleanupAfterMetablock(s *Reader) {
 	s.contextModes = nil
 	s.contextMap = nil
 	s.distContextMap = nil
-	s.literal_hgroup.HTrees = nil
-	s.insert_copy_hgroup.HTrees = nil
-	s.distance_hgroup.HTrees = nil
+	s.literalHGroup.HTrees = nil
+	s.insertCopyHGroup.HTrees = nil
+	s.distanceHGroup.HTrees = nil
 }
 
 func decoderHuffmanTreeGroupInit(s *Reader, group *bitstream.HuffmanTreeGroup, alphabetSize uint32, maxSymbol uint32, nTrees uint32) bool {
