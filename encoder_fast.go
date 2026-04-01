@@ -1,26 +1,15 @@
 package brotli
 
 import (
-	"math"
-
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/metablock"
 	"github.com/nijaru/brotli/matchfinder"
 )
 
-func gaussianProbability(x, mean, stdDev float64) float64 {
-	return math.Exp(-(x-mean)*(x-mean)/(2*stdDev*stdDev)) / math.Sqrt(2*math.Pi*stdDev*stdDev)
-}
-
-// A FastEncoder implements the matchfinder.Encoder interface, writing in Brotli
-// format. It uses a simplified encoding (like level 0 in the reference
-// implementation) to save time.
 type FastEncoder struct {
-	wroteHeader   bool
-	bw            bitstream.BitWriter
-	commandHisto  [704]uint32
-	distanceHisto [64]uint32
-	distRb       [4]int
+	wroteHeader bool
+	bw          bitstream.BitWriter
+	distRb      [4]int
 }
 
 func (e *FastEncoder) Reset() {
