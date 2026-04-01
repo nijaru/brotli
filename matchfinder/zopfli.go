@@ -44,6 +44,18 @@ func (z *Zopfli) maxDist() int {
 	return z.MaxDistance
 }
 
+type zplStep struct {
+	isLiteral bool
+	dist      uint16
+	length    uint16
+}
+
+// candScore ranks candidates: higher is better for the DP.
+// Length dominates, but closer distance gets a small bonus.
+func candScore(length, dist int) int {
+	return length*256 - dist/256
+}
+
 // FindMatches implements matchfinder.MatchFinder.
 func (z *Zopfli) FindMatches(dst []Match, src []byte) []Match {
 	if len(src) < 8 {
@@ -78,18 +90,6 @@ func (z *Zopfli) FindMatches(dst []Match, src []byte) []Match {
 		dst = append(dst, Match{Unmatched: len(src) - e.NextEmit})
 	}
 	return dst
-}
-
-type zplStep struct {
-	isLiteral bool
-	dist      uint16
-	length    uint16
-}
-
-// candScore ranks candidates: higher is better for the DP.
-// Length dominates, but closer distance gets a small bonus.
-func candScore(length, dist int) int {
-	return length*256 - dist/256
 }
 
 func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter {

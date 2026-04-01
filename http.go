@@ -4,8 +4,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/nijaru/brotli/flate"
 )
 
 // HTTPCompressor chooses a compression method (brotli, gzip, or none) based on
@@ -21,14 +19,11 @@ func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) 
 		w.Header().Set("Vary", "Accept-Encoding")
 	}
 
-	encoding := negotiateContentEncoding(r, []string{"br", "gzip"})
+	encoding := negotiateContentEncoding(r, []string{"br"})
 	switch encoding {
 	case "br":
 		w.Header().Set("Content-Encoding", "br")
 		return NewWriterLevel(w, level)
-	case "gzip":
-		w.Header().Set("Content-Encoding", "gzip")
-		return flate.NewGZIPWriter(w, level)
 	}
 	return nopCloser{w}
 }
