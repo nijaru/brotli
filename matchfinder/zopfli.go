@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"math"
 	"math/bits"
+	"slices"
 )
 
 // Zopfli is a MatchFinder that uses exhaustive candidate search
@@ -33,6 +34,7 @@ const (
 	zplLenMax    = 262
 	zplMinMatch  = 4
 	zplChainMax  = 65536
+	zplMaxCands  = 128 // max candidates per position
 )
 
 func (z *Zopfli) maxDist() int {
@@ -40,13 +42,6 @@ func (z *Zopfli) maxDist() int {
 		return 1 << 20
 	}
 	return z.MaxDistance
-}
-
-// A decision recorded at each position during DP.
-type zplStep struct {
-	isLiteral bool   // true = emit one literal byte
-	dist      uint16 // match distance (valid when !isLiteral)
-	length    uint16 // match length (valid when !isLiteral)
 }
 
 // FindMatches implements matchfinder.MatchFinder.
@@ -68,7 +63,6 @@ func (z *Zopfli) FindMatches(dst []Match, src []byte) []Match {
 	z.history = append(z.history, src...)
 	src = z.history
 
-	// Process in blocks to bound memory.
 	blockSize := 1 << 16
 	n := len(src) - e.NextEmit
 	for off := 0; off < n; off += blockSize {
@@ -86,6 +80,18 @@ func (z *Zopfli) FindMatches(dst []Match, src []byte) []Match {
 	return dst
 }
 
+type zplStep struct {
+	isLiteral bool
+	dist      uint16
+	length    uint16
+}
+
+// candScore ranks candidates: higher is better for the DP.
+// Length dominates, but closer distance gets a small bonus.
+func candScore(length, dist int) int {
+	return length*256 - dist/256
+}
+
 func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter {
 	blkLen := len(blk)
 	if blkLen < zplMinMatch {
@@ -93,7 +99,6 @@ func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter
 		return e
 	}
 
-	// Ensure table / chain capacity.
 	if len(z.table) < zplTableSize {
 		z.table = make([]uint32, zplTableSize)
 	}
@@ -104,8 +109,7 @@ func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter
 	}
 	clear(z.table)
 
-	// Build hash chain: for each position i, chain[i] = previous position
-	// with the same hash (or MaxUint32 if none).
+	// Build hash chain.
 	for i := 0; i < blkLen-3; i++ {
 		key := hashZpl(blk, i) & (zplTableSize - 1)
 		if prev := z.table[key]; prev != 0 {
@@ -113,26 +117,30 @@ func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter
 		} else {
 			z.chain[i] = math.MaxUint32
 		}
-		z.table[key] = uint32(i + 1) // 1-based
+		z.table[key] = uint32(i + 1)
 	}
 	for i := max(0, blkLen-3); i < blkLen; i++ {
 		z.chain[i] = math.MaxUint32
 	}
 
-	// Phase 1: find longest match at each position.
+	// Phase 1: collect candidates at each position.
 	type candidate struct {
-		length uint16 // 0 = none
+		length uint16
 		dist   uint16
 	}
-	cands := make([]candidate, blkLen)
+
+	// candsByPos tracks the flat candidates slice: cands[start[i]:end[i]]
+	// belongs to position i.
+	cands := make([]candidate, 0, blkLen*4)
+	candStart := make([]int, blkLen)
+	candEnd := make([]int, blkLen)
 
 	for i := 0; i < blkLen-zplMinMatch; i++ {
-		bestLen := 0
-		bestDist := uint32(0)
-		walked := 0
+		start := len(cands)
+		added := 0
 
-		for cur := z.chain[i]; cur != math.MaxUint32 && walked < zplChainMax; cur = z.chain[cur] {
-			walked++
+		for cur := z.chain[i]; cur != math.MaxUint32 && added < zplMaxCands; cur = z.chain[cur] {
+			added++
 			dist := uint32(i) - cur
 			if dist == 0 || int(dist) > maxDist {
 				continue
@@ -145,23 +153,44 @@ func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter
 			}
 			end := extendMatchBoundedZpl(blk, int(cur)+4, i+4, zplLenMax)
 			ml := end - i
-			if ml > bestLen {
-				bestLen = ml
-				bestDist = dist
-				if bestLen >= zplLenMax {
-					break
-				}
+			if ml < zplMinMatch {
+				continue
 			}
+			cands = append(cands, candidate{length: uint16(ml), dist: uint16(dist)})
 		}
 
-		if bestLen >= zplMinMatch {
-			cands[i] = candidate{length: uint16(bestLen), dist: uint16(bestDist)}
+		// Keep only the best zplMaxCands candidates at each position,
+		// sorted by score descending. Deduplicate by distance (keep longest).
+		if len(cands)-start > 1 {
+			best := cands[start:]
+			slices.SortFunc(best, func(a, b candidate) int {
+				sa := candScore(int(a.length), int(a.dist))
+				sb := candScore(int(b.length), int(b.dist))
+				return sb - sa
+			})
+			// Deduplicate: keep longest for each unique distance.
+			write := start
+			for read := start; read < len(cands); read++ {
+				dup := false
+				for w := start; w < write; w++ {
+					if cands[w].dist == cands[read].dist {
+						dup = true
+						break
+					}
+				}
+				if !dup && write-start < zplMaxCands {
+					cands[write] = cands[read]
+					write++
+				}
+			}
+			cands = cands[:write]
 		}
+
+		candStart[i] = start
+		candEnd[i] = len(cands)
 	}
 
 	// Phase 2: DP optimal parse.
-	// cost[p] = minimum approximate bit-cost to reach position p.
-	// dec[p]  = the decision that achieved cost[p].
 	cost := make([]float64, blkLen+1)
 	dec := make([]zplStep, blkLen+1)
 	for i := 1; i <= blkLen; i++ {
@@ -180,21 +209,20 @@ func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter
 			dec[i+1] = zplStep{isLiteral: true}
 		}
 
-		// Option B: a match.
-		ci := cands[i]
-		if ci.length == 0 {
-			continue
-		}
-		ml := int(ci.length)
-		if i+ml > blkLen {
-			ml = blkLen - i
-		}
-		base := cost[i] + costMatchBase() + costDistExtra(int(ci.dist))
-		for l := zplMinMatch; l <= ml; l++ {
-			c := base + costLenExtra(l)
-			if c < cost[i+l] {
-				cost[i+l] = c
-				dec[i+l] = zplStep{isLiteral: false, dist: ci.dist, length: uint16(l)}
+		// Option B: try each candidate match.
+		for ci := candStart[i]; ci < candEnd[i]; ci++ {
+			c := cands[ci]
+			ml := int(c.length)
+			if i+ml > blkLen {
+				ml = blkLen - i
+			}
+			base := cost[i] + costMatchBase() + costDistExtra(int(c.dist))
+			for l := zplMinMatch; l <= ml; l++ {
+				cc := base + costLenExtra(l)
+				if cc < cost[i+l] {
+					cost[i+l] = cc
+					dec[i+l] = zplStep{isLiteral: false, dist: c.dist, length: uint16(l)}
+				}
 			}
 		}
 	}
@@ -205,7 +233,7 @@ func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter
 	for pos > 0 {
 		s := dec[pos]
 		if !s.isLiteral && s.length == 0 {
-			// Unreachable state (shouldn't happen if DP is correct).
+			// Guard: force literal if no valid match decision.
 			s.isLiteral = true
 		}
 		steps = append(steps, s)
@@ -227,49 +255,36 @@ func (z *Zopfli) findBlock(e matchEmitter, blk []byte, maxDist int) matchEmitter
 		steps[i], steps[j] = steps[j], steps[i]
 	}
 
-	// Phase 4: emit matches.
-	blockStart := e.NextEmit // global position of first byte in this block
-
-	// Emit entries for the steps.
+	// Phase 4: emit in forward order.
+	var pendingLits int
 	for _, s := range steps {
 		if s.isLiteral {
-			blockStart++
+			pendingLits++
 			continue
 		}
-		matchLen := int(s.length)
-		matchGlobalStart := blockStart
-
-		// Check for byte-level validity of the match against source data.
-		if matchLen <= matchGlobalStart-e.NextEmit+blkLen && int(s.dist) <= matchGlobalStart-e.NextEmit {
-			// distance must be >= 1
-			if s.dist == 0 {
-				s.isLiteral = true
-				blockStart++
-				continue
-			}
+		// Safety: distance must be >= 1.
+		if s.dist == 0 {
+			pendingLits += int(s.length)
+			continue
 		}
-
 		e.Dst = append(e.Dst, Match{
-			Unmatched: matchGlobalStart - e.NextEmit,
-			Length:    matchLen,
+			Unmatched: pendingLits,
+			Length:    int(s.length),
 			Distance:  int(s.dist),
 		})
-		e.NextEmit = matchGlobalStart + matchLen
-		blockStart += matchLen
+		pendingLits = 0
 	}
-
-	// Remaining block bytes.
-	if blockStart > e.NextEmit {
-		e.Dst = append(e.Dst, Match{Unmatched: int(blockStart) - e.NextEmit})
-		e.NextEmit = blockStart
+	if pendingLits > 0 {
+		e.Dst = append(e.Dst, Match{Unmatched: pendingLits})
 	}
+	e.NextEmit += blkLen
 
 	return e
 }
 
 func hashZpl(data []byte, i int) uint64 {
 	v := binary.LittleEndian.Uint32(data[i:])
-	return (uint64(v) * 0x1E35A7BD1E35A7BD)
+	return uint64(v) * 0x1E35A7BD1E35A7BD
 }
 
 func extendMatchBoundedZpl(data []byte, cur, pos, limit int) int {
@@ -287,7 +302,6 @@ func extendMatchBoundedZpl(data []byte, cur, pos, limit int) int {
 	return pos
 }
 
-// Approximate bit-cost functions for the DP.
 func costLiteral() float64              { return 3.2 }
 func costMatchBase() float64            { return 4.5 }
 func costLenExtra(n int) float64        { return float64(bits.Len32(uint32(n))) * 0.7 }
