@@ -59,13 +59,7 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 		options.Quality = 11
 	}
 
-	quality := options.Quality
-	if quality > 9 {
-		// We don't support levels 10 and 11 yet (Zopfli).
-		quality = 9
-	}
-
-	lgWin := 16 // Default 64 KB block size for low-latency streaming
+	lgWin := 16
 	if options.LGWin > 0 {
 		lgWin = options.LGWin
 	}
@@ -73,14 +67,14 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 	w := &Writer{
 		w: matchfinder.Writer{
 			Dest:        dst,
-			MatchFinder: getMatchFinder(quality, options.LGWin),
+			MatchFinder: getMatchFinder(options.Quality, options.LGWin),
 			Encoder:     &Encoder{},
 			BlockSize:   1 << uint(lgWin),
 		},
 		dst:     dst,
 		options: options,
 	}
-	if quality < 1 {
+	if options.Quality < 1 {
 		w.w.Encoder = &FastEncoder{}
 	}
 	return w
@@ -167,6 +161,8 @@ func getMatchFinder(level int, lgwin int) matchfinder.MatchFinder {
 		return &matchfinder.Bargain2{MaxDistance: maxDistance}
 	case 9:
 		return &matchfinder.Bargain3{MaxDistance: maxDistance}
+	case 10, 11:
+		return &matchfinder.Zopfli{MaxDistance: maxDistance}
 	}
 	return &matchfinder.Bargain3{MaxDistance: maxDistance}
 }
@@ -176,8 +172,8 @@ func getMatchFinder(level int, lgwin int) matchfinder.MatchFinder {
 func NewParallelWriter(dst io.Writer, options WriterOptions, concurrency int) *matchfinder.ParallelWriter {
 	if options.Quality < 0 {
 		options.Quality = 0
-	} else if options.Quality > 9 {
-		options.Quality = 9
+	} else if options.Quality > 11 {
+		options.Quality = 11
 	}
 
 	lgWin := 16
