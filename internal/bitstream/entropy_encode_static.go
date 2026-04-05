@@ -4,9 +4,9 @@ import (
 	"github.com/nijaru/brotli/internal/common"
 )
 
-var kCodeLengthDepth = [18]byte{4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 0, 4, 4}
+var codeLengthDepth = [18]byte{4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 0, 4, 4}
 
-var kStaticCommandCodeDepth = [common.NumCommandSymbols]byte{
+var staticCommandCodeDepth = [common.NumCommandSymbols]byte{
 	9,
 	9,
 	9,
@@ -713,7 +713,7 @@ var kStaticCommandCodeDepth = [common.NumCommandSymbols]byte{
 	11,
 }
 
-var kStaticDistanceCodeDepth = [64]byte{
+var staticDistanceCodeDepth = [64]byte{
 	6,
 	6,
 	6,
@@ -780,7 +780,7 @@ var kStaticDistanceCodeDepth = [64]byte{
 	6,
 }
 
-var kCodeLengthBits = [18]uint32{0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 15, 31, 0, 11, 7}
+var codeLengthBits = [18]uint32{0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 15, 31, 0, 11, 7}
 
 func StoreStaticCodeLengthCode(storage_ix *uint, storage []byte) {
 	WriteBits(40, 0x0000FF55555554, storage_ix, storage)
@@ -791,7 +791,7 @@ func StoreStaticCodeLengthCodeBW(bw *BitWriter) {
 	bw.WriteBits(8, 0xFF)
 }
 
-var kZeroRepsBits = [common.NumCommandSymbols]uint64{
+var zeroRepsBits = [common.NumCommandSymbols]uint64{
 	0x00000000,
 	0x00000000,
 	0x00000000,
@@ -1498,7 +1498,7 @@ var kZeroRepsBits = [common.NumCommandSymbols]uint64{
 	0x08f9cb87,
 }
 
-var kZeroRepsDepth = [common.NumCommandSymbols]uint32{
+var zeroRepsDepth = [common.NumCommandSymbols]uint32{
 	0,
 	4,
 	8,
@@ -2205,7 +2205,7 @@ var kZeroRepsDepth = [common.NumCommandSymbols]uint32{
 	28,
 }
 
-var kNonZeroRepsBits = [common.NumCommandSymbols]uint64{
+var nonZeroRepsBits = [common.NumCommandSymbols]uint64{
 	0x0000000b,
 	0x0000001b,
 	0x0000002b,
@@ -2912,7 +2912,7 @@ var kNonZeroRepsBits = [common.NumCommandSymbols]uint64{
 	0x3baeb6db,
 }
 
-var kNonZeroRepsDepth = [common.NumCommandSymbols]uint32{
+var nonZeroRepsDepth = [common.NumCommandSymbols]uint32{
 	6,
 	6,
 	6,
@@ -3619,7 +3619,7 @@ var kNonZeroRepsDepth = [common.NumCommandSymbols]uint32{
 	30,
 }
 
-var kStaticCommandCodeBits = [common.NumCommandSymbols]uint16{
+var staticCommandCodeBits = [common.NumCommandSymbols]uint16{
 	0,
 	256,
 	128,
@@ -4331,7 +4331,7 @@ func StoreStaticCommandHuffmanTree(storage_ix *uint, storage []byte) {
 	WriteBits(3, 0x00000000, storage_ix, storage)
 }
 
-var kStaticDistanceCodeBits = [64]uint16{
+var staticDistanceCodeBits = [64]uint16{
 	0,
 	32,
 	16,

@@ -141,28 +141,30 @@ mainLoop:
 			}
 			if coffsetS < int32(z.MaxDistance) && uint32(cv) == candidateS.val {
 				t = candidateS.offset - z.current
-				if binary.LittleEndian.Uint32(src[t:]) == uint32(cv) {
-					// Found a regular match.
-					// See if we can find a long match at s+1
-					cv := binary.LittleEndian.Uint64(src[s+1:])
-					nextHashL = z.hashLong(cv)
-					candidateL = z.longTable[nextHashL]
-					coffsetL = s - (candidateL.offset - z.current) + 1
-					z.longTable[nextHashL] = tableEntry{offset: s + 1 + z.current, val: uint32(cv)}
-					if coffsetL < int32(z.MaxDistance) && uint32(cv) == candidateL.val {
-						t = candidateL.offset - z.current
-						if binary.LittleEndian.Uint32(src[t:]) == uint32(cv) {
-							// We found a long match at s+1, so we'll use that instead
-							// of the regular match at s.
-							s++
-							break
-						}
-					}
-
-					t = candidateS.offset - z.current
-					break
+				if binary.LittleEndian.Uint32(src[t:]) != uint32(cv) {
+					goto noMatch
 				}
+				// Found a regular match.
+				// See if we can find a long match at s+1
+				cv := binary.LittleEndian.Uint64(src[s+1:])
+				nextHashL = z.hashLong(cv)
+				candidateL = z.longTable[nextHashL]
+				coffsetL = s - (candidateL.offset - z.current) + 1
+				z.longTable[nextHashL] = tableEntry{offset: s + 1 + z.current, val: uint32(cv)}
+				if coffsetL < int32(z.MaxDistance) && uint32(cv) == candidateL.val {
+					t = candidateL.offset - z.current
+					if binary.LittleEndian.Uint32(src[t:]) == uint32(cv) {
+						// We found a long match at s+1, so we'll use that instead
+						// of the regular match at s.
+						s++
+						break
+					}
+				}
+
+				t = candidateS.offset - z.current
+				break
 			}
+		noMatch:
 
 			s += stepSize + ((s - nextEmit) >> 7)
 			if s > sLimit {
@@ -171,8 +173,10 @@ mainLoop:
 			cv = binary.LittleEndian.Uint64(src[s:])
 		}
 
-		// A 4-byte match has been found. We'll later see if more than 4 bytes.
-		offset1, offset2 = s-t, offset1
+		// A 4-byte match has been found. We'll later see if more than
+		// 4 bytes.
+		offset2 = offset1
+		offset1 = s - t
 
 		end := extendMatch(src, int(t+4), int(s+4))
 		for t > 0 && s > nextEmit && src[t-1] == src[s-1] {
@@ -228,7 +232,6 @@ mainLoop:
 			})
 			s = int32(end)
 			nextEmit = s
-			//lint:ignore SA4006 offset2 used next iteration in "check offset 2" block
 			offset1, offset2 = offset2, offset1
 			if s >= sLimit {
 				break mainLoop

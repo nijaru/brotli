@@ -52,6 +52,7 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 			if readErr == io.EOF && r.state != stateDone {
 				readErr = io.ErrUnexpectedEOF
 			}
+			// If readErr is `nil`, we just proxy underlying stream behavior.
 			return 0, readErr
 		}
 		r.in = r.buf[:m]
@@ -63,12 +64,12 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 
 	for {
 		var written uint
-		inLen := uint(len(r.in))
-		outLen := uint(len(p))
-		inRemaining := inLen
-		outRemaining := outLen
-		result := decoderDecompressStream(r, &inRemaining, &r.in, &outRemaining, &p)
-		written = outLen - outRemaining
+		in_len := uint(len(r.in))
+		out_len := uint(len(p))
+		in_remaining := in_len
+		out_remaining := out_len
+		result := decoderDecompressStream(r, &in_remaining, &r.in, &out_remaining, &p)
+		written = out_len - out_remaining
 		n = int(written)
 
 		switch result {
@@ -99,6 +100,7 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 		// Top off the buffer.
 		encN, err := r.src.Read(r.buf)
 		if encN == 0 {
+			// Not enough data to complete decoding.
 			if err == io.EOF {
 				return 0, io.ErrUnexpectedEOF
 			}

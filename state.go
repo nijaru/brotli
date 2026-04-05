@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/nijaru/brotli/internal/bitstream"
+	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/dictionary"
 )
 
@@ -112,13 +113,13 @@ type Reader struct {
 	distRbIdx                 int
 	distRb                     [4]int
 	errorCode                  int
-	subLoopCounter            uint32
+	sub_loopCounter            uint32
 	ringbuffer                  []byte
 	ringbufferEnd              []byte
 	htreeCommand               []bitstream.HuffmanCode
 	contextLookup              []byte
 	contextMapSlice           []byte
-	distContextMapSlice      []byte
+	dist_contextMapSlice      []byte
 	literalHGroup              bitstream.HuffmanTreeGroup
 	insertCopyHGroup          bitstream.HuffmanTreeGroup
 	distanceHGroup             bitstream.HuffmanTreeGroup
@@ -134,10 +135,10 @@ type Reader struct {
 	distancePostfixBits       uint32
 	numDirectDistanceCodes   uint32
 	distancePostfixMask       int
-	numDistHTrees             uint32
+	numDistHtrees             uint32
 	distContextMap            []byte
-	literalHTree               []bitstream.HuffmanCode
-	distHTreeIndex            byte
+	literalHtree               []bitstream.HuffmanCode
+	distHtreeIndex            byte
 	repeatCodeLen             uint32
 	prevCodeLen               uint32
 	copyLength                 int
@@ -151,7 +152,7 @@ type Reader struct {
 	symbolLists                bitstream.SymbolList
 	symbolsListsArray         [bitstream.HuffmanMaxCodeLength + 1 + numCommandSymbols]uint16
 	nextSymbol                 [32]int
-	codeLengthCodeLengths    [codeLengthCodes]byte
+	codeLengthCodeLengths    [common.CodeLengthCodes]byte
 	codeLengthHisto           [16]uint16
 	htreeIndex                 int
 	next                        []bitstream.HuffmanCode
@@ -165,7 +166,7 @@ type Reader struct {
 	substateUncompressed       int
 	substateHuffman            int
 	substateDecodeUint8       int
-	substateReadBlockLength  int
+	substate_read_blockLength  int
 	isLastMetablock           uint
 	isUncompressed             uint
 	isMetadata                 uint
@@ -174,8 +175,8 @@ type Reader struct {
 	largeWindow                bool
 	sizeNibbles                uint
 	windowBits                 uint32
-	newRingbufferSize         int
-	numLiteralHTrees          uint32
+	new_ringbufferSize         int
+	num_literalHtrees          uint32
 	contextMap                 []byte
 	contextModes               []byte
 	dictionary                  *dictionary.Dictionary
@@ -186,7 +187,7 @@ type Reader struct {
 func decoderStateInit(s *Reader) bool {
 	s.errorCode = 0 /* BROTLI_DECODER_NO_ERROR */
 
-	bitstream.InitBitReader(&s.br)
+	s.br.Init()
 	s.state = stateUninited
 	s.largeWindow = false
 	s.substateMetablockHeader = stateMetablockHeaderNone
@@ -195,7 +196,7 @@ func decoderStateInit(s *Reader) bool {
 	s.substateUncompressed = stateUncompressedNone
 	s.substateHuffman = stateHuffmanNone
 	s.substateDecodeUint8 = stateDecodeUint8None
-	s.substateReadBlockLength = stateReadBlockLengthNone
+	s.substate_read_blockLength = stateReadBlockLengthNone
 
 	s.bufferLength = 0
 	s.loopCounter = 0
@@ -206,16 +207,16 @@ func decoderStateInit(s *Reader) bool {
 	s.blockTypeTrees = nil
 	s.blockLenTrees = nil
 	s.ringbufferSize = 0
-	s.newRingbufferSize = 0
+	s.new_ringbufferSize = 0
 	s.ringbufferMask = 0
 
 	s.contextMap = nil
 	s.contextModes = nil
 	s.distContextMap = nil
 	s.contextMapSlice = nil
-	s.distContextMapSlice = nil
+	s.dist_contextMapSlice = nil
 
-	s.subLoopCounter = 0
+	s.sub_loopCounter = 0
 
 	s.literalHGroup.Codes = nil
 	s.literalHGroup.HTrees = nil
@@ -267,9 +268,9 @@ func decoderStateMetablockBegin(s *Reader) {
 	s.contextModes = nil
 	s.distContextMap = nil
 	s.contextMapSlice = nil
-	s.literalHTree = nil
-	s.distContextMapSlice = nil
-	s.distHTreeIndex = 0
+	s.literalHtree = nil
+	s.dist_contextMapSlice = nil
+	s.distHtreeIndex = 0
 	s.contextLookup = nil
 	s.literalHGroup.Codes = nil
 	s.literalHGroup.HTrees = nil

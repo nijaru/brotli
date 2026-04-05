@@ -8,9 +8,9 @@ package dictionary
 
 /* Collection of static dictionary words. */
 type Dictionary struct {
-	SizeBitsByLength [32]byte
-	OffsetsByLength   [32]uint32
-	DataSize           uint
+	Size_bits_by_length [32]byte
+	Offsets_by_length   [32]uint32
+	Data_size           uint
 	Data                []byte
 }
 
@@ -122805,7 +122805,7 @@ var DictionaryData = []byte{
 }
 
 var kBrotliDictionary = Dictionary{
-	/* SizeBitsByLength */
+	/* Size_bits_by_length */
 	[32]byte{
 		0,
 		0,
@@ -122841,7 +122841,7 @@ var kBrotliDictionary = Dictionary{
 		0,
 	},
 
-	/* OffsetsByLength */
+	/* Offsets_by_length */
 	[32]uint32{
 		0,
 		0,
@@ -122877,7 +122877,7 @@ var kBrotliDictionary = Dictionary{
 		122784,
 	},
 
-	/* DataSize ==  sizeof(DictionaryData) */
+	/* Data_size ==  sizeof(DictionaryData) */
 	122784,
 
 	/* Data */

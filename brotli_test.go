@@ -115,7 +115,7 @@ func TestWriterV2(t *testing.T) {
 		// Test basic encoder usage.
 		input := []byte("<html><body><H1>Hello world</H1></body></html>")
 		out := bytes.Buffer{}
-		e := NewWriterLevel(&out, level)
+		e := NewWriterV2(&out, level)
 		in := bytes.NewReader(input)
 		n, err := io.Copy(e, in)
 		if err != nil {
@@ -583,7 +583,7 @@ func BenchmarkEncodeV2(b *testing.B) {
 	}
 
 	for b.Loop() {
-		w := NewWriterLevel(io.Discard, 6)
+		w := NewWriterV2(io.Discard, 6)
 		w.Write(data)
 		w.Close()
 	}
@@ -596,7 +596,7 @@ func BenchmarkEncodeLevelsResetV2(b *testing.B) {
 
 	for level := BestSpeed; level <= 9; level++ {
 		buf := new(bytes.Buffer)
-		w := NewWriterLevel(buf, level)
+		w := NewWriterV2(buf, level)
 		w.Write(opticks)
 		w.Close()
 		b.Run(fmt.Sprintf("%d", level), func(b *testing.B) {
@@ -976,7 +976,7 @@ func TestIssue51(t *testing.T) {
 			dataStr := randomstring.HumanFriendlyString(i)
 			dataBytes := []byte(dataStr)
 			buf := bytes.Buffer{}
-			w := NewWriterLevel(&buf, 4)
+			w := NewWriterV2(&buf, 4)
 
 			n, err := w.Write(dataBytes)
 			if err != nil {
@@ -1035,7 +1035,7 @@ func TestV2FalseMatchZeroVal(t *testing.T) {
 
 	for level := 0; level <= 9; level++ {
 		var buf bytes.Buffer
-		w := NewWriterLevel(&buf, level)
+		w := NewWriterV2(&buf, level)
 		w.Write(data)
 		w.Close()
 
@@ -1056,7 +1056,7 @@ func BenchmarkParallelEncode(b *testing.B) {
 	}
 
 	for b.Loop() {
-		w := NewParallelWriter(io.Discard, WriterOptions{Quality: 6}, 8)
+		w := NewParallelWriter(io.Discard, 6, 8)
 		w.Write(data)
 		w.Close()
 	}

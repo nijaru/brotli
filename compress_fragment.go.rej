@@ -1,0 +1,16 @@
+@@ -662,6 +663,7 @@
+ 			{
+ 				var base int = ip
+ 				/* > 0 */
++				fmt.Printf("DEBUG: found match at ip=%d, candidate=%d\n", ip, candidate)
+ 
+ 				var matched uint = 5 + findMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
+ 				if ip-candidate > maxDistance_compress_fragment {
+@@ -669,6 +671,7 @@
+ 					goto trawl
+ 				}
+ 				ip += int(matched)
++				fmt.Printf("DEBUG: matched %d bytes, new ip=%d\n", matched, ip)
+ 
+ 				if next_emit == base {
+ 					if last_distance > 0 && int(base-ip)+last_distance < maxDistance_compress_fragment {

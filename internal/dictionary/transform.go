@@ -30,13 +30,13 @@ const (
 const TransformsMaxCutOff = TransformOmitLast9
 
 type Transforms struct {
-	PrefixSuffixSize uint16
-	PrefixSuffix      []byte
-	PrefixSuffix_map  []uint16
-	NumTransforms     uint32
+	Prefix_suffix_size uint16
+	Prefix_suffix      []byte
+	Prefix_suffix_map  []uint16
+	Num_transforms     uint32
 	Transforms         []byte
 	Params             []byte
-	CutoffTransforms   [TransformsMaxCutOff + 1]int16
+	CutOffTransforms   [TransformsMaxCutOff + 1]int16
 }
 
 func transformPrefixId(t *Transforms, I int) byte {
@@ -52,11 +52,11 @@ func transformSuffixId(t *Transforms, I int) byte {
 }
 
 func transformPrefix(t *Transforms, I int) []byte {
-	return t.PrefixSuffix[t.PrefixSuffix_map[transformPrefixId(t, I)]:]
+	return t.Prefix_suffix[t.Prefix_suffix_map[transformPrefixId(t, I)]:]
 }
 
 func transformSuffix(t *Transforms, I int) []byte {
-	return t.PrefixSuffix[t.PrefixSuffix_map[transformSuffixId(t, I)]:]
+	return t.Prefix_suffix[t.Prefix_suffix_map[transformSuffixId(t, I)]:]
 }
 
 /* RFC 7932 transforms string data */
