@@ -808,6 +808,8 @@ func extendLastCommand(s *Writer, bytes *uint32, wrappedLastProcessedPos *uint32
 				(*wrappedLastProcessedPos)++
 			}
 		}
+
+		metablock.GetLengthCode(uint(lastCommand.Insert_len_), uint(int(lastCommand.Copy_len_&0x1FFFFFF)+int(lastCommand.Copy_len_>>25)), (lastCommand.Dist_prefix_&0x3FF == 0), &lastCommand.Cmd_prefix_)
 	}
 }
 
