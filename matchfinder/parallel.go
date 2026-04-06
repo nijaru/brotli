@@ -20,7 +20,7 @@ type ParallelWriter struct {
 	err    error
 	inBuf  []byte
 	nextID int
-	
+
 	results   chan blockResult
 	pending   map[int][]byte
 	nextToOut int
@@ -53,7 +53,7 @@ func (w *ParallelWriter) drain() {
 			w.err = res.err
 		}
 		w.pending[res.id] = res.data
-		
+
 		for {
 			data, ok := w.pending[w.nextToOut]
 			if !ok {
@@ -62,7 +62,7 @@ func (w *ParallelWriter) drain() {
 			delete(w.pending, w.nextToOut)
 			w.nextToOut++
 			w.mu.Unlock()
-			
+
 			if w.err == nil {
 				_, w.err = w.Dest.Write(data)
 			}
@@ -85,18 +85,18 @@ func (w *ParallelWriter) Write(p []byte) (n int, err error) {
 		block := make([]byte, w.BlockSize)
 		copy(block, w.inBuf[:w.BlockSize])
 		w.inBuf = w.inBuf[w.BlockSize:]
-		
+
 		w.wg.Add(1)
 		id := w.nextID
 		w.nextID++
-		
+
 		go func(id int, data []byte) {
 			mf := w.MatchFinder()
 			e := w.Encoder()
 			matches := mf.FindMatches(nil, data)
 			out := e.Encode(nil, data, matches, false)
 			w.results <- blockResult{id: id, data: out}
-			
+
 			// If these interfaces implement Close, we can return them to a pool.
 			if c, ok := mf.(io.Closer); ok {
 				c.Close()
@@ -122,7 +122,7 @@ func (w *ParallelWriter) Close() error {
 			matches := mf.FindMatches(nil, data)
 			out := e.Encode(nil, data, matches, true)
 			w.results <- blockResult{id: id, data: out}
-			
+
 			if c, ok := mf.(io.Closer); ok {
 				c.Close()
 			}
@@ -152,36 +152,14 @@ func putBargain1(z *Bargain1) {
 	bargain1Pool.Put(z)
 }
 
-var encoderPool = sync.Pool{
-	New: func() any {
-		return nil
-	},
-}
-
-func PutEncoder(e Encoder) {
-	encoderPool.Put(e)
-}
-
 func GetEncoder(f func() Encoder) Encoder {
-	if v := encoderPool.Get(); v != nil {
-		return v.(Encoder)
-	}
 	return f()
 }
 
-var fastEncoderPool = sync.Pool{
-	New: func() any {
-		return nil
-	},
-}
-
-func PutFastEncoder(e Encoder) {
-	fastEncoderPool.Put(e)
-}
+func PutEncoder(Encoder) {}
 
 func GetFastEncoder(f func() Encoder) Encoder {
-	if v := fastEncoderPool.Get(); v != nil {
-		return v.(Encoder)
-	}
 	return f()
 }
+
+func PutFastEncoder(Encoder) {}

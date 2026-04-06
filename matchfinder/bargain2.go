@@ -70,24 +70,8 @@ func (z *Bargain2) FindMatches(dst []Match, src []byte) []Match {
 		copy(z.history, z.history[delta:])
 		z.history = z.history[:z.MaxDistance]
 
-		for i := range z.table5 {
-			v := z.table5[i].offset
-			v -= int32(delta)
-			if v < 0 {
-				z.table5[i] = tableEntry{}
-			} else {
-				z.table5[i].offset = v
-			}
-		}
-		for i := range z.table8 {
-			v := z.table8[i].offset
-			v -= int32(delta)
-			if v < 0 {
-				z.table8[i] = tableEntry{}
-			} else {
-				z.table8[i].offset = v
-			}
-		}
+		adjustTableOffsets(z.table5[:], delta)
+		adjustTableOffsets(z.table8[:], delta)
 	}
 
 	historyLen := len(z.history)

@@ -40,6 +40,7 @@ func (z *Bargain1) Close() error {
 	putBargain1(z)
 	return nil
 }
+
 func (z *Bargain1) FindMatches(dst []Match, src []byte) []Match {
 	if z.MaxDistance == 0 {
 		z.MaxDistance = 1 << 16
@@ -73,15 +74,7 @@ func (z *Bargain1) FindMatches(dst []Match, src []byte) []Match {
 		copy(z.history, z.history[delta:])
 		z.history = z.history[:z.MaxDistance]
 
-		for i := range z.table6 {
-			v := z.table6[i].offset
-			v -= int32(delta)
-			if v < 0 {
-				z.table6[i] = tableEntry{}
-			} else {
-				z.table6[i].offset = v
-			}
-		}
+		adjustTableOffsets(z.table6[:], delta)
 	}
 
 	historyLen := len(z.history)

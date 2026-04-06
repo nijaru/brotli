@@ -43,15 +43,7 @@ func (z *ZFast) FindMatches(dst []Match, src []byte) []Match {
 	// Protect against overflow of current.
 	if int(z.current) >= int(math.MaxInt32)-2*z.MaxDistance-len(z.history) {
 		minOffset := z.current + int32(len(z.history)) - int32(z.MaxDistance)
-		for i := range z.table {
-			v := z.table[i].offset
-			if v < minOffset {
-				v = 0
-			} else {
-				v = v - z.current + int32(z.MaxDistance)
-			}
-			z.table[i].offset = v
-		}
+		rebaseTableOffsets(z.table[:], minOffset, int32(z.MaxDistance))
 		z.current = int32(z.MaxDistance)
 	}
 

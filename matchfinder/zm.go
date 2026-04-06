@@ -34,24 +34,8 @@ func (z *ZM) FindMatches(dst []Match, src []byte) []Match {
 		copy(z.history, z.history[delta:])
 		z.history = z.history[:z.MaxDistance]
 
-		for i := range z.table {
-			v := z.table[i].offset
-			v -= int32(delta)
-			if v < 0 {
-				z.table[i] = tableEntry{}
-			} else {
-				z.table[i].offset = v
-			}
-		}
-		for i := range z.longTable {
-			v := z.longTable[i].offset
-			v -= int32(delta)
-			if v < 0 {
-				z.longTable[i] = tableEntry{}
-			} else {
-				z.longTable[i].offset = v
-			}
-		}
+		adjustTableOffsets(z.table[:], delta)
+		adjustTableOffsets(z.longTable[:], delta)
 	}
 
 	if len(src) < 16 {

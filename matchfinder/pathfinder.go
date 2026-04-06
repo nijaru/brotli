@@ -43,9 +43,7 @@ type Pathfinder struct {
 }
 
 func (q *Pathfinder) Reset() {
-	for i := range q.table {
-		q.table[i] = 0
-	}
+	clear(q.table)
 	q.history = q.history[:0]
 	q.chain = q.chain[:0]
 }
@@ -112,8 +110,7 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 		q.chain = q.chain[:q.MaxDistance]
 
 		for i, v := range q.table {
-			newV := max(int(v)-delta, 0)
-			q.table[i] = uint32(newV)
+			q.table[i] = uint32(max(int(v)-delta, 0))
 		}
 	}
 

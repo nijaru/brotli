@@ -49,9 +49,7 @@ type M4 struct {
 }
 
 func (q *M4) Reset() {
-	for i := range q.table {
-		q.table[i] = 0
-	}
+	clear(q.table)
 	q.history = q.history[:0]
 	q.chain = q.chain[:0]
 }
@@ -90,11 +88,7 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 		}
 
 		for i, v := range q.table {
-			newV := int(v) - delta
-			if newV < 0 {
-				newV = 0
-			}
-			q.table[i] = uint32(newV)
+			q.table[i] = uint32(max(int(v)-delta, 0))
 		}
 	}
 
@@ -215,7 +209,7 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			matches = [3]absoluteMatch{
 				matches[0],
 				matches[2],
-				absoluteMatch{},
+				{},
 			}
 
 		case matches[0].Start < matches[2].End+q.MinLength:
@@ -224,8 +218,8 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			e.emit(matches[2])
 			matches = [3]absoluteMatch{
 				matches[0],
-				absoluteMatch{},
-				absoluteMatch{},
+				{},
+				{},
 			}
 
 		default:
