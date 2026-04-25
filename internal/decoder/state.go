@@ -1,4 +1,4 @@
-package brotli
+package decoder
 
 import (
 	"io"

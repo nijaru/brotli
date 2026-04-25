@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nijaru/brotli/internal/decoder"
 	"github.com/nijaru/brotli/internal/encoder/generic"
 	"github.com/nijaru/brotli/internal/match"
 	"github.com/xyproto/randomstring"
@@ -486,7 +487,7 @@ func TestErrorReset(t *testing.T) {
 		return buf.Bytes()
 	}
 
-	corruptReader := func(reader *Reader) {
+	corruptReader := func(reader *decoder.Reader) {
 		buf := bytes.NewBuffer([]byte("trash"))
 		reader.Reset(buf)
 		_, err := io.ReadAll(reader)
@@ -495,7 +496,7 @@ func TestErrorReset(t *testing.T) {
 		}
 	}
 
-	decompress := func(input []byte, reader *Reader) []byte {
+	decompress := func(input []byte, reader *decoder.Reader) []byte {
 		buf := bytes.NewBuffer(input)
 		reader.Reset(buf)
 		output, err := io.ReadAll(reader)
@@ -509,7 +510,7 @@ func TestErrorReset(t *testing.T) {
 	source := []byte("text")
 
 	compressed := compress(source)
-	reader := new(Reader)
+	reader := &decoder.Reader{}
 	corruptReader(reader)
 	decompressed := decompress(compressed, reader)
 	if string(source) != string(decompressed) {
