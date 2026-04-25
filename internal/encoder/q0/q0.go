@@ -365,91 +365,91 @@ func emitInsertLen(insertlen uint, depth []byte, bits []uint16, histo []uint32, 
 	}
 }
 
-func (e *Encoder) emitLongInsertLen(insertlen uint, histo []uint32, storage_ix *uint, storage []byte) {
+func emitLongInsertLen(insertlen uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
 	if insertlen < 22594 {
-		bitstream.WriteBits(uint(e.CmdDepths[62]), uint64(e.CmdBits[62]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[62]), uint64(bits[62]), storage_ix, storage)
 		bitstream.WriteBits(14, uint64(insertlen)-6210, storage_ix, storage)
 		histo[62]++
 	} else {
-		bitstream.WriteBits(uint(e.CmdDepths[63]), uint64(e.CmdBits[63]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[63]), uint64(bits[63]), storage_ix, storage)
 		bitstream.WriteBits(24, uint64(insertlen)-22594, storage_ix, storage)
 		histo[63]++
 	}
 }
 
-func (e *Encoder) emitCopyLen(copylen uint, histo []uint32, storage_ix *uint, storage []byte) {
+func emitCopyLen(copylen uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
 	if copylen < 10 {
 		var code uint = copylen + 14
-		bitstream.WriteBits(uint(e.CmdDepths[code]), uint64(e.CmdBits[code]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
 		histo[code]++
 	} else if copylen < 134 {
 		var tail uint = copylen - 6
 		var nbits uint32 = common.Log2FloorNonZero(tail) - 1
 		var prefix uint = tail >> nbits
 		var code uint = uint(nbits<<1) + prefix + 20
-		bitstream.WriteBits(uint(e.CmdDepths[code]), uint64(e.CmdBits[code]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
 		bitstream.WriteBits(uint(nbits), uint64(tail)-(uint64(prefix)<<nbits), storage_ix, storage)
 		histo[code]++
 	} else if copylen < 2118 {
 		var tail uint = copylen - 70
 		var nbits uint32 = common.Log2FloorNonZero(tail)
 		var code uint = uint(nbits + 28)
-		bitstream.WriteBits(uint(e.CmdDepths[code]), uint64(e.CmdBits[code]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
 		bitstream.WriteBits(uint(nbits), uint64(tail)-(1<<nbits), storage_ix, storage)
 		histo[code]++
 	} else {
-		bitstream.WriteBits(uint(e.CmdDepths[39]), uint64(e.CmdBits[39]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[39]), uint64(bits[39]), storage_ix, storage)
 		bitstream.WriteBits(24, uint64(copylen)-2118, storage_ix, storage)
 		histo[39]++
 	}
 }
 
-func (e *Encoder) emitCopyLenLastDistance(copylen uint, histo []uint32, storage_ix *uint, storage []byte) {
+func emitCopyLenLastDistance(copylen uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
 	if copylen < 12 {
 		var code uint = copylen - 4
-		bitstream.WriteBits(uint(e.CmdDepths[code]), uint64(e.CmdBits[code]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
 		histo[code]++
 	} else if copylen < 72 {
 		var tail uint = copylen - 8
 		var nbits uint32 = common.Log2FloorNonZero(tail) - 1
 		var prefix uint = tail >> nbits
 		var code uint = uint(nbits<<1) + prefix + 4
-		bitstream.WriteBits(uint(e.CmdDepths[code]), uint64(e.CmdBits[code]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
 		bitstream.WriteBits(uint(nbits), uint64(tail)-(uint64(prefix)<<nbits), storage_ix, storage)
 		histo[code]++
 	} else if copylen < 136 {
 		var tail uint = copylen - 8
 		var code uint = uint((tail >> 5) + 30)
-		bitstream.WriteBits(uint(e.CmdDepths[code]), uint64(e.CmdBits[code]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
 		bitstream.WriteBits(5, uint64(tail)&31, storage_ix, storage)
-		bitstream.WriteBits(uint(e.CmdDepths[64]), uint64(e.CmdBits[64]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[64]), uint64(bits[64]), storage_ix, storage)
 		histo[code]++
 		histo[64]++
 	} else if copylen < 2120 {
 		var tail uint = copylen - 72
 		var nbits uint32 = common.Log2FloorNonZero(tail)
 		var code uint = uint(nbits + 28)
-		bitstream.WriteBits(uint(e.CmdDepths[code]), uint64(e.CmdBits[code]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
 		bitstream.WriteBits(uint(nbits), uint64(tail)-(1<<nbits), storage_ix, storage)
-		bitstream.WriteBits(uint(e.CmdDepths[64]), uint64(e.CmdBits[64]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[64]), uint64(bits[64]), storage_ix, storage)
 		histo[code]++
 		histo[64]++
 	} else {
-		bitstream.WriteBits(uint(e.CmdDepths[39]), uint64(e.CmdBits[39]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[39]), uint64(bits[39]), storage_ix, storage)
 		bitstream.WriteBits(24, uint64(copylen)-2120, storage_ix, storage)
-		bitstream.WriteBits(uint(e.CmdDepths[64]), uint64(e.CmdBits[64]), storage_ix, storage)
+		bitstream.WriteBits(uint(depth[64]), uint64(bits[64]), storage_ix, storage)
 		histo[39]++
 		histo[64]++
 	}
 }
 
-func (e *Encoder) emitDistance(distance uint, histo []uint32, storage_ix *uint, storage []byte) {
+func emitDistance(distance uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
 	var d uint = distance + 3
 	var nbits uint32 = common.Log2FloorNonZero(d) - 1
 	var prefix uint = (d >> nbits) & 1
 	var offset uint = (2 + prefix) << nbits
 	var distcode uint = uint(2*(nbits-1) + uint32(prefix) + 80)
-	bitstream.WriteBits(uint(e.CmdDepths[distcode]), uint64(e.CmdBits[distcode]), storage_ix, storage)
+	bitstream.WriteBits(uint(depth[distcode]), uint64(bits[distcode]), storage_ix, storage)
 	bitstream.WriteBits(uint(nbits), uint64(d-offset), storage_ix, storage)
 	histo[distcode]++
 }
@@ -575,9 +575,13 @@ next_block:
 		copy(cmd_histo[:], kCmdHistoSeed[:])
 		ip_end = input + int(block_size)
 		last_distance = -1
-		next_emit = input
+		if next_emit != 0 && input != 0 {
+			// Carry over next_emit from previous block on merge
+		} else {
+			next_emit = input
+		}
 		if block_size >= 16 {
-			var ip_limit int = ip_end - 16
+			var ip_limit int = input + int(min(block_size-5, input_size-16))
 			var next_hash uint32
 			var ip int = input
 			ip++
@@ -620,16 +624,16 @@ next_block:
 					var distance int = base - candidate
 					var insertlen uint = uint(base - next_emit)
 					ip += int(matched)
-					emitInsertLen(insertlen, lit_depth[:], lit_bits[:], cmd_histo[:], storage_ix, storage)
+					emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 					emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
 					if distance == last_distance {
 						bitstream.WriteBits(uint(cmd_depth[64]), uint64(cmd_bits[64]), storage_ix, storage)
 						cmd_histo[64]++
 					} else {
-						e.emitDistance(uint(distance), cmd_histo[:], storage_ix, storage)
+						emitDistance(uint(distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 						last_distance = distance
 					}
-					e.emitCopyLenLastDistance(matched, cmd_histo[:], storage_ix, storage)
+					emitCopyLenLastDistance(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 
 					next_emit = ip
 					if ip >= ip_limit {
@@ -658,8 +662,8 @@ next_block:
 					}
 					ip += int(matched)
 					last_distance = int(base - candidate)
-					e.emitCopyLen(matched, cmd_histo[:], storage_ix, storage)
-					e.emitDistance(uint(last_distance), cmd_histo[:], storage_ix, storage)
+					emitCopyLen(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+					emitDistance(uint(last_distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 
 					next_emit = ip
 					if ip >= ip_limit {
@@ -697,7 +701,7 @@ next_block:
 
 		if next_emit < ip_end {
 			var insertlen uint = uint(ip_end - next_emit)
-			emitInsertLen(insertlen, lit_depth[:], lit_bits[:], cmd_histo[:], storage_ix, storage)
+			emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 			emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
 		}
 		next_emit = ip_end
