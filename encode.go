@@ -8,6 +8,7 @@ import (
 	"github.com/nijaru/brotli/internal/context"
 	"github.com/nijaru/brotli/internal/hasher"
 	"github.com/nijaru/brotli/internal/metablock"
+	"github.com/nijaru/brotli/internal/quality"
 	"github.com/nijaru/brotli/internal/ringbuffer"
 )
 
@@ -264,11 +265,11 @@ func encoderCompressStreamFast(s *Writer, op int, availableIn *uint, nextIn *[]b
 	blockSizeLimit := uint(1) << s.params.Lgwin
 	var commandBuf []uint32 = nil
 	var literalBuf []byte = nil
-	if s.params.Quality != fastOnePassCompressionQuality && s.params.Quality != fastTwoPassCompressionQuality {
+	if s.plan.Tier > quality.TierQ1 {
 		return false
 	}
 
-	if s.params.Quality == fastTwoPassCompressionQuality {
+	if s.plan.Tier == quality.TierQ1 {
 		twoPassBufSize := min(kCompressFragmentTwoPassBlockSize, min(*availableIn, blockSizeLimit))
 		if s.commandBuf == nil || cap(s.commandBuf) < int(twoPassBufSize) {
 			s.commandBuf = make([]uint32, twoPassBufSize)
@@ -309,7 +310,7 @@ func encoderCompressStreamFast(s *Writer, op int, availableIn *uint, nextIn *[]b
 			storage[1] = byte(s.lastBytes >> 8)
 			table = getHashTable(s, s.params.Quality, blockSize, &tableSize)
 
-			if s.params.Quality == fastOnePassCompressionQuality {
+			if s.plan.Tier == quality.TierQ0 {
 				compressFragmentFast(*nextIn, blockSize, isLast, table, tableSize, s.cmdDepths[:], s.cmdBits[:], &s.cmdCodeNumbits, s.cmdCode[:], &storageIx, storage)
 			} else {
 				compressFragmentTwoPass(*nextIn, blockSize, isLast, commandBuf, literalBuf, table, tableSize, &storageIx, storage)
@@ -434,14 +435,14 @@ func ensureInitialized(s *Writer) bool {
 	/* Initialize last byte with stream header. */
 	{
 		lgwin := int(s.params.Lgwin)
-		if s.params.Quality == fastOnePassCompressionQuality || s.params.Quality == fastTwoPassCompressionQuality {
+		if s.plan.Tier == quality.TierQ0 || s.plan.Tier == quality.TierQ1 {
 			lgwin = max(lgwin, 18)
 		}
 
 		encodeWindowBits(lgwin, s.params.Large_window, &s.lastBytes, &s.lastBytesBits)
 	}
 
-	if s.params.Quality == fastOnePassCompressionQuality {
+	if s.plan.Tier == quality.TierQ0 {
 		s.cmdDepths = [128]byte{
 			0, 4, 4, 5, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8,
 			0, 0, 0, 4, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7,
@@ -835,7 +836,7 @@ func encodeData(s *Writer, isLast bool, forceFlush bool) bool {
 		return false
 	}
 
-	if s.params.Quality == fastTwoPassCompressionQuality {
+	if s.plan.Tier == quality.TierQ1 {
 		const kCompressFragmentTwoPassBlockSize uint = 1 << 17
 		if s.commandBuf == nil || cap(s.commandBuf) < int(kCompressFragmentTwoPassBlockSize) {
 			s.commandBuf = make([]uint32, kCompressFragmentTwoPassBlockSize)
@@ -846,7 +847,7 @@ func encodeData(s *Writer, isLast bool, forceFlush bool) bool {
 		}
 	}
 
-	if s.params.Quality == fastOnePassCompressionQuality || s.params.Quality == fastTwoPassCompressionQuality {
+	if s.plan.Tier == quality.TierQ0 || s.plan.Tier == quality.TierQ1 {
 		var storage []byte
 		storageIx := uint(s.lastBytesBits)
 		var tableSize uint
@@ -860,7 +861,7 @@ func encodeData(s *Writer, isLast bool, forceFlush bool) bool {
 		storage[0] = byte(s.lastBytes)
 		storage[1] = byte(s.lastBytes >> 8)
 		table = getHashTable(s, s.params.Quality, uint(bytes), &tableSize)
-		if s.params.Quality == fastOnePassCompressionQuality {
+		if s.plan.Tier == quality.TierQ0 {
 			compressFragmentFast(data[wrappedLastProcessedPos&mask:], uint(bytes), isLast, table, tableSize, s.cmdDepths[:], s.cmdBits[:], &s.cmdCodeNumbits, s.cmdCode[:], &storageIx, storage)
 		} else {
 			compressFragmentTwoPass(data[wrappedLastProcessedPos&mask:], uint(bytes), isLast, s.commandBuf, s.literalBuf, table, tableSize, &storageIx, storage)
@@ -894,9 +895,9 @@ func encodeData(s *Writer, isLast bool, forceFlush bool) bool {
 		extendLastCommand(s, &bytes, &wrappedLastProcessedPos)
 	}
 
-	if s.params.Quality == zopflificationQuality {
+	if s.params.Quality == 10 {
 		createZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.params, s.hasher_.(*hasher.H10), s.distCache[:], &s.lastInsertLen, &s.commands, &s.numLiterals)
-	} else if s.params.Quality == hqZopflificationQuality {
+	} else if s.params.Quality == 11 {
 		createHqZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.params, s.hasher_, s.distCache[:], &s.lastInsertLen, &s.commands, &s.numLiterals)
 	} else {
 		createBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.params, s.hasher_, s.distCache[:], &s.lastInsertLen, &s.commands, &s.numLiterals)
@@ -908,7 +909,7 @@ func encodeData(s *Writer, isLast bool, forceFlush bool) bool {
 		maxCommands := int(maxLength / 8)
 		processedBytes := uint(s.inputPos - s.lastFlushPos)
 		nextInputFitsMetablock := (processedBytes+inputBlockSize(s) <= maxLength)
-		shouldFlush := (s.params.Quality < minQualityForBlockSplit && s.numLiterals+uint(len(s.commands)) >= maxNumDelayedSymbols)
+		shouldFlush := (!s.plan.BlockSplit && s.numLiterals+uint(len(s.commands)) >= maxNumDelayedSymbols)
 
 		if !isLast && !forceFlush && !shouldFlush && nextInputFitsMetablock && s.numLiterals < maxLiterals && len(s.commands) < maxCommands {
 			if updateLastProcessedPos(s) {
@@ -993,7 +994,7 @@ func encoderCompressStream(s *Writer, op int, availableIn *uint, nextIn *[]byte)
 		return false
 	}
 
-	if s.params.Quality == fastOnePassCompressionQuality || s.params.Quality == fastTwoPassCompressionQuality {
+	if s.plan.Tier == quality.TierQ0 || s.plan.Tier == quality.TierQ1 {
 		return encoderCompressStreamFast(s, op, availableIn, nextIn)
 	}
 

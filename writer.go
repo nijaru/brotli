@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/nijaru/brotli/internal/quality"
 	"github.com/nijaru/brotli/matchfinder"
 )
 
@@ -32,6 +33,7 @@ type Writer struct {
 	dst     io.Writer
 	options WriterOptions
 	err     error
+	plan    quality.Plan
 
 	baselineEncoder
 }
@@ -70,6 +72,7 @@ func (w *Writer) Reset(dst io.Writer) {
 	if w.options.LGWin > 0 {
 		w.params.Lgwin = uint(w.options.LGWin)
 	}
+	w.plan = quality.NewPlan(w.options.Quality, int(w.params.Lgwin), 0, 0, false)
 	w.dst = dst
 	w.err = nil
 }
