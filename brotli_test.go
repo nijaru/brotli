@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nijaru/brotli/internal/encoder/generic"
 	"github.com/nijaru/brotli/internal/match"
 	"github.com/xyproto/randomstring"
 )
@@ -643,7 +644,7 @@ func test(t *testing.T, filename string, m match.MatchFinder, blockSize int) {
 	w := &match.Writer{
 		Dest:        b,
 		MatchFinder: m,
-		Encoder:     &Encoder{},
+		Encoder:     &generic.Encoder{},
 		BlockSize:   blockSize,
 	}
 	w.Write(data)
@@ -672,7 +673,7 @@ func benchmark(b *testing.B, filename string, m match.MatchFinder, blockSize int
 	w := &match.Writer{
 		Dest:        buf,
 		MatchFinder: m,
-		Encoder:     &Encoder{},
+		Encoder:     &generic.Encoder{},
 		BlockSize:   blockSize,
 	}
 	w.Write(data)
@@ -695,7 +696,7 @@ func testFastEncoder(t *testing.T, filename string, m match.MatchFinder, blockSi
 	w := &match.Writer{
 		Dest:        b,
 		MatchFinder: m,
-		Encoder:     &FastEncoder{},
+		Encoder:     &generic.FastEncoder{},
 		BlockSize:   blockSize,
 	}
 	w.Write(data)
@@ -724,7 +725,7 @@ func benchmarkFastEncoder(b *testing.B, filename string, m match.MatchFinder, bl
 	w := &match.Writer{
 		Dest:        buf,
 		MatchFinder: m,
-		Encoder:     &FastEncoder{},
+		Encoder:     &generic.FastEncoder{},
 		BlockSize:   blockSize,
 	}
 	w.Write(data)

@@ -1,7 +1,8 @@
-package brotli
+package generic
 
 import (
 	"github.com/nijaru/brotli/internal/common"
+	"github.com/nijaru/brotli/internal/quality"
 )
 
 /* Copyright 2013 Google Inc. All Rights Reserved.
@@ -9,32 +10,6 @@ import (
    Distributed under MIT license.
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
-
-const (
-	fastOnePassCompressionQuality         = 0
-	fastTwoPassCompressionQuality         = 1
-	zopflificationQuality                 = 10
-	hqZopflificationQuality               = 11
-	minQualityForBlockSplit               = 4
-	minQualityForNonzeroDistanceParams    = 4
-	minQualityForOptimizeHistograms       = 4
-	minQualityForExtensiveReferenceSearch = 5
-	minQualityForContextModeling          = 5
-	minQualityForHqContextModeling        = 7
-	minQualityForHqBlockSplitting         = 10
-	maxNumDelayedSymbols                  = 0x2FFF
-	maxQualityForStaticEntropyCodes       = 2
-	minWindowBits                         = 10
-	maxWindowBits                         = 24
-	largeMaxWindowBits                    = 30
-	minInputBlockBits                     = 16
-	maxInputBlockBits                     = 24
-	minQuality                            = 0
-	maxQuality                            = 11
-	maxZopfliLenQuality10                 = 150
-	maxZopfliLenQuality11                 = 325
-	longCopyQuickStep                     = 16384
-)
 
 func maxZopfliCandidates(params *common.EncoderParams) uint {
 	if params.Quality <= 10 {
@@ -54,26 +29,26 @@ func literalSpreeLengthForSparseSearch(params *common.EncoderParams) uint {
 
 func maxZopfliLen(params *common.EncoderParams) uint {
 	if params.Quality <= 10 {
-		return maxZopfliLenQuality10
+		return quality.MaxZopfliLenQuality10
 	} else {
-		return maxZopfliLenQuality11
+		return quality.MaxZopfliLenQuality11
 	}
 }
 
 func sanitizeParams(params *common.EncoderParams) {
-	params.Quality = min(maxQuality, max(minQuality, params.Quality))
-	if params.Quality <= maxQualityForStaticEntropyCodes {
+	params.Quality = min(quality.MaxQuality, max(quality.MinQuality, params.Quality))
+	if params.Quality <= quality.MaxQualityForStaticEntropyCodes {
 		params.Large_window = false
 	}
 
-	if params.Lgwin < minWindowBits {
-		params.Lgwin = minWindowBits
+	if params.Lgwin < quality.MinWindowBits {
+		params.Lgwin = quality.MinWindowBits
 	} else {
 		var maxLgwin int
 		if params.Large_window {
-			maxLgwin = largeMaxWindowBits
+			maxLgwin = quality.LargeMaxWindowBits
 		} else {
-			maxLgwin = maxWindowBits
+			maxLgwin = quality.MaxWindowBits
 		}
 		if params.Lgwin > uint(maxLgwin) {
 			params.Lgwin = uint(maxLgwin)
@@ -83,9 +58,9 @@ func sanitizeParams(params *common.EncoderParams) {
 
 func computeLgBlock(params *common.EncoderParams) int {
 	lgblock := params.Lgblock
-	if params.Quality == fastOnePassCompressionQuality || params.Quality == fastTwoPassCompressionQuality {
+	if params.Quality == quality.Q0 || params.Quality == quality.Q1 {
 		lgblock = int(params.Lgwin)
-	} else if params.Quality < minQualityForBlockSplit {
+	} else if params.Quality < quality.MinQualityForBlockSplit {
 		lgblock = 14
 	} else if lgblock == 0 {
 		lgblock = 16
@@ -93,14 +68,14 @@ func computeLgBlock(params *common.EncoderParams) int {
 			lgblock = min(18, int(params.Lgwin))
 		}
 	} else {
-		lgblock = min(maxInputBlockBits, max(minInputBlockBits, lgblock))
+		lgblock = min(quality.MaxInputBlockBits, max(quality.MinInputBlockBits, lgblock))
 	}
 
 	return lgblock
 }
 
 func maxMetablockSize(params *common.EncoderParams) uint {
-	bits := min(computeRbBits(params), maxInputBlockBits)
+	bits := min(computeRbBits(params), quality.MaxInputBlockBits)
 	return uint(1) << uint(bits)
 }
 

@@ -4,14 +4,23 @@ import (
 	"errors"
 	"io"
 
-	"github.com/nijaru/brotli/internal/quality"
+	"github.com/nijaru/brotli/internal/encoder/generic"
 	"github.com/nijaru/brotli/internal/match"
+	"github.com/nijaru/brotli/internal/quality"
 )
 
 const (
 	BestSpeed          = 0
 	BestCompression    = 11
 	DefaultCompression = 6
+)
+
+// Operations that can be performed by streaming encoder.
+const (
+	operationProcess      = 0
+	operationFlush        = 1
+	operationFinish       = 2
+	operationEmitMetadata = 3
 )
 
 // WriterOptions configures Writer.
@@ -35,7 +44,7 @@ type Writer struct {
 	err     error
 	plan    quality.Plan
 
-	baselineEncoder
+	generic.State
 }
 
 // Writes to the returned writer are compressed and written to dst.
@@ -67,28 +76,28 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 // its original state from NewWriter or NewWriterLevel, but writing to dst
 // instead. This permits reusing a Writer rather than allocating a new one.
 func (w *Writer) Reset(dst io.Writer) {
-	encoderInitState(w)
-	w.params.Quality = w.options.Quality
+	generic.InitState(&w.State)
+	w.Params.Quality = w.options.Quality
 	if w.options.LGWin > 0 {
-		w.params.Lgwin = uint(w.options.LGWin)
+		w.Params.Lgwin = uint(w.options.LGWin)
 	}
-	w.plan = quality.NewPlan(w.options.Quality, int(w.params.Lgwin), 0, 0, false)
-	w.dst = dst
-	w.err = nil
+	w.plan = quality.NewPlan(w.options.Quality, int(w.Params.Lgwin), 0, 0, false)
+	w.Dst = dst
+	w.Err = nil
 }
 
 func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
-	if w.dst == nil {
+	if w.Dst == nil {
 		return 0, errWriterClosed
 	}
-	if w.err != nil {
-		return 0, w.err
+	if w.Err != nil {
+		return 0, w.Err
 	}
 
 	for {
 		availableIn := uint(len(p))
 		nextIn := p
-		success := encoderCompressStream(w, op, &availableIn, &nextIn)
+		success := generic.CompressStream(&w.State, op, &availableIn, &nextIn)
 		bytesConsumed := len(p) - int(availableIn)
 		p = p[bytesConsumed:]
 		n += bytesConsumed
@@ -96,8 +105,8 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 			return n, errEncode
 		}
 
-		if len(p) == 0 || w.err != nil {
-			return n, w.err
+		if len(p) == 0 || w.Err != nil {
+			return n, w.Err
 		}
 	}
 }
@@ -115,7 +124,7 @@ func (w *Writer) Flush() error {
 func (w *Writer) Close() error {
 	// If stream is already closed, it is reported by `writeChunk`.
 	_, err := w.writeChunk(nil, operationFinish)
-	w.dst = nil
+	w.Dst = nil
 	return err
 }
 
@@ -171,7 +180,7 @@ func NewParallelWriter(dst io.Writer, level int, concurrency int) *match.Paralle
 			return getMatchFinder(level)
 		},
 		Encoder: func() match.Encoder {
-			return match.GetEncoder(func() match.Encoder { return &Encoder{} })
+			return match.GetEncoder(func() match.Encoder { return &generic.Encoder{} })
 		},
 		BlockSize:   1 << 16,
 		Concurrency: concurrency,
@@ -190,7 +199,7 @@ func NewWriterV2(dst io.Writer, level int) *match.Writer {
 	w := &match.Writer{
 		Dest:        dst,
 		MatchFinder: getMatchFinder(level),
-		Encoder:     &Encoder{},
+		Encoder:     &generic.Encoder{},
 		BlockSize:   1 << 16,
 	}
 	return w

@@ -1,4 +1,4 @@
-package brotli
+package generic
 
 import (
 	"math"
@@ -7,6 +7,7 @@ import (
 	"github.com/nijaru/brotli/internal/context"
 	"github.com/nijaru/brotli/internal/hasher"
 	"github.com/nijaru/brotli/internal/metablock"
+	"github.com/nijaru/brotli/internal/quality"
 )
 
 type zopfliNode struct {
@@ -559,7 +560,7 @@ func computeShortestPathFromNodes(num_bytes uint, nodes []zopfliNode) uint {
 
 /* REQUIRES: nodes != NULL and len(nodes) >= num_bytes + 1 */
 func zopfliCreateCommands(num_bytes uint, block_start uint, nodes []zopfliNode, dist_cache []int, last_insert_len *uint, params *common.EncoderParams, commands *[]metablock.Command, num_literals *uint) {
-	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
+	var max_backward_limit uint = common.MaxBackwardLimit(params.Lgwin)
 	var pos uint = 0
 	var offset uint32 = nodes[0].u.next
 	var i uint
@@ -598,7 +599,7 @@ func zopfliCreateCommands(num_bytes uint, block_start uint, nodes []zopfliNode, 
 }
 
 func zopfliIterate(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, gap uint, dist_cache []int, model *zopfliCostModel, num_matches []uint32, matches []hasher.BackwardMatch, nodes []zopfliNode) uint {
-	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
+	var max_backward_limit uint = common.MaxBackwardLimit(params.Lgwin)
 	var max_zopfli_len uint = maxZopfliLen(params)
 	var queue startPosQueue
 	var cur_match_pos uint = 0
@@ -608,7 +609,7 @@ func zopfliIterate(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_
 	initStartPosQueue(&queue)
 	for i = 0; i+3 < num_bytes; i++ {
 		var skip uint = updateNodes(num_bytes, position, i, ringbuffer, ringbuffer_mask, params, max_backward_limit, dist_cache, uint(num_matches[i]), matches[cur_match_pos:], model, &queue, nodes)
-		if skip < longCopyQuickStep {
+		if skip < quality.LongCopyQuickStep {
 			skip = 0
 		}
 		cur_match_pos += uint(num_matches[i])
@@ -652,7 +653,7 @@ Computes the shortest path of commands from position to at most
 REQUIRES: nodes != nil and len(nodes) >= num_bytes + 1
 */
 func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, dist_cache []int, handle *hasher.H10, nodes []zopfliNode) uint {
-	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
+	var max_backward_limit uint = common.MaxBackwardLimit(params.Lgwin)
 	var max_zopfli_len uint = maxZopfliLen(params)
 	var model zopfliCostModel
 	var queue startPosQueue
@@ -683,7 +684,7 @@ func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte,
 		}
 
 		skip = updateNodes(num_bytes, position, i, ringbuffer, ringbuffer_mask, params, max_backward_limit, dist_cache, num_matches, matches[:], &model, &queue, nodes)
-		if skip < longCopyQuickStep {
+		if skip < quality.LongCopyQuickStep {
 			skip = 0
 		}
 		if num_matches == 1 && hasher.BackwardMatchLength(&matches[0]) > max_zopfli_len {
@@ -720,7 +721,7 @@ func createZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []
 }
 
 func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.Handle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
-	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
+	var max_backward_limit uint = common.MaxBackwardLimit(params.Lgwin)
 	var num_matches []uint32 = make([]uint32, num_bytes)
 	var matches_size uint = 4 * num_bytes
 	var store_end uint
@@ -778,7 +779,7 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 		num_matches[i] = uint32(num_found_matches)
 		if num_found_matches > 0 {
 			var match_len uint = hasher.BackwardMatchLength(&matches[cur_match_end-1])
-			if match_len > maxZopfliLenQuality11 {
+			if match_len > quality.MaxZopfliLenQuality11 {
 				var skip uint = match_len - 1
 				matches[cur_match_pos] = matches[cur_match_end-1]
 				cur_match_pos++

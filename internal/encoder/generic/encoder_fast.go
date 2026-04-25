@@ -1,4 +1,4 @@
-package brotli
+package generic
 
 import (
 	"math"

@@ -1,4 +1,4 @@
-package brotli
+package generic
 
 import (
 	"encoding/binary"
@@ -30,8 +30,8 @@ func hash5(p []byte, shift uint) uint32 {
 }
 
 func hashBytesAtOffset5(v uint64, offset int, shift uint) uint32 {
-	assert(offset >= 0)
-	assert(offset <= 3)
+	common.Assert(offset >= 0)
+	common.Assert(offset <= 3)
 	{
 		var h uint64 = ((v >> uint(8*offset)) << 24) * uint64(hasher.KHashMul32)
 		return uint32(h >> shift)
@@ -142,7 +142,7 @@ Builds a command and distance prefix code (each 64 symbols) into "depth" and
 */
 func buildAndStoreCommandPrefixCode1(histogram []uint32, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
 	var tree [129]bitstream.HuffmanTree
-	var cmd_depth = [numCommandSymbols]byte{0}
+	var cmd_depth = [common.NumCommandSymbols]byte{0}
 	/* Tree size for building a tree over 64 symbols is 2 * 64 + 1. */
 
 	var cmd_bits [64]uint16
@@ -187,7 +187,7 @@ func buildAndStoreCommandPrefixCode1(histogram []uint32, depth []byte, bits []ui
 			cmd_depth[448+8*i] = depth[56+i]
 		}
 
-		bitstream.StoreHuffmanTree(cmd_depth[:], numCommandSymbols, tree[:], storage_ix, storage)
+		bitstream.StoreHuffmanTree(cmd_depth[:], common.NumCommandSymbols, tree[:], storage_ix, storage)
 	}
 
 	bitstream.StoreHuffmanTree(depth[64:], 64, tree[:], storage_ix, storage)
@@ -618,14 +618,14 @@ emit_commands:
 			   number of bytes to move ahead for each iteration. */
 
 			var candidate int
-			assert(next_emit < ip)
+			common.Assert(next_emit < ip)
 
 		trawl:
 			for {
 				var hash uint32 = next_hash
 				var bytes_between_hash_lookups uint32 = skip >> 5
 				skip++
-				assert(hash == hash5(in[next_ip:], shift))
+				common.Assert(hash == hash5(in[next_ip:], shift))
 				ip = next_ip
 				next_ip = int(uint32(ip) + bytes_between_hash_lookups)
 				if next_ip > ip_limit {
@@ -642,8 +642,8 @@ emit_commands:
 				}
 
 				candidate = base_ip + table[hash]
-				assert(candidate >= base_ip)
-				assert(candidate < ip)
+				common.Assert(candidate >= base_ip)
+				common.Assert(candidate < ip)
 
 				table[hash] = int(ip - base_ip)
 				if isMatch5(in[ip:], in[candidate:]) {
@@ -664,7 +664,7 @@ emit_commands:
 			{
 				var base int = ip
 				/* > 0 */
-				var matched uint = 5 + findMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
+				var matched uint = 5 + common.FindMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
 				var distance int = int(base - candidate)
 				/* We have a 5-byte match at ip, and we need to emit bytes in
 				   [next_emit, ip). */
@@ -722,7 +722,7 @@ emit_commands:
 				/* We have a 5-byte match at ip, and no need to emit any literal bytes
 				   prior to ip. */
 
-				var matched uint = 5 + findMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
+				var matched uint = 5 + common.FindMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
 				if ip-candidate > maxDistance_compress_fragment {
 					break
 				}
@@ -760,7 +760,7 @@ emit_commands:
 	}
 
 emit_remainder:
-	assert(next_emit <= ip_end)
+	common.Assert(next_emit <= ip_end)
 	input += int(block_size)
 	input_size -= block_size
 	block_size = min(input_size, compressFragmentFastImpl_kMergeBlockSize)
@@ -768,7 +768,7 @@ emit_remainder:
 	/* Decide if we want to continue this meta-block instead of emitting the
 	   last insert-only command. */
 	if input_size > 0 && total_block_size+block_size <= 1<<20 && shouldMergeBlock(in[input:], block_size, lit_depth[:]) {
-		assert(total_block_size > 1<<16)
+		common.Assert(total_block_size > 1<<16)
 
 		/* Update the size of the current meta-block and continue emitting commands.
 		   We can do this because the current size and the new size both have 5
@@ -857,7 +857,7 @@ func compressFragmentFast(input []byte, input_size uint, is_last bool, table []i
 	var table_bits uint = uint(common.Log2FloorNonZero(table_size))
 
 	if input_size == 0 {
-		assert(is_last)
+		common.Assert(is_last)
 		bitstream.WriteBits(1, 1, storage_ix, storage) /* islast */
 		bitstream.WriteBits(1, 1, storage_ix, storage) /* isempty */
 		*storage_ix = (*storage_ix + 7) &^ 7

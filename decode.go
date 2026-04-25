@@ -3,6 +3,7 @@ package brotli
 import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/common"
+	"github.com/nijaru/brotli/internal/context"
 	"github.com/nijaru/brotli/internal/dictionary"
 )
 
@@ -545,7 +546,7 @@ func processRepeatedCodeLength(code_len uint32, repeat_delta uint32, alphabet_si
 	var old_repeat uint32 /* for BROTLI_REPEAT_ZERO_CODE_LENGTH */ /* for BROTLI_REPEAT_ZERO_CODE_LENGTH */
 	var extra_bits uint32 = 3
 	var new_len uint32 = 0
-	if code_len == repeatPreviousCodeLength {
+	if code_len == common.RepeatPreviousCodeLength {
 		new_len = *prevCodeLen
 		extra_bits = 2
 	}
@@ -620,11 +621,11 @@ func readSymbolCodeLengths(alphabet_size uint32, s *Reader) int {
 		p = p[br.GetBitsUnmasked()&uint64(bitstream.BitMask(bitstream.HuffmanMaxCodeLengthCodeLength)):]
 		br.DropBits(uint32(p[0].Bits)) /* Use 1..5 bits. */
 		code_len = uint32(p[0].Value)             /* code_len == 0..17 */
-		if code_len < repeatPreviousCodeLength {
+		if code_len < common.RepeatPreviousCodeLength {
 			processSingleCodeLength(code_len, &symbol, &repeat, &space, &prevCodeLen, symbolLists, codeLengthHisto, nextSymbol) /* code_len == 16..17, extra_bits == 2..3 */
 		} else {
 			var extra_bits uint32
-			if code_len == repeatPreviousCodeLength {
+			if code_len == common.RepeatPreviousCodeLength {
 				extra_bits = 2
 			} else {
 				extra_bits = 3
@@ -664,7 +665,7 @@ func safeReadSymbolCodeLengths(alphabet_size uint32, s *Reader) int {
 		}
 
 		code_len = uint32(p[0].Value) /* code_len == 0..17 */
-		if code_len < repeatPreviousCodeLength {
+		if code_len < common.RepeatPreviousCodeLength {
 			br.DropBits(uint32(p[0].Bits))
 			processSingleCodeLength(code_len, &s.symbol, &s.repeat, &s.space, &s.prevCodeLen, s.symbolLists, s.codeLengthHisto[:], s.nextSymbol[:]) /* code_len == 16..17, extra_bits == 2..3 */
 		} else {
@@ -842,7 +843,7 @@ func readHuffmanCode(alphabet_size uint32, max_symbol uint32, table []bitstream.
 				}
 
 				s.symbol = 0
-				s.prevCodeLen = initialRepeatedCodeLength
+				s.prevCodeLen = common.InitialRepeatedCodeLength
 				s.repeat = 0
 				s.repeatCodeLen = 0
 				s.space = 32768
@@ -1214,7 +1215,7 @@ func prepareLiteralDecoding(s *Reader) {
 	s.trivialLiteralContext = int((trivial >> (block_type & 31)) & 1)
 	s.literalHtree = []bitstream.HuffmanCode(s.literalHGroup.HTrees[s.contextMapSlice[0]])
 	context_mode = s.contextModes[block_type] & 3
-	s.contextLookup = getContextLUT(int(context_mode))
+	s.contextLookup = context.GetContextLUT(int(context_mode))
 }
 
 /*
@@ -1816,7 +1817,7 @@ CommandInner:
 		var p1 byte = s.ringbuffer[(pos-1)&s.ringbufferMask]
 		var p2 byte = s.ringbuffer[(pos-2)&s.ringbufferMask]
 		for {
-			var context byte
+			var ctx byte
 			if !checkInputAmountMaybeSafe(safe, br, 28) { /* 162 bits + 7 bytes */
 				s.state = stateCommandInner
 				result = decoderNeedsMoreInput
@@ -1838,8 +1839,8 @@ CommandInner:
 				}
 			}
 
-			context = getContext(p1, p2, s.contextLookup)
-			hc = []bitstream.HuffmanCode(s.literalHGroup.HTrees[s.contextMapSlice[context]])
+			ctx = context.GetContext(p1, p2, s.contextLookup)
+			hc = []bitstream.HuffmanCode(s.literalHGroup.HTrees[s.contextMapSlice[ctx]])
 			p2 = p1
 			if safe == 0 {
 				p1 = byte(readSymbol(hc, br))
@@ -1927,7 +1928,7 @@ CommandPostDecodeLiterals:
 		/* The maximum allowed distance is BROTLI_MAX_ALLOWED_DISTANCE = 0x7FFFFFFC.
 		   With this choice, no signed overflow can occur after decoding
 		   a special distance code (e.g., after adding 3 to the last distance). */
-		if s.distanceCode > maxAllowedDistance {
+		if s.distanceCode > common.MaxAllowedDistance {
 			return decoderErrorFormatDistance
 		}
 
@@ -2062,17 +2063,17 @@ func safeProcessCommands(s *Reader) int {
 /* Returns the maximum number of distance symbols which can only represent
    distances not exceeding BROTLI_MAX_ALLOWED_DISTANCE. */
 
-var maxDistanceSymbol_bound = [maxNpostfix + 1]uint32{0, 4, 12, 28}
-var maxDistanceSymbol_diff = [maxNpostfix + 1]uint32{73, 126, 228, 424}
+var maxDistanceSymbolBound = [common.MaxNpostfix + 1]uint32{0, 4, 12, 28}
+var maxDistanceSymbolDiff = [common.MaxNpostfix + 1]uint32{73, 126, 228, 424}
 
 func maxDistanceSymbol(ndirect uint32, npostfix uint32) uint32 {
 	var postfix uint32 = 1 << npostfix
-	if ndirect < maxDistanceSymbol_bound[npostfix] {
-		return ndirect + maxDistanceSymbol_diff[npostfix] + postfix
-	} else if ndirect > maxDistanceSymbol_bound[npostfix]+postfix {
-		return ndirect + maxDistanceSymbol_diff[npostfix]
+	if ndirect < maxDistanceSymbolBound[npostfix] {
+		return ndirect + maxDistanceSymbolDiff[npostfix] + postfix
+	} else if ndirect > maxDistanceSymbolBound[npostfix]+postfix {
+		return ndirect + maxDistanceSymbolDiff[npostfix]
 	} else {
-		return maxDistanceSymbol_bound[npostfix] + maxDistanceSymbol_diff[npostfix] + postfix
+		return maxDistanceSymbolBound[npostfix] + maxDistanceSymbolDiff[npostfix] + postfix
 	}
 }
 
@@ -2421,13 +2422,13 @@ func decoderDecompressStream(s *Reader, available_in *uint, next_in *[]byte, ava
 			{
 				var num_direct_codes uint32 = s.numDirectDistanceCodes - common.NumDistanceShortCodes
 				var num_distanceCodes uint32
-				var maxDistance_symbol uint32
+				var maxDistSymbol uint32
 				if s.largeWindow {
-					num_distanceCodes = uint32(distanceAlphabetSize(uint(s.distancePostfixBits), uint(num_direct_codes), common.LargeMaxDistanceBits))
-					maxDistance_symbol = maxDistanceSymbol(num_direct_codes, s.distancePostfixBits)
+					num_distanceCodes = uint32(common.DistanceAlphabetSize(uint(s.distancePostfixBits), uint(num_direct_codes), common.LargeMaxDistanceBits))
+					maxDistSymbol = maxDistanceSymbol(num_direct_codes, s.distancePostfixBits)
 				} else {
-					num_distanceCodes = uint32(distanceAlphabetSize(uint(s.distancePostfixBits), uint(num_direct_codes), common.MaxDistanceBits))
-					maxDistance_symbol = num_distanceCodes
+					num_distanceCodes = uint32(common.DistanceAlphabetSize(uint(s.distancePostfixBits), uint(num_direct_codes), common.MaxDistanceBits))
+					maxDistSymbol = num_distanceCodes
 				}
 				var allocation_success bool = true
 				result = decodeContextMap(s.numBlockTypes[2]<<common.DistanceContextBits, &s.numDistHtrees, &s.distContextMap, s)
@@ -2439,11 +2440,11 @@ func decoderDecompressStream(s *Reader, available_in *uint, next_in *[]byte, ava
 					allocation_success = false
 				}
 
-				if !decoderHuffmanTreeGroupInit(s, &s.insertCopyHGroup, numCommandSymbols, numCommandSymbols, s.numBlockTypes[1]) {
+				if !decoderHuffmanTreeGroupInit(s, &s.insertCopyHGroup, common.NumCommandSymbols, common.NumCommandSymbols, s.numBlockTypes[1]) {
 					allocation_success = false
 				}
 
-				if !decoderHuffmanTreeGroupInit(s, &s.distanceHGroup, num_distanceCodes, maxDistance_symbol, s.numDistHtrees) {
+				if !decoderHuffmanTreeGroupInit(s, &s.distanceHGroup, num_distanceCodes, maxDistSymbol, s.numDistHtrees) {
 					allocation_success = false
 				}
 

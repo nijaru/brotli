@@ -107,7 +107,7 @@ type Reader struct {
 	bufferLength               uint32
 	pos                         int
 	maxBackwardDistance       int
-	maxDistance                int
+	maxDistance                 int
 	ringbufferSize             int
 	ringbufferMask             int
 	distRbIdx                 int
@@ -150,7 +150,7 @@ type Reader struct {
 	space                       uint32
 	table                       [32]bitstream.HuffmanCode
 	symbolLists                bitstream.SymbolList
-	symbolsListsArray         [bitstream.HuffmanMaxCodeLength + 1 + numCommandSymbols]uint16
+	symbolsListsArray         [bitstream.HuffmanMaxCodeLength + 1 + common.NumCommandSymbols]uint16
 	nextSymbol                 [32]int
 	codeLengthCodeLengths    [common.CodeLengthCodes]byte
 	codeLengthHisto           [16]uint16

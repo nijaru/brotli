@@ -1,4 +1,4 @@
-package brotli
+package generic
 
 import (
 	"sync"
@@ -6,6 +6,7 @@ import (
 	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/hasher"
 	"github.com/nijaru/brotli/internal/metablock"
+	"github.com/nijaru/brotli/internal/quality"
 )
 
 /* Copyright 2013 Google Inc. All Rights Reserved.
@@ -42,7 +43,7 @@ func computeDistanceCode(distance uint, max_distance uint, dist_cache []int) uin
 var hasherSearchResultPool sync.Pool
 
 func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *common.EncoderParams, handle hasher.Handle, dist_cache []int, last_insert_len *uint, commands *[]metablock.Command, num_literals *uint) {
-	var max_backward_limit uint = maxBackwardLimit(params.Lgwin)
+	var max_backward_limit uint = common.MaxBackwardLimit(params.Lgwin)
 	var insert_length uint = *last_insert_len
 	var pos_end uint = position + num_bytes
 	var store_end uint
@@ -85,7 +86,7 @@ func createBackwardReferences(num_bytes uint, position uint, ringbuffer []byte, 
 			max_length--
 			for ; ; max_length-- {
 				var cost_diff_lazy uint = 175
-				if params.Quality < minQualityForExtensiveReferenceSearch {
+				if params.Quality < quality.MinQualityForExtensiveReferenceSearch {
 					sr2.Len = min(sr.Len-1, max_length)
 				} else {
 					sr2.Len = 0

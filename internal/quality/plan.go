@@ -1,5 +1,36 @@
 package quality
 
+// Quality thresholds.
+const (
+	Q0                                        = 0
+	Q1                                        = 1
+	QZopfli                                   = 10
+	QHQZopfli                                 = 11
+	MinQualityForBlockSplit                   = 4
+	MinQualityForNonzeroDistanceParams        = 4
+	MinQualityForOptimizeHistograms           = 4
+	MinQualityForExtensiveReferenceSearch     = 5
+	MinQualityForContextModeling              = 5
+	MinQualityForHqContextModeling            = 7
+	MinQualityForHqBlockSplitting             = 10
+	MaxNumDelayedSymbols                      = 0x2FFF
+	MaxQualityForStaticEntropyCodes           = 2
+	MinWindowBits                             = 10
+	MaxWindowBits                             = 24
+	LargeMaxWindowBits                        = 30
+	MinInputBlockBits                         = 16
+	MaxInputBlockBits                         = 24
+	MinQuality                                = 0
+	MaxQuality                                = 11
+	MaxZopfliLenQuality10                     = 150
+	MaxZopfliLenQuality11                     = 325
+	LongCopyQuickStep                         = 16384
+	MaxZopfliCandidatesQ10                    = 1
+	MaxZopfliCandidatesQ11                    = 5
+	SparseSearchSpreeLow                      = 64
+	SparseSearchSpreeHigh                     = 512
+)
+
 // Tier identifies the encoder strategy for a quality level.
 type Tier int
 

@@ -1,4 +1,4 @@
-package brotli
+package generic
 
 import (
 	"encoding/binary"
@@ -26,7 +26,7 @@ func hash1(p []byte, shift uint, length uint) uint32 {
 }
 
 func hashBytesAtOffset(v uint64, offset uint, shift uint, length uint) uint32 {
-	assert(offset <= 8-length)
+	common.Assert(offset <= 8-length)
 	{
 		var h uint64 = ((v >> (8 * offset)) << ((8 - length) * 8)) * uint64(hasher.KHashMul32)
 		return uint32(h >> shift)
@@ -50,7 +50,7 @@ Builds a command and distance prefix code (each 64 symbols) into "depth" and
 */
 func buildAndStoreCommandPrefixCode(histogram []uint32, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
 	var tree [129]bitstream.HuffmanTree
-	var cmd_depth = [numCommandSymbols]byte{0}
+	var cmd_depth = [common.NumCommandSymbols]byte{0}
 	/* Tree size for building a tree over 64 symbols is 2 * 64 + 1. */
 
 	var cmd_bits [64]uint16
@@ -94,7 +94,7 @@ func buildAndStoreCommandPrefixCode(histogram []uint32, depth []byte, bits []uin
 			cmd_depth[448+8*i] = depth[16+i]
 		}
 
-		bitstream.StoreHuffmanTree(cmd_depth[:], numCommandSymbols, tree[:], storage_ix, storage)
+		bitstream.StoreHuffmanTree(cmd_depth[:], common.NumCommandSymbols, tree[:], storage_ix, storage)
 	}
 
 	bitstream.StoreHuffmanTree(depth[64:], 64, tree[:], storage_ix, storage)
@@ -289,7 +289,7 @@ func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr 
 
 			var candidate int
 
-			assert(next_emit < ip)
+			common.Assert(next_emit < ip)
 
 		trawl:
 			for {
@@ -297,7 +297,7 @@ func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr 
 				var bytes_between_hash_lookups uint32 = skip >> 5
 				skip++
 				ip = next_ip
-				assert(hash == hash1(input[ip:], shift, min_match))
+				common.Assert(hash == hash1(input[ip:], shift, min_match))
 				next_ip = int(uint32(ip) + bytes_between_hash_lookups)
 				if next_ip > ip_limit {
 					goto emit_remainder
@@ -313,8 +313,8 @@ func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr 
 				}
 
 				candidate = base_ip + table[hash]
-				assert(candidate >= base_ip)
-				assert(candidate < ip)
+				common.Assert(candidate >= base_ip)
+				common.Assert(candidate < ip)
 
 				table[hash] = int(ip - base_ip)
 				if isMatch1(input[ip:], base_ip_ptr[candidate-base_ip:], min_match) {
@@ -335,7 +335,7 @@ func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr 
 			{
 				var base int = ip
 				/* > 0 */
-				var matched uint = min_match + findMatchLengthWithLimit(base_ip_ptr[uint(candidate-base_ip)+min_match:], input[uint(ip)+min_match:], uint(ip_end-ip)-min_match)
+				var matched uint = min_match + common.FindMatchLengthWithLimit(base_ip_ptr[uint(candidate-base_ip)+min_match:], input[uint(ip)+min_match:], uint(ip_end-ip)-min_match)
 				var distance int = int(base - candidate)
 				/* We have a 6-byte match at ip, and we need to emit bytes in
 				   [next_emit, ip). */
@@ -402,7 +402,7 @@ func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr 
 				/* We have a 6-byte match at ip, and no need to emit any
 				   literal bytes prior to ip. */
 
-				var matched uint = min_match + findMatchLengthWithLimit(base_ip_ptr[uint(candidate-base_ip)+min_match:], input[uint(ip)+min_match:], uint(ip_end-ip)-min_match)
+				var matched uint = min_match + common.FindMatchLengthWithLimit(base_ip_ptr[uint(candidate-base_ip)+min_match:], input[uint(ip)+min_match:], uint(ip_end-ip)-min_match)
 				ip += int(matched)
 				last_distance = int(base - candidate) /* > 0 */
 				emitCopyLen(matched, commands)
@@ -456,7 +456,7 @@ func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr 
 	}
 
 emit_remainder:
-	assert(next_emit <= ip_end)
+	common.Assert(next_emit <= ip_end)
 
 	/* Emit the remaining bytes as literals. */
 	if next_emit < ip_end {
@@ -499,7 +499,7 @@ func storeCommands(literals []byte, num_literals uint, commands []uint32, num_co
 
 	for i = 0; i < num_commands; i++ {
 		var code uint32 = commands[i] & 0xFF
-		assert(code < 128)
+		common.Assert(code < 128)
 		cmd_histo[code]++
 	}
 
@@ -513,7 +513,7 @@ func storeCommands(literals []byte, num_literals uint, commands []uint32, num_co
 		var cmd uint32 = commands[i]
 		var code uint32 = cmd & 0xFF
 		var extra uint32 = cmd >> 8
-		assert(code < 128)
+		common.Assert(code < 128)
 		bitstream.WriteBits(uint(cmd_depths[code]), uint64(cmd_bits[code]), storage_ix, storage)
 		bitstream.WriteBits(uint(storeCommands_kNumExtraBits[code]), uint64(extra), storage_ix, storage)
 		if code < 24 {
