@@ -5,7 +5,7 @@
 package flate
 
 import (
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/match"
 )
 
 const (
@@ -77,7 +77,7 @@ type huffmanBitWriter struct {
 	codegenEncoding *huffmanEncoder
 }
 
-func NewEncoder() matchfinder.Encoder {
+func NewEncoder() match.Encoder {
 	return &huffmanBitWriter{
 		literalFreq:     make([]int32, maxNumLit),
 		offsetFreq:      make([]int32, offsetCodeCount),
@@ -358,7 +358,7 @@ func (w *huffmanBitWriter) writeFixedHeader(isEof bool) {
 }
 
 // writeBlock will write a block of tokens with the smallest encoding.
-func (w *huffmanBitWriter) writeBlock(matches []matchfinder.Match, eof bool, input []byte) {
+func (w *huffmanBitWriter) writeBlock(matches []match.Match, eof bool, input []byte) {
 	numLiterals, numOffsets := w.makeStatistics(matches, input)
 
 	var extraBits int
@@ -422,7 +422,7 @@ func (w *huffmanBitWriter) writeBlock(matches []matchfinder.Match, eof bool, inp
 // literalFreq and offsetFreq, and generates literalEncoding
 // and offsetEncoding.
 // The number of literal and offset tokens is returned.
-func (w *huffmanBitWriter) makeStatistics(matches []matchfinder.Match, input []byte) (numLiterals, numOffsets int) {
+func (w *huffmanBitWriter) makeStatistics(matches []match.Match, input []byte) (numLiterals, numOffsets int) {
 	for i := range w.literalFreq {
 		w.literalFreq[i] = 0
 	}
@@ -469,7 +469,7 @@ func (w *huffmanBitWriter) makeStatistics(matches []matchfinder.Match, input []b
 
 // writeTokens writes a slice of tokens to the output.
 // codes for literal and offset encoding must be supplied.
-func (w *huffmanBitWriter) writeTokens(matches []matchfinder.Match, input []byte, leCodes, oeCodes []hcode) {
+func (w *huffmanBitWriter) writeTokens(matches []match.Match, input []byte, leCodes, oeCodes []hcode) {
 	pos := 0
 	for _, m := range matches {
 		for _, c := range input[pos : pos+m.Unmatched] {
@@ -503,7 +503,7 @@ func (w *huffmanBitWriter) writeTokens(matches []matchfinder.Match, input []byte
 	}
 }
 
-func (w *huffmanBitWriter) Encode(dst []byte, src []byte, matches []matchfinder.Match, lastBlock bool) []byte {
+func (w *huffmanBitWriter) Encode(dst []byte, src []byte, matches []match.Match, lastBlock bool) []byte {
 	w.dst = dst
 
 	w.writeBlock(matches, lastBlock, src)

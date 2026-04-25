@@ -1,4 +1,4 @@
-package matchfinder
+package match
 
 import "fmt"
 

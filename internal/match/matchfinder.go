@@ -8,7 +8,7 @@
 // usually closely tied together. You can't use flate's matcher with snappy's
 // encoder, for example. This package defines interfaces and an intermediate
 // representation to allow mixing and matching compression components.
-package matchfinder
+package match
 
 import "io"
 

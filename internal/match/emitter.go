@@ -1,4 +1,4 @@
-package matchfinder
+package match
 
 // An absoluteMatch is like a Match, but it stores indexes into the byte
 // stream instead of lengths.

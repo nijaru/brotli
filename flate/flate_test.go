@@ -9,16 +9,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/match"
 )
 
-func test(t *testing.T, filename string, m matchfinder.MatchFinder, blockSize int) {
+func test(t *testing.T, filename string, m match.MatchFinder, blockSize int) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}
 	b := new(bytes.Buffer)
-	w := &matchfinder.Writer{
+	w := &match.Writer{
 		Dest:        b,
 		MatchFinder: m,
 		Encoder:     NewEncoder(),
@@ -38,7 +38,7 @@ func test(t *testing.T, filename string, m matchfinder.MatchFinder, blockSize in
 }
 
 func TestEncodeHuffmanOnly(t *testing.T) {
-	test(t, "../testdata/Isaac.Newton-Opticks.txt", matchfinder.NoMatchFinder{}, 1<<16)
+	test(t, "../testdata/Isaac.Newton-Opticks.txt", match.NoMatchFinder{}, 1<<16)
 }
 
 func TestWriterLevels(t *testing.T) {
@@ -90,7 +90,7 @@ func TestGZIPWriterLevels(t *testing.T) {
 	}
 }
 
-func benchmark(b *testing.B, filename string, m matchfinder.MatchFinder, blockSize int) {
+func benchmark(b *testing.B, filename string, m match.MatchFinder, blockSize int) {
 	b.StopTimer()
 	b.ReportAllocs()
 	data, err := os.ReadFile(filename)
@@ -100,7 +100,7 @@ func benchmark(b *testing.B, filename string, m matchfinder.MatchFinder, blockSi
 
 	b.SetBytes(int64(len(data)))
 	buf := new(bytes.Buffer)
-	w := &matchfinder.Writer{
+	w := &match.Writer{
 		Dest:        buf,
 		MatchFinder: m,
 		Encoder:     NewEncoder(),
@@ -118,7 +118,7 @@ func benchmark(b *testing.B, filename string, m matchfinder.MatchFinder, blockSi
 }
 
 func BenchmarkEncodeHuffmanOnly(b *testing.B) {
-	benchmark(b, "../testdata/Isaac.Newton-Opticks.txt", matchfinder.NoMatchFinder{}, 1<<20)
+	benchmark(b, "../testdata/Isaac.Newton-Opticks.txt", match.NoMatchFinder{}, 1<<20)
 }
 
 func BenchmarkWriterLevels(b *testing.B) {

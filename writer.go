@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/nijaru/brotli/internal/quality"
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/match"
 )
 
 const (
@@ -131,47 +131,47 @@ type nopCloser struct {
 
 func (nopCloser) Close() error { return nil }
 
-func getMatchFinder(level int) matchfinder.MatchFinder {
+func getMatchFinder(level int) match.MatchFinder {
 	switch level {
 	case 0, 1:
-		return &matchfinder.ZFast{MaxDistance: 1 << 20}
+		return &match.ZFast{MaxDistance: 1 << 20}
 	case 2:
-		return &matchfinder.ZDFast{MaxDistance: 1 << 20}
+		return &match.ZDFast{MaxDistance: 1 << 20}
 	case 3:
-		return &matchfinder.ZM{MaxDistance: 1 << 20}
+		return &match.ZM{MaxDistance: 1 << 20}
 	case 4:
-		return &matchfinder.Trio{MaxDistance: 1 << 20}
+		return &match.Trio{MaxDistance: 1 << 20}
 	case 5, 6:
-		return &matchfinder.Bargain1{MaxDistance: 1 << 20}
+		return &match.Bargain1{MaxDistance: 1 << 20}
 	case 7:
-		return &matchfinder.Bargain2{MaxDistance: 1 << 20, Skip: true}
+		return &match.Bargain2{MaxDistance: 1 << 20, Skip: true}
 	case 8:
-		return &matchfinder.Bargain2{MaxDistance: 1 << 20}
+		return &match.Bargain2{MaxDistance: 1 << 20}
 	case 9:
-		return &matchfinder.Bargain3{MaxDistance: 1 << 20}
+		return &match.Bargain3{MaxDistance: 1 << 20}
 	}
-	return &matchfinder.Bargain3{MaxDistance: 1 << 20}
+	return &match.Bargain3{MaxDistance: 1 << 20}
 }
 
 // NewParallelWriter is like NewWriterV2, but it uses multiple goroutines to
 // compress blocks in parallel.
-func NewParallelWriter(dst io.Writer, level int, concurrency int) *matchfinder.ParallelWriter {
+func NewParallelWriter(dst io.Writer, level int, concurrency int) *match.ParallelWriter {
 	if level < 0 {
 		level = 0
 	} else if level > 9 {
 		level = 9
 	}
 
-	w := &matchfinder.ParallelWriter{
+	w := &match.ParallelWriter{
 		Dest: dst,
-		MatchFinder: func() matchfinder.MatchFinder {
+		MatchFinder: func() match.MatchFinder {
 			if level >= 5 && level <= 6 {
-				return matchfinder.GetBargain1()
+				return match.GetBargain1()
 			}
 			return getMatchFinder(level)
 		},
-		Encoder: func() matchfinder.Encoder {
-			return matchfinder.GetEncoder(func() matchfinder.Encoder { return &Encoder{} })
+		Encoder: func() match.Encoder {
+			return match.GetEncoder(func() match.Encoder { return &Encoder{} })
 		},
 		BlockSize:   1 << 16,
 		Concurrency: concurrency,
@@ -180,14 +180,14 @@ func NewParallelWriter(dst io.Writer, level int, concurrency int) *matchfinder.P
 }
 
 // NewWriterV2 is like NewWriterLevel, but it uses the new implementation
-func NewWriterV2(dst io.Writer, level int) *matchfinder.Writer {
+func NewWriterV2(dst io.Writer, level int) *match.Writer {
 	if level < 0 {
 		level = 0
 	} else if level > 9 {
 		level = 9
 	}
 
-	w := &matchfinder.Writer{
+	w := &match.Writer{
 		Dest:        dst,
 		MatchFinder: getMatchFinder(level),
 		Encoder:     &Encoder{},

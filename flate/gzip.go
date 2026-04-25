@@ -4,17 +4,17 @@ import (
 	"hash/crc32"
 	"time"
 
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/match"
 )
 
-func NewGZIPEncoder() matchfinder.Encoder {
+func NewGZIPEncoder() match.Encoder {
 	return &gzipEncoder{
 		f: NewEncoder(),
 	}
 }
 
 type gzipEncoder struct {
-	f           matchfinder.Encoder
+	f           match.Encoder
 	length      uint32
 	crc         uint32
 	wroteHeader bool
@@ -36,7 +36,7 @@ func appendUint32(dst []byte, n uint32) []byte {
 	)
 }
 
-func (g *gzipEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, lastBlock bool) []byte {
+func (g *gzipEncoder) Encode(dst []byte, src []byte, matches []match.Match, lastBlock bool) []byte {
 	if !g.wroteHeader {
 		dst = append(dst,
 			0x1f, 0x8b, // magic number

@@ -1,4 +1,4 @@
-package matchfinder
+package match
 
 func adjustTableOffsets(tbl []tableEntry, delta int) {
 	for i := range tbl {

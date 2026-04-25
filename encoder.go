@@ -3,10 +3,10 @@ package brotli
 import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/metablock"
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/match"
 )
 
-// An Encoder implements the matchfinder.Encoder interface, writing in Brotli format.
+// An Encoder implements the match.Encoder interface, writing in Brotli format.
 type Encoder struct {
 	wroteHeader bool
 	bw          bitstream.BitWriter
@@ -20,11 +20,11 @@ func (e *Encoder) Reset() {
 
 func (e *Encoder) Close() error {
 	e.Reset()
-	matchfinder.PutEncoder(e)
+	match.PutEncoder(e)
 	return nil
 }
 
-func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, lastBlock bool) []byte {
+func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBlock bool) []byte {
 	e.bw.Dst = dst
 	if !e.wroteHeader {
 		e.bw.WriteBits(4, 15)

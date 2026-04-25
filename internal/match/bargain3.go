@@ -1,4 +1,4 @@
-package matchfinder
+package match
 
 import (
 	"encoding/binary"
@@ -7,14 +7,9 @@ import (
 	"slices"
 )
 
-const (
-	bargain2TableBits = 18
-	bargain2TableSize = 1 << bargain2TableBits
-)
-
-// Bargain2 is a MatchFinder that attempts to find the encoding with the lowest
-// "bit cost", using 2 hash lengths (5 and 8).
-type Bargain2 struct {
+// Bargain3 is a MatchFinder that attempts to find the encoding with the lowest
+// "bit cost", using 3 hash lengths (5, 8, and 12).
+type Bargain3 struct {
 	MaxDistance int
 
 	// Skip is whether to look for matches at every other byte instead of every
@@ -22,8 +17,9 @@ type Bargain2 struct {
 	Skip bool
 
 	history []byte
-	table5  [bargain2TableSize]tableEntry
-	table8  [bargain2TableSize]tableEntry
+	table5  [1 << 17]tableEntry
+	table8  [1 << 18]tableEntry
+	table12 [1 << 19]tableEntry
 
 	// holding onto buffers to reduce allocations:
 
@@ -31,13 +27,14 @@ type Bargain2 struct {
 	matches  []Match
 }
 
-func (z *Bargain2) Reset() {
-	z.table5 = [bargain2TableSize]tableEntry{}
-	z.table8 = [bargain2TableSize]tableEntry{}
+func (z *Bargain3) Reset() {
+	z.table5 = [len(z.table5)]tableEntry{}
+	z.table8 = [len(z.table8)]tableEntry{}
+	z.table12 = [len(z.table12)]tableEntry{}
 	z.history = z.history[:0]
 }
 
-func (z *Bargain2) FindMatches(dst []Match, src []byte) []Match {
+func (z *Bargain3) FindMatches(dst []Match, src []byte) []Match {
 	if z.MaxDistance == 0 {
 		z.MaxDistance = 1 << 16
 	}
@@ -72,6 +69,7 @@ func (z *Bargain2) FindMatches(dst []Match, src []byte) []Match {
 
 		adjustTableOffsets(z.table5[:], delta)
 		adjustTableOffsets(z.table8[:], delta)
+		adjustTableOffsets(z.table12[:], delta)
 	}
 
 	historyLen := len(z.history)
@@ -128,20 +126,24 @@ func (z *Bargain2) FindMatches(dst []Match, src []byte) []Match {
 			}
 		}
 
-		if i > len(src)-8 {
+		if i > len(src)-12 {
 			// There's no room to check hashes.
 			continue
 		}
 
 		cv := binary.LittleEndian.Uint64(src[i:])
+		extra := binary.LittleEndian.Uint32(src[i+8:])
 		nextHash5 := z.hash5(cv)
 		nextHash8 := z.hash8(cv)
+		nextHash12 := z.hash12(cv, extra)
 		candidate5 := z.table5[nextHash5]
 		candidate8 := z.table8[nextHash8]
+		candidate12 := z.table12[nextHash12]
 
 		entry := tableEntry{offset: int32(i), val: uint32(cv)}
 		z.table5[nextHash5] = entry
 		z.table8[nextHash8] = entry
+		z.table12[nextHash12] = entry
 
 		// Look for a repeat match, unless there is no previous distance, or a match at
 		// that distance has already been found.
@@ -194,6 +196,22 @@ func (z *Bargain2) FindMatches(dst []Match, src []byte) []Match {
 				}
 				nextOverlapSearch = max(nextOverlapSearch, m.Start+1, m.End-6)
 			}
+
+			if int(candidate12.offset) < i && i-int(candidate12.offset) < z.MaxDistance && uint32(cv) == candidate12.val &&
+				binary.LittleEndian.Uint32(src[candidate12.offset:]) == uint32(cv) {
+				m := extendMatch2(src, i, int(candidate12.offset), historyLen)
+				delta := i - m.Start
+				if delta == 0 {
+					addMatch(m, unmatched, false)
+				} else {
+					// The match was extended backwards. Add it with and without the extra.
+					addMatch(m, max(unmatched-delta, 0), false)
+					m.Start += delta
+					m.Match += delta
+					addMatch(m, unmatched, false)
+				}
+				nextOverlapSearch = max(nextOverlapSearch, m.Start+1, m.End-6)
+			}
 		}
 	}
 
@@ -223,10 +241,14 @@ func (z *Bargain2) FindMatches(dst []Match, src []byte) []Match {
 	return append(dst, matches...)
 }
 
-func (z *Bargain2) hash5(u uint64) uint32 {
-	return uint32(((u << 24) * 889523592379) >> (64 - bargain2TableBits))
+func (z *Bargain3) hash5(u uint64) uint32 {
+	return uint32(((u << 24) * 889523592379) >> (64 - 17))
 }
 
-func (z *Bargain2) hash8(u uint64) uint32 {
-	return uint32((u * 0xcf1bbcdcb7a56463) >> (64 - bargain2TableBits))
+func (z *Bargain3) hash8(u uint64) uint32 {
+	return uint32((u * 0xcf1bbcdcb7a56463) >> (64 - 18))
+}
+
+func (z *Bargain3) hash12(u uint64, e uint32) uint32 {
+	return uint32((u*0xcf1bbcdcb7a56463 + uint64(e)*(2654435761<<32)) >> (64 - 19))
 }

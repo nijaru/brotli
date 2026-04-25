@@ -6,7 +6,7 @@ import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/hasher"
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/match"
 )
 
 /* Copyright 2015 Google Inc. All Rights Reserved.
@@ -106,7 +106,7 @@ func (e *Encoder) writeHeader(lgwin uint, storageIx *uint, storage []byte) {
 	}
 }
 
-func (e *Encoder) Encode(dst []byte, src []byte, matches []matchfinder.Match, lastBlock bool) []byte {
+func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBlock bool) []byte {
 	inputSize := uint(len(src))
 	if !e.wroteHeader && e.CmdCodeNumbits == 0 {
 		e.Reset()

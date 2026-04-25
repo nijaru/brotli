@@ -3,33 +3,33 @@ package flate
 import (
 	"io"
 
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/match"
 )
 
-// NewWriter returns a new matchfinder.Writer that compresses data at the given level,
+// NewWriter returns a new match.Writer that compresses data at the given level,
 // in flate encoding. Levels 1–9 are available; levels outside this range will
 // be replaced with the closest level available.
-func NewWriter(w io.Writer, level int) *matchfinder.Writer {
+func NewWriter(w io.Writer, level int) *match.Writer {
 	return newWriter(w, level, NewEncoder())
 }
 
-// NewGZIPWriter returns a new matchfinder.Writer that compresses data at the given
+// NewGZIPWriter returns a new match.Writer that compresses data at the given
 // level, in gzip encoding. Levels 1–9 are available; levels outside this range
 // will be replaced by the closest level available.
-func NewGZIPWriter(w io.Writer, level int) *matchfinder.Writer {
+func NewGZIPWriter(w io.Writer, level int) *match.Writer {
 	return newWriter(w, level, NewGZIPEncoder())
 }
 
-func newWriter(w io.Writer, level int, e matchfinder.Encoder) *matchfinder.Writer {
-	var mf matchfinder.MatchFinder
+func newWriter(w io.Writer, level int, e match.Encoder) *match.Writer {
+	var mf match.MatchFinder
 	if level < 2 {
-		mf = &matchfinder.ZFast{MaxDistance: 1 << 15}
+		mf = &match.ZFast{MaxDistance: 1 << 15}
 	} else if level == 2 {
-		mf = &matchfinder.ZDFast{MaxDistance: 1 << 15}
+		mf = &match.ZDFast{MaxDistance: 1 << 15}
 	} else if level == 3 {
-		mf = &matchfinder.ZM{MaxDistance: 1 << 15}
+		mf = &match.ZM{MaxDistance: 1 << 15}
 	} else if level == 4 {
-		mf = &matchfinder.Trio{MaxDistance: 1 << 15}
+		mf = &match.Trio{MaxDistance: 1 << 15}
 	} else if level < 8 {
 		chainLen := 32
 		switch level {
@@ -38,7 +38,7 @@ func newWriter(w io.Writer, level int, e matchfinder.Encoder) *matchfinder.Write
 		case 6:
 			chainLen = 16
 		}
-		mf = &matchfinder.M4{
+		mf = &match.M4{
 			MaxDistance:     1 << 15,
 			ChainLength:     chainLen,
 			HashLen:         5,
@@ -50,14 +50,14 @@ func newWriter(w io.Writer, level int, e matchfinder.Encoder) *matchfinder.Write
 		if level == 8 {
 			chainLen = 4
 		}
-		mf = &matchfinder.Pathfinder{
+		mf = &match.Pathfinder{
 			MaxDistance: 1 << 15,
 			ChainLength: chainLen,
 			HashLen:     hashLen,
 		}
 	}
 
-	return &matchfinder.Writer{
+	return &match.Writer{
 		Dest:        w,
 		MatchFinder: mf,
 		Encoder:     e,
