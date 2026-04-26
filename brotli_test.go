@@ -565,14 +565,15 @@ func BenchmarkEncodeLevelsReset(b *testing.B) {
 		w := NewWriterLevel(buf, level)
 		w.Write(opticks)
 		w.Close()
+		ratio := float64(len(opticks)) / float64(buf.Len())
 		b.Run(fmt.Sprintf("%d", level), func(b *testing.B) {
 			b.ReportAllocs()
-			b.ReportMetric(float64(len(opticks))/float64(buf.Len()), "ratio")
 			b.SetBytes(int64(len(opticks)))
 			for b.Loop() {
 				w.Reset(io.Discard)
 				w.Write(opticks)
 				w.Close()
+				b.ReportMetric(ratio, "ratio")
 			}
 		})
 	}
@@ -601,14 +602,15 @@ func BenchmarkEncodeLevelsResetV2(b *testing.B) {
 		w := NewWriterV2(buf, level)
 		w.Write(opticks)
 		w.Close()
+		ratio := float64(len(opticks)) / float64(buf.Len())
 		b.Run(fmt.Sprintf("%d", level), func(b *testing.B) {
 			b.ReportAllocs()
-			b.ReportMetric(float64(len(opticks))/float64(buf.Len()), "ratio")
 			b.SetBytes(int64(len(opticks)))
 			for b.Loop() {
 				w.Reset(io.Discard)
 				w.Write(opticks)
 				w.Close()
+				b.ReportMetric(ratio, "ratio")
 			}
 		})
 	}
