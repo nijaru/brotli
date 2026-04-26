@@ -82,6 +82,7 @@ func (w *Writer) Reset(dst io.Writer) {
 		w.Params.Lgwin = uint(w.options.LGWin)
 	}
 	w.plan = quality.NewPlan(w.options.Quality, int(w.Params.Lgwin), 0, 0, false)
+	w.State.Plan = w.plan
 	w.Dst = dst
 	w.Err = nil
 }

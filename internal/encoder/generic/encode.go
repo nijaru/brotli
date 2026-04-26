@@ -427,6 +427,7 @@ func ensureInitialized(s *State) bool {
 	s.RemainingMetadataBytes = math.MaxUint32
 
 	sanitizeParams(&s.Params)
+	initEncoderDictionary(&s.Params.Dictionary)
 	s.Params.Lgblock = computeLgBlock(&s.Params)
 	chooseDistanceParams(&s.Params)
 
@@ -896,9 +897,9 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 	}
 
 	if s.Params.Quality == 10 {
-		createZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.Params, s.Hasher_.(*hasher.H10), s.DistCache[:], &s.LastInsertLen, &s.Commands, &s.NumLiterals)
+		createZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.Params, s.Hasher_.(*hasher.H10), s.DistCache[:], &s.LastInsertLen, &s.Commands, &s.NumLiterals, &s.ZopfliNodes, &s.ZopfliLiteralCosts, &s.ZopfliCostDist)
 	} else if s.Params.Quality == 11 {
-		createHqZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.Params, s.Hasher_, s.DistCache[:], &s.LastInsertLen, &s.Commands, &s.NumLiterals)
+		createHqZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.Params, s.Hasher_, s.DistCache[:], &s.LastInsertLen, &s.Commands, &s.NumLiterals, &s.ZopfliNodes, &s.ZopfliMatches, &s.ZopfliNumMatches, &s.ZopfliLiteralCosts, &s.ZopfliCostDist)
 	} else {
 		createBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.Params, s.Hasher_, s.DistCache[:], &s.LastInsertLen, &s.Commands, &s.NumLiterals)
 	}
