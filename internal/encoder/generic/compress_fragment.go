@@ -356,6 +356,16 @@ func rewindBitPosition1(new_storage_ix uint, storage_ix *uint, storage []byte) {
 	var bitpos uint = new_storage_ix & 7
 	var mask uint = (1 << bitpos) - 1
 	storage[new_storage_ix>>3] &= byte(mask)
+
+	startByte := (new_storage_ix + 7) >> 3
+	endByte := (*storage_ix + 7) >> 3
+	if endByte > uint(len(storage)) {
+		endByte = uint(len(storage))
+	}
+	if endByte > startByte {
+		clear(storage[startByte:endByte])
+	}
+
 	*storage_ix = new_storage_ix
 }
 

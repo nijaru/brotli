@@ -53,6 +53,7 @@ type Plan struct {
 	OptimizeHisto    bool    // quality >= 4: optimize histogram clusters
 	ExtensiveRef     bool    // quality >= 5: extensive distance reference search
 	Lgblock          int     // input block log size (computed from quality + lgwin)
+	Lgwin            int     // window bits
 	MaxZopfliLen     int     // 150 for Q10, 325 for Q11
 	ZopfliCandidates int     // 1 for Q10, 5 for Q11
 	SparseSearchSpree int    // 64 for Q<9, 512 for Q>=9
@@ -116,6 +117,7 @@ func NewPlan(quality, lgwin, lgblock int, sizeHint uint64, largeWindow bool) Pla
 		OptimizeHisto:   quality >= 4,
 		ExtensiveRef:    quality >= 5,
 		Lgblock:         lgblock,
+		Lgwin:           lgwin,
 		MaxZopfliLen:    zopfliLen(quality),
 		ZopfliCandidates: zopfliCandidates(quality),
 		SparseSearchSpree: sparseSearchSpree(quality),

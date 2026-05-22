@@ -1966,6 +1966,7 @@ CommandPostDecodeLiterals:
 					goto saveStateAndReturn
 				}
 			} else {
+				println("DECODER DEBUG: transform_idx:", transform_idx, "Num_transforms:", trans.Num_transforms, "distanceCode:", s.distanceCode, "maxDistance:", s.maxDistance, "maxBackwardDistance:", s.maxBackwardDistance, "pos:", pos, "copyLength:", i)
 				return decoderErrorFormatTransform
 			}
 		} else {

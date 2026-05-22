@@ -48,6 +48,7 @@ var kCmdCodeDefault = [57]byte{
 }
 
 type Encoder struct {
+	Lgwin          uint
 	CmdDepths      [128]byte
 	CmdBits        [128]uint16
 	CmdCode        [512]byte
@@ -63,7 +64,8 @@ type Encoder struct {
 	wroteHeader   bool
 }
 
-func (e *Encoder) Reset() {
+func (e *Encoder) Reset(lgwin uint) {
+	e.Lgwin = lgwin
 	e.CmdDepths = [128]byte{
 		0, 4, 4, 5, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 0, 0, 4, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 10, 10, 10, 10, 10, 10, 0, 4, 4, 5, 5, 5, 6, 6, 7, 8, 8, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 7, 7, 7, 8, 10, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
 	}
@@ -109,7 +111,7 @@ func (e *Encoder) writeHeader(lgwin uint, storageIx *uint, storage []byte) {
 func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBlock bool) []byte {
 	inputSize := uint(len(src))
 	if !e.wroteHeader && e.CmdCodeNumbits == 0 {
-		e.Reset()
+		e.Reset(22)
 	}
 
 	maxOutSize := uint(len(dst)) + 2*inputSize + 1024
@@ -121,14 +123,18 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 	
 	if e.lastBytesBits > 0 {
 		storage[storageIx>>3] = byte(e.lastBytes)
-		if e.lastBytesBits > 8 {
-			storage[(storageIx>>3)+1] = byte(e.lastBytes >> 8)
-		}
 		storageIx += uint(e.lastBytesBits)
 	}
 
+	if (storageIx & 7) != 0 {
+		storage[storageIx>>3] &= (1 << (storageIx & 7)) - 1
+	} else {
+		storage[storageIx>>3] = 0
+	}
+	clear(storage[(storageIx+7)>>3:])
+
 	if !e.wroteHeader {
-		e.writeHeader(22, &storageIx, storage)
+		e.writeHeader(e.Lgwin, &storageIx, storage)
 		e.wroteHeader = true
 	}
 
@@ -140,13 +146,6 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 		}
 		table := e.getTable(tableSize)
 
-		if (storageIx & 7) != 0 {
-			storage[storageIx>>3] &= (1 << (storageIx & 7)) - 1
-		} else {
-			storage[storageIx>>3] = 0
-		}
-		clear(storage[(storageIx+7)>>3:])
-
 		e.compressFragmentFast(src, inputSize, lastBlock, table, tableSize, e.CmdDepths[:], e.CmdBits[:], &e.CmdCodeNumbits, e.CmdCode[:], &storageIx, storage)
 	} else if lastBlock {
 		bitstream.WriteBits(1, 1, &storageIx, storage) // islast
@@ -157,18 +156,15 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 	if lastBlock {
 		e.lastBytes = 0
 		e.lastBytesBits = 0
+		return storage[:(storageIx+7)>>3]
 	} else {
 		e.lastBytesBits = byte(storageIx & 7)
 		if e.lastBytesBits > 0 {
 			e.lastBytes = uint16(storage[storageIx>>3])
-			if e.lastBytesBits > 8 {
-				e.lastBytes |= uint16(storage[(storageIx>>3)+1]) << 8
-			}
 			e.lastBytes &= (1 << e.lastBytesBits) - 1
 		}
+		return storage[:storageIx>>3]
 	}
-
-	return storage[:(storageIx+7)>>3]
 }
 
 func hash5(p []byte, shift uint) uint32 {
@@ -528,9 +524,34 @@ func (e *Encoder) shouldMergeBlock(data []byte, len uint, depths []byte) bool {
 	}
 }
 
-func emitUncompressedMetaBlock1(begin, end []byte, mlen_storage_ix uint, storage_ix *uint, storage []byte) {
+func rewindBitPosition1(new_storage_ix uint, storage_ix *uint, storage []byte) {
+	var bitpos uint = new_storage_ix & 7
+	var mask uint = (1 << bitpos) - 1
+	storage[new_storage_ix>>3] &= byte(mask)
+
+	startByte := (new_storage_ix + 7) >> 3
+	endByte := (*storage_ix + 7) >> 3
+	if endByte > uint(len(storage)) {
+		endByte = uint(len(storage))
+	}
+	if endByte > startByte {
+		clear(storage[startByte:endByte])
+	}
+
+	*storage_ix = new_storage_ix
+}
+
+func shouldUseUncompressedMode(compressed uint, insertlen uint, literal_ratio uint) bool {
+	if compressed*50 > insertlen {
+		return false
+	} else {
+		return literal_ratio > 980
+	}
+}
+
+func emitUncompressedMetaBlock1(begin []byte, end []byte, storage_ix_start uint, storage_ix *uint, storage []byte) {
 	var length uint = uint(len(begin) - len(end))
-	*storage_ix = mlen_storage_ix - 3
+	rewindBitPosition1(storage_ix_start, storage_ix, storage)
 	storeMetaBlockHeader1(length, true, storage_ix, storage)
 	*storage_ix = (*storage_ix + 7) &^ 7
 	copy(storage[*storage_ix>>3:], begin[:length])
@@ -539,197 +560,213 @@ func emitUncompressedMetaBlock1(begin, end []byte, mlen_storage_ix uint, storage
 }
 
 func (e *Encoder) compressFragmentFastImpl(in []byte, input_size uint, is_last bool, table []int, table_bits uint, cmd_depth []byte, cmd_bits []uint16, cmd_code_numbits *uint, cmd_code []byte, storage_ix *uint, storage []byte) {
-	var initial_storage_ix uint = *storage_ix
 	var shift uint = 64 - table_bits
-	var block_size uint
-	var total_block_size uint
-	var mlen_storage_ix uint
-	var literal_ratio uint
 	var cmd_histo [128]uint32
 	var ip_end int
-	var next_emit int
-	var last_distance int
+	var next_emit int = 0
+	var base_ip int = 0
 	var input int = 0
-	var last_processed_ip int = 0
-
 	var lit_depth [256]byte
 	var lit_bits [256]uint16
+	var literal_ratio uint
+	var ip int
+	var last_distance int
+
+	maxDistance := int((1 << e.Lgwin) - 16)
+	if maxDistance > 262128 {
+		maxDistance = 262128
+	}
+
+	var metablockStart int = input
+	var block_size uint = min(input_size, firstBlockSize)
+	var total_block_size uint = block_size
+	var mlen_storage_ix uint = *storage_ix + 3
+
+	storeMetaBlockHeader1(block_size, false, storage_ix, storage)
+
+	/* No block splits, no contexts. */
+	bitstream.WriteBits(13, 0, storage_ix, storage)
+
+	literal_ratio = e.buildAndStoreLiteralPrefixCode(in[input:], block_size, lit_depth[:], lit_bits[:], storage_ix, storage)
+	{
+		var i uint
+		for i = 0; i+7 < *cmd_code_numbits; i += 8 {
+			bitstream.WriteBits(8, uint64(cmd_code[i>>3]), storage_ix, storage)
+		}
+		bitstream.WriteBits(*cmd_code_numbits&7, uint64(cmd_code[*cmd_code_numbits>>3]), storage_ix, storage)
+	}
+
+emit_commands:
+	copy(cmd_histo[:], kCmdHistoSeed[:])
+	ip = input
+	last_distance = -1
+	ip_end = int(uint(input) + block_size)
+
+	if block_size >= 16 {
+		var ip_limit int = input + int(min(block_size-5, input_size-16))
+		var next_hash uint32
+		ip++
+		for next_hash = hash5(in[ip:], shift); ; {
+			var skip uint32 = 32
+			var next_ip int = ip
+			var candidate int
+
+		trawl:
+			for {
+				var hash_val uint32 = next_hash
+				var bytes_between uint32 = skip >> 5
+				skip++
+				ip = next_ip
+				next_ip = ip + int(bytes_between)
+				if next_ip > ip_limit {
+					goto emit_remainder
+				}
+				next_hash = hash5(in[next_ip:], shift)
+				candidate = ip - last_distance
+				if isMatch5(in[ip:], in[candidate:]) {
+					if candidate < ip {
+						table[hash_val] = int(ip - base_ip)
+						break
+					}
+				}
+				candidate = base_ip + table[hash_val]
+				table[hash_val] = int(ip - base_ip)
+				if isMatch5(in[ip:], in[candidate:]) {
+					break
+				}
+			}
+
+			if ip-candidate > maxDistance {
+				goto trawl
+			}
+
+			{
+				var base int = ip
+				var matched uint = 5 + common.FindMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
+				var distance int = base - candidate
+				var insertlen uint = uint(base - next_emit)
+				ip += int(matched)
+
+				if insertlen < 6210 {
+					emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+				} else if shouldUseUncompressedMode(uint(next_emit - metablockStart), insertlen, literal_ratio) {
+					emitUncompressedMetaBlock1(in[metablockStart:], in[base:], mlen_storage_ix-3, storage_ix, storage)
+					input_size -= uint(base - input)
+					input = base
+					next_emit = input
+					goto next_block
+				} else {
+					emitLongInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+				}
+				emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
+
+				if distance == last_distance {
+					bitstream.WriteBits(uint(cmd_depth[64]), uint64(cmd_bits[64]), storage_ix, storage)
+					cmd_histo[64]++
+				} else {
+					emitDistance(uint(distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+					last_distance = distance
+				}
+				emitCopyLenLastDistance(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+
+				next_emit = ip
+				if ip >= ip_limit {
+					goto emit_remainder
+				}
+				{
+					var input_bytes uint64 = binary.LittleEndian.Uint64(in[ip-3:])
+					var h0 uint32 = hashAtOffset(input_bytes, 0, shift)
+					table[h0] = int(ip - base_ip - 3)
+					var h1 uint32 = hashAtOffset(input_bytes, 1, shift)
+					table[h1] = int(ip - base_ip - 2)
+					var h2 uint32 = hashAtOffset(input_bytes, 2, shift)
+					table[h2] = int(ip - base_ip - 1)
+
+					var cur_hash uint32 = hashAtOffset(input_bytes, 3, shift)
+					candidate = base_ip + table[cur_hash]
+					table[cur_hash] = int(ip - base_ip)
+				}
+			}
+
+			for isMatch5(in[ip:], in[candidate:]) {
+				var base int = ip
+				var matched uint = 5 + common.FindMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
+				if ip-candidate > maxDistance {
+					break
+				}
+				ip += int(matched)
+				last_distance = int(base - candidate)
+				emitCopyLen(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+				emitDistance(uint(last_distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+
+				next_emit = ip
+				if ip >= ip_limit {
+					goto emit_remainder
+				}
+				{
+					var input_bytes uint64 = binary.LittleEndian.Uint64(in[ip-3:])
+					var h0 uint32 = hashAtOffset(input_bytes, 0, shift)
+					table[h0] = int(ip - base_ip - 3)
+					var h1 uint32 = hashAtOffset(input_bytes, 1, shift)
+					table[h1] = int(ip - base_ip - 2)
+					var h2 uint32 = hashAtOffset(input_bytes, 2, shift)
+					table[h2] = int(ip - base_ip - 1)
+
+					var cur_hash uint32 = hashAtOffset(input_bytes, 3, shift)
+					candidate = base_ip + table[cur_hash]
+					table[cur_hash] = int(ip - base_ip)
+				}
+			}
+			ip++
+			next_hash = hash5(in[ip:], shift)
+		}
+	}
+
+emit_remainder:
+	input += int(block_size)
+	input_size -= block_size
+	block_size = min(input_size, mergeBlockSize)
+
+	if input_size > 0 && total_block_size+block_size <= 1<<20 && e.shouldMergeBlock(in[input:], block_size, lit_depth[:]) {
+		total_block_size += block_size
+		updateBits(20, uint32(total_block_size-1), mlen_storage_ix, storage)
+		goto emit_commands
+	}
+
+	if next_emit < ip_end {
+		var insertlen uint = uint(ip_end - next_emit)
+		if insertlen < 6210 {
+			emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+			emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
+		} else if shouldUseUncompressedMode(uint(next_emit - metablockStart), insertlen, literal_ratio) {
+			emitUncompressedMetaBlock1(in[metablockStart:], in[ip_end:], mlen_storage_ix-3, storage_ix, storage)
+		} else {
+			emitLongInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+			emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
+		}
+	}
+	next_emit = ip_end
 
 next_block:
 	if input_size > 0 {
+		metablockStart = input
 		block_size = min(input_size, firstBlockSize)
 		total_block_size = block_size
 		mlen_storage_ix = *storage_ix + 3
 		storeMetaBlockHeader1(block_size, false, storage_ix, storage)
 		bitstream.WriteBits(13, 0, storage_ix, storage)
 		literal_ratio = e.buildAndStoreLiteralPrefixCode(in[input:], block_size, lit_depth[:], lit_bits[:], storage_ix, storage)
-		{
-			var i uint
-			for i = 0; i+7 < *cmd_code_numbits; i += 8 {
-				bitstream.WriteBits(8, uint64(cmd_code[i>>3]), storage_ix, storage)
-			}
-			bitstream.WriteBits(*cmd_code_numbits&7, uint64(cmd_code[*cmd_code_numbits>>3]), storage_ix, storage)
-		}
-
-	emit_commands:
-		copy(cmd_histo[:], kCmdHistoSeed[:])
-		ip_end = input + int(block_size)
-		last_distance = -1
-		if next_emit != 0 && input != 0 {
-			// Carry over next_emit from previous block on merge
-		} else {
-			next_emit = input
-		}
-		if block_size >= 16 {
-			var ip_limit int = input + int(min(block_size-5, input_size-16))
-			var next_hash uint32
-			var ip int = input
-			ip++
-			for next_hash = hash5(in[ip:], shift); ; {
-				var skip uint32 = 32
-				var next_ip int = ip
-				var candidate int
-			trawl:
-				for {
-					var hash_val uint32 = next_hash
-					var bytes_between uint32 = skip >> 5
-					skip++
-					ip = next_ip
-					next_ip = ip + int(bytes_between)
-					if next_ip > ip_limit {
-						goto emit_remainder
-					}
-					next_hash = hash5(in[next_ip:], shift)
-					candidate = ip - last_distance
-					if isMatch5(in[ip:], in[candidate:]) {
-						if candidate < ip {
-							table[hash_val] = int(ip - last_processed_ip)
-							break
-						}
-					}
-					candidate = last_processed_ip + table[hash_val]
-					table[hash_val] = int(ip - last_processed_ip)
-					if isMatch5(in[ip:], in[candidate:]) {
-						break
-					}
-				}
-
-				if ip-candidate > maxDistance {
-					goto trawl
-				}
-
-				{
-					var base int = ip
-					var matched uint = 5 + common.FindMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
-					var distance int = base - candidate
-					var insertlen uint = uint(base - next_emit)
-					ip += int(matched)
-					emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-					emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
-					if distance == last_distance {
-						bitstream.WriteBits(uint(cmd_depth[64]), uint64(cmd_bits[64]), storage_ix, storage)
-						cmd_histo[64]++
-					} else {
-						emitDistance(uint(distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-						last_distance = distance
-					}
-					emitCopyLenLastDistance(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-
-					next_emit = ip
-					if ip >= ip_limit {
-						goto emit_remainder
-					}
-					{
-						var input_bytes uint64 = binary.LittleEndian.Uint64(in[ip-3:])
-						var h0 uint32 = hashAtOffset(input_bytes, 0, shift)
-						table[h0] = int(ip - last_processed_ip - 3)
-						var h1 uint32 = hashAtOffset(input_bytes, 1, shift)
-						table[h1] = int(ip - last_processed_ip - 2)
-						var h2 uint32 = hashAtOffset(input_bytes, 2, shift)
-						table[h2] = int(ip - last_processed_ip - 1)
-
-						var cur_hash uint32 = hashAtOffset(input_bytes, 3, shift)
-						candidate = last_processed_ip + table[cur_hash]
-						table[cur_hash] = int(ip - last_processed_ip)
-					}
-				}
-
-				for isMatch5(in[ip:], in[candidate:]) {
-					var base int = ip
-					var matched uint = 5 + common.FindMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
-					if ip-candidate > maxDistance {
-						break
-					}
-					ip += int(matched)
-					last_distance = int(base - candidate)
-					emitCopyLen(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-					emitDistance(uint(last_distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-
-					next_emit = ip
-					if ip >= ip_limit {
-						goto emit_remainder
-					}
-					{
-						var input_bytes uint64 = binary.LittleEndian.Uint64(in[ip-3:])
-						var h0 uint32 = hashAtOffset(input_bytes, 0, shift)
-						table[h0] = int(ip - last_processed_ip - 3)
-						var h1 uint32 = hashAtOffset(input_bytes, 1, shift)
-						table[h1] = int(ip - last_processed_ip - 2)
-						var h2 uint32 = hashAtOffset(input_bytes, 2, shift)
-						table[h2] = int(ip - last_processed_ip - 1)
-
-						var cur_hash uint32 = hashAtOffset(input_bytes, 3, shift)
-						candidate = last_processed_ip + table[cur_hash]
-						table[cur_hash] = int(ip - last_processed_ip)
-					}
-				}
-				ip++
-				next_hash = hash5(in[ip:], shift)
-			}
-		}
-
-	emit_remainder:
-		input = ip_end
-		input_size -= block_size
-		block_size = min(input_size, mergeBlockSize)
-
-		if input_size > 0 && total_block_size+block_size <= 1<<20 && e.shouldMergeBlock(in[input:], block_size, lit_depth[:]) {
-			total_block_size += block_size
-			updateBits(20, uint32(total_block_size-1), mlen_storage_ix, storage)
-			goto emit_commands
-		}
-
-		if next_emit < ip_end {
-			var insertlen uint = uint(ip_end - next_emit)
-			emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-			emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
-		}
-		next_emit = ip_end
-
-		if *storage_ix-initial_storage_ix > 31+(total_block_size<<3) {
-			emitUncompressedMetaBlock1(in[input-int(total_block_size):], in[input:], mlen_storage_ix, storage_ix, storage)
-		}
-
-		if input_size > 0 {
-			// Update for next block
-			e.buildAndStoreCommandPrefixCode(cmd_histo[:], cmd_depth, cmd_bits, storage_ix, storage)
-			goto next_block
-		}
+		e.buildAndStoreCommandPrefixCode(cmd_histo[:], cmd_depth, cmd_bits, storage_ix, storage)
+		goto emit_commands
 	}
 
 	if !is_last {
-		// Update for next Encode call
-		cmd_code[0] = 0
+		clear(cmd_code)
 		*cmd_code_numbits = 0
 		var startBits uint = 0
-		// Build and store into cmd_code buffer
 		e.buildAndStoreCommandPrefixCodeToBuffer(cmd_histo[:], cmd_depth, cmd_bits, &startBits, cmd_code)
 		*cmd_code_numbits = startBits
 	}
-
-	_ = last_processed_ip
-	_ = initial_storage_ix
-	_ = literal_ratio
 }
 
 func (e *Encoder) compressFragmentFast(input []byte, input_size uint, is_last bool, table []int, table_size uint, cmd_depth []byte, cmd_bits []uint16, cmd_code_numbits *uint, cmd_code []byte, storage_ix *uint, storage []byte) {
@@ -741,7 +778,12 @@ func (e *Encoder) compressFragmentFast(input []byte, input_size uint, is_last bo
 		return
 	}
 
+	initial_storage_ix := *storage_ix
 	e.compressFragmentFastImpl(input, input_size, is_last, table, uint(common.Log2FloorNonZero(table_size)), cmd_depth, cmd_bits, cmd_code_numbits, cmd_code, storage_ix, storage)
+
+	if *storage_ix-initial_storage_ix > 31+(input_size<<3) {
+		emitUncompressedMetaBlock1(input, input[input_size:], initial_storage_ix, storage_ix, storage)
+	}
 
 	if is_last {
 		bitstream.WriteBits(1, 1, storage_ix, storage) /* islast */
@@ -749,3 +791,30 @@ func (e *Encoder) compressFragmentFast(input []byte, input_size uint, is_last bo
 		*storage_ix = (*storage_ix + 7) &^ 7
 	}
 }
+
+// Flush writes an empty metadata block to align the stream to a byte boundary
+// and returns the flushed bytes.
+func (e *Encoder) Flush() []byte {
+	if e.lastBytesBits == 0 {
+		return nil
+	}
+	seal := uint32(e.lastBytes)
+	sealBits := uint(e.lastBytesBits)
+	e.lastBytes = 0
+	e.lastBytesBits = 0
+
+	/* is_last = 0, data_nibbles = 11, reserved = 0, meta_nibbles = 00 */
+	seal |= 0x6 << sealBits
+	sealBits += 6
+
+	storage := e.getStorage(8)
+	storage[0] = byte(seal)
+	if sealBits > 8 {
+		storage[1] = byte(seal >> 8)
+	}
+	if sealBits > 16 {
+		storage[2] = byte(seal >> 16)
+	}
+	return storage[:(sealBits+7)>>3]
+}
+

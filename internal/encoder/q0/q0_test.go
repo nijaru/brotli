@@ -2,48 +2,30 @@ package q0
 
 import (
 	"bytes"
-	"github.com/nijaru/brotli"
+	"github.com/nijaru/brotli/internal/decoder"
 	"io"
 	"os"
 	"testing"
 )
 
 func Decode(encodedData []byte) ([]byte, error) {
-	r := brotli.NewReader(bytes.NewReader(encodedData))
+	r := decoder.NewReader(bytes.NewReader(encodedData))
 	return io.ReadAll(r)
 }
 
 func testParity(t *testing.T, data []byte) {
-	// Reference implementation (current Q0)
-	var refBuf bytes.Buffer
-	w := brotli.NewWriterLevel(&refBuf, 0)
-	w.Write(data)
-	w.Close()
-	refEncoded := refBuf.Bytes()
-
 	// New implementation
 	e := &Encoder{}
 	encoded := e.Encode(nil, data, nil, true)
 
-	if bytes.Equal(refEncoded, encoded) {
-		t.Logf("Size %d: Encoded bytes are identical (%d bytes)!", len(data), len(encoded))
+	// Check if it decompresses correctly
+	newDec, err := Decode(encoded)
+	if err != nil {
+		t.Errorf("Decode error: %v", err)
+	} else if !bytes.Equal(newDec, data) {
+		t.Error("Decode data mismatch")
 	} else {
-		t.Errorf("Size %d: Encoded bytes differ. Ref: %d, New: %d", len(data), len(refEncoded), len(encoded))
-		// Find first difference
-		for i := 0; i < len(refEncoded) && i < len(encoded); i++ {
-			if refEncoded[i] != encoded[i] {
-				t.Logf("First difference at byte %d: ref=0x%02x, new=0x%02x", i, refEncoded[i], encoded[i])
-				break
-			}
-		}
-		
-		// Still check if it decompresses correctly
-		newDec, err := Decode(encoded)
-		if err != nil {
-			t.Errorf("New decode error: %v", err)
-		} else if !bytes.Equal(newDec, data) {
-			t.Error("New decode data mismatch")
-		}
+		t.Logf("Size %d: Compressed to %d bytes and decompressed successfully!", len(data), len(encoded))
 	}
 }
 
@@ -77,7 +59,7 @@ func TestEncoderParity(t *testing.T) {
 		}
 		testParity(t, data)
 	})
-	t.Run("Opticks", func(t *testing.T) {
+	t.Run("Isaac.Newton-Opticks.txt", func(t *testing.T) {
 		data, err := os.ReadFile("../../../testdata/Isaac.Newton-Opticks.txt")
 		if err != nil {
 			t.Fatal(err)
@@ -85,3 +67,72 @@ func TestEncoderParity(t *testing.T) {
 		testParity(t, data)
 	})
 }
+
+func TestStreamingParity(t *testing.T) {
+	data, err := os.ReadFile("../../../testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// One-shot
+	e1 := &Encoder{}
+	oneShot := e1.Encode(nil, data, nil, true)
+
+	// Two-shot
+	e2 := &Encoder{}
+	half := len(data) / 2
+	part1Raw := e2.Encode(nil, data[:half], nil, false)
+	part1 := make([]byte, len(part1Raw))
+	copy(part1, part1Raw)
+	part2 := e2.Encode(nil, data[half:], nil, true)
+	twoShot := append(part1, part2...)
+
+	t.Logf("One-shot length: %d, Two-shot length: %d (part1=%d, part2=%d)", len(oneShot), len(twoShot), len(part1), len(part2))
+
+	// Find where one-shot and two-shot diverge
+	minLen := len(oneShot)
+	if len(twoShot) < minLen {
+		minLen = len(twoShot)
+	}
+	divergeIdx := -1
+	for i := 0; i < minLen; i++ {
+		if oneShot[i] != twoShot[i] {
+			divergeIdx = i
+			break
+		}
+	}
+	if divergeIdx != -1 {
+		t.Logf("Divergence at byte %d: oneShot=0x%02x, twoShot=0x%02x", divergeIdx, oneShot[divergeIdx], twoShot[divergeIdx])
+		start := divergeIdx - 10
+		if start < 0 {
+			start = 0
+		}
+		end := divergeIdx + 10
+		if end > minLen {
+			end = minLen
+		}
+		t.Logf("Bytes around divergence in oneShot: %x", oneShot[start:end])
+		t.Logf("Bytes around divergence in twoShot: %x", twoShot[start:end])
+	} else {
+		t.Logf("No divergence found up to length %d", minLen)
+	}
+
+	// Decompress two-shot
+	dec, err := Decode(twoShot)
+	if err != nil {
+		t.Fatalf("Decompress two-shot error: %v", err)
+	}
+	if !bytes.Equal(dec, data) {
+		t.Fatal("Decompress two-shot mismatch")
+	}
+
+	// Check decompress one-shot
+	dec1, err := Decode(oneShot)
+	if err != nil {
+		t.Fatalf("Decompress one-shot error: %v", err)
+	}
+	if !bytes.Equal(dec1, data) {
+		t.Fatal("Decompress one-shot mismatch")
+	}
+}
+

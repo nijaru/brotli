@@ -29,11 +29,6 @@ This function writes bits into bytes in increasing addresses, and within
 	and locate the rest in BYTE+1, BYTE+2, etc.
 */
 func WriteBits(n_bits uint, bits uint64, pos *uint, array []byte) {
-	/* This branch of the code can write up to 56 bits at a time,
-	   7 bits are lost by being perhaps already in *p and at least
-	   1 bit is needed to initialize the bit-stream ahead (i.e. if 7
-	   bits are in *p and we write 57 bits, then the next write will
-	   access a byte that was never initialized). */
 	p := array[*pos>>3:]
 	v := uint64(p[0])
 	v |= bits << (*pos & 7)
