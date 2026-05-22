@@ -5,7 +5,7 @@ import (
 
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/metablock"
-	"github.com/nijaru/brotli/internal/match"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 func gaussianProbability(x, mean, stdDev float64) float64 {

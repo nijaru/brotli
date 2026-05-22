@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/nijaru/brotli/internal/encoder/generic"
-	"github.com/nijaru/brotli/internal/match"
+	"github.com/nijaru/brotli/matchfinder"
 	"github.com/nijaru/brotli/internal/quality"
 )
 

@@ -19,7 +19,7 @@ import (
 
 	"github.com/nijaru/brotli/internal/decoder"
 	"github.com/nijaru/brotli/internal/encoder/generic"
-	"github.com/nijaru/brotli/internal/match"
+	"github.com/nijaru/brotli/matchfinder"
 	"github.com/xyproto/randomstring"
 )
 

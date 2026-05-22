@@ -3,7 +3,7 @@ package generic
 import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/metablock"
-	"github.com/nijaru/brotli/internal/match"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 // An Encoder implements the match.Encoder interface, writing in Brotli format.

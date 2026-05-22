@@ -5,7 +5,7 @@
 package flate
 
 import (
-	"github.com/nijaru/brotli/internal/match"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 const (

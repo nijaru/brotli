@@ -6,7 +6,7 @@ import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/hasher"
-	"github.com/nijaru/brotli/internal/match"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 /* Copyright 2015 Google Inc. All Rights Reserved.
