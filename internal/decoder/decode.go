@@ -770,14 +770,8 @@ func readHuffmanCode(alphabet_size uint32, max_symbol uint32, table []bitstream.
 			if s.sub_loopCounter != 1 {
 				s.space = 32
 				s.repeat = 0 /* num_codes */
-				var i int
-				for i = 0; i <= bitstream.HuffmanMaxCodeLengthCodeLength; i++ {
-					s.codeLengthHisto[i] = 0
-				}
-
-				for i = 0; i < common.CodeLengthCodes; i++ {
-					s.codeLengthCodeLengths[i] = 0
-				}
+				clear(s.codeLengthHisto[:])
+				clear(s.codeLengthCodeLengths[:])
 
 				s.substateHuffman = stateHuffmanComplex
 				continue
@@ -833,9 +827,7 @@ func readHuffmanCode(alphabet_size uint32, max_symbol uint32, table []bitstream.
 				}
 
 				bitstream.BuildCodeLengthsHuffmanTable(s.table[:], s.codeLengthCodeLengths[:], s.codeLengthHisto[:])
-				for i = 0; i < 16; i++ {
-					s.codeLengthHisto[i] = 0
-				}
+				clear(s.codeLengthHisto[:])
 
 				for i = 0; i <= bitstream.HuffmanMaxCodeLength; i++ {
 					s.nextSymbol[i] = int(i) - (bitstream.HuffmanMaxCodeLength + 1)
@@ -1182,10 +1174,8 @@ func decodeBlockTypeAndLength(safe int, s *Reader, tree_type int) bool {
 }
 
 func detectTrivialLiteralBlockTypes(s *Reader) {
+	clear(s.trivialLiteralContexts[:])
 	var i uint
-	for i = 0; i < 8; i++ {
-		s.trivialLiteralContexts[i] = 0
-	}
 	for i = 0; uint32(i) < s.numBlockTypes[0]; i++ {
 		var offset uint = i << common.LiteralContextBits
 		var error uint = 0
