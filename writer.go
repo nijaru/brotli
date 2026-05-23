@@ -5,8 +5,9 @@ import (
 	"io"
 
 	"github.com/nijaru/brotli/internal/encoder/generic"
-	"github.com/nijaru/brotli/matchfinder"
+	"github.com/nijaru/brotli/internal/encoder/q0"
 	"github.com/nijaru/brotli/internal/quality"
+	"github.com/nijaru/brotli/matchfinder"
 )
 
 const (
@@ -44,7 +45,8 @@ type Writer struct {
 	err     error
 	plan    quality.Plan
 
-	generic.State
+	q0State      q0.Encoder
+	genericState generic.State
 }
 
 // Writes to the returned writer are compressed and written to dst.
@@ -76,29 +78,60 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 // its original state from NewWriter or NewWriterLevel, but writing to dst
 // instead. This permits reusing a Writer rather than allocating a new one.
 func (w *Writer) Reset(dst io.Writer) {
-	generic.InitState(&w.State)
-	w.Params.Quality = w.options.Quality
+	w.dst = dst
+	w.err = nil
+
+	var lgwin uint = 22
 	if w.options.LGWin > 0 {
-		w.Params.Lgwin = uint(w.options.LGWin)
+		lgwin = uint(w.options.LGWin)
 	}
-	w.plan = quality.NewPlan(w.options.Quality, int(w.Params.Lgwin), 0, 0, false)
-	w.State.Plan = w.plan
-	w.Dst = dst
-	w.Err = nil
+	w.plan = quality.NewPlan(w.options.Quality, int(lgwin), 0, 0, false)
+
+	if w.plan.Tier == quality.TierQ0 {
+		w.q0State.Reset(lgwin)
+	} else {
+		generic.InitState(&w.genericState)
+		w.genericState.Params.Quality = w.options.Quality
+		w.genericState.Params.Lgwin = lgwin
+		w.genericState.Plan = w.plan
+		w.genericState.Dst = dst
+		w.genericState.Err = nil
+	}
 }
 
 func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
-	if w.Dst == nil {
+	if w.dst == nil {
 		return 0, errWriterClosed
 	}
-	if w.Err != nil {
-		return 0, w.Err
+	if w.err != nil {
+		return 0, w.err
+	}
+
+	if w.plan.Tier == quality.TierQ0 {
+		var isLast bool
+		if op == operationFinish {
+			isLast = true
+		}
+
+		if op == operationFlush {
+			data := w.q0State.Flush()
+			if len(data) > 0 {
+				_, w.err = w.dst.Write(data)
+			}
+			return 0, w.err
+		}
+
+		data := w.q0State.Encode(nil, p, nil, isLast)
+		if len(data) > 0 {
+			_, w.err = w.dst.Write(data)
+		}
+		return len(p), w.err
 	}
 
 	for {
 		availableIn := uint(len(p))
 		nextIn := p
-		success := generic.CompressStream(&w.State, op, &availableIn, &nextIn)
+		success := generic.CompressStream(&w.genericState, op, &availableIn, &nextIn)
 		bytesConsumed := len(p) - int(availableIn)
 		p = p[bytesConsumed:]
 		n += bytesConsumed
@@ -106,8 +139,9 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 			return n, errEncode
 		}
 
-		if len(p) == 0 || w.Err != nil {
-			return n, w.Err
+		if len(p) == 0 || w.genericState.Err != nil {
+			w.err = w.genericState.Err
+			return n, w.err
 		}
 	}
 }
@@ -125,7 +159,7 @@ func (w *Writer) Flush() error {
 func (w *Writer) Close() error {
 	// If stream is already closed, it is reported by `writeChunk`.
 	_, err := w.writeChunk(nil, operationFinish)
-	w.Dst = nil
+	w.dst = nil
 	return err
 }
 

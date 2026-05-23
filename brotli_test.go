@@ -97,16 +97,21 @@ func TestIssue22(t *testing.T) {
 		e := NewWriterOptions(&out, WriterOptions{Quality: level})
 		n, err := e.Write(data)
 		if err != nil {
-			t.Errorf("Error compressing data: %v", err)
+			t.Errorf("Level %d: Error compressing data: %v", level, err)
+			continue
 		}
 		if int(n) != len(data) {
-			t.Errorf("Write() n=%v, want %v", n, len(data))
+			t.Errorf("Level %d: Write() n=%v, want %v", level, n, len(data))
 		}
 		if err := e.Close(); err != nil {
-			t.Errorf("Close Error after writing %d bytes: %v", n, err)
+			t.Errorf("Level %d: Close Error after writing %d bytes: %v", level, n, err)
+			continue
 		}
 		if err := checkCompressedData(out.Bytes(), data); err != nil {
-			t.Errorf("Error decompressing data at level %d: %v", level, err)
+			t.Errorf("Level %d: Error decompressing data: %v", level, err)
+		} else {
+			t.Logf("Level %d: Compressed size: %d", level, out.Len())
+			t.Logf("Level %d: Success!", level)
 		}
 	}
 }

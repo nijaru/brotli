@@ -2,6 +2,7 @@ package q0
 
 import (
 	"bytes"
+	"compress/gzip"
 	"github.com/nijaru/brotli/internal/decoder"
 	"io"
 	"os"
@@ -61,6 +62,22 @@ func TestEncoderParity(t *testing.T) {
 	})
 	t.Run("Isaac.Newton-Opticks.txt", func(t *testing.T) {
 		data, err := os.ReadFile("../../../testdata/Isaac.Newton-Opticks.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		testParity(t, data)
+	})
+	t.Run("Issue22", func(t *testing.T) {
+		f, err := os.Open("../../../testdata/issue22.gz")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		zr, err := gzip.NewReader(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(zr)
 		if err != nil {
 			t.Fatal(err)
 		}

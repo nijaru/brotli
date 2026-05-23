@@ -39,13 +39,8 @@ type State struct {
 	PrevByte         byte
 	PrevByte2        byte
 	Storage          []byte
-	SmallTable       [1 << 10]int
 	LargeTable       []int
 	LargeTableSize   uint
-	CmdDepths        [128]byte
-	CmdBits          [128]uint16
-	CmdCode          [512]byte
-	CmdCodeNumbits   uint
 	CommandBuf       []uint32
 	LiteralBuf       []byte
 	// Zopfli reusable buffers (Q10-Q11)
@@ -80,7 +75,7 @@ func InitState(s *State) {
 	if s.Hasher_ != nil {
 		s.Hasher_.Common().Is_prepared_ = false
 	}
-	s.CmdCodeNumbits = 0
+
 	s.StreamState = streamProcessing
 	s.IsLastBlockEmitted = false
 	s.IsInitialized = false
@@ -111,7 +106,7 @@ func ResetForReuse(s *State) {
 	if s.Hasher_ != nil {
 		s.Hasher_.Common().Is_prepared_ = false
 	}
-	s.CmdCodeNumbits = 0
+
 	s.StreamState = streamProcessing
 	s.IsLastBlockEmitted = false
 	s.RemainingMetadataBytes = 0x7FFFFFFF

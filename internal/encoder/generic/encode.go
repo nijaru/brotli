@@ -136,39 +136,16 @@ func hashTableSize(maxTableSize uint, inputSize uint) uint {
 }
 
 func getHashTable(s *State, qLevel int, inputSize uint, tableSize *uint) []int {
-	var maxTableSize uint
-	if qLevel == quality.Q0 {
-		maxTableSize = 1 << 15
-	} else {
-		maxTableSize = 1 << 16
-	}
+	var maxTableSize uint = 1 << 16
 	htsize := hashTableSize(maxTableSize, inputSize)
-	var table []int
-	if qLevel == quality.Q0 {
-		if htsize <= uint(len(s.SmallTable)) {
-			*tableSize = htsize
-			table = s.SmallTable[:]
-		} else {
-			if htsize > s.LargeTableSize {
-				s.LargeTableSize = htsize
-				s.LargeTable = make([]int, htsize)
-			}
-			*tableSize = htsize
-			table = s.LargeTable
-		}
-	} else {
-		if htsize > s.LargeTableSize {
-			s.LargeTableSize = htsize
-			s.LargeTable = make([]int, htsize)
-		}
-
-		*tableSize = htsize
-		table = s.LargeTable
+	if htsize > s.LargeTableSize {
+		s.LargeTableSize = htsize
+		s.LargeTable = make([]int, htsize)
 	}
 
 	*tableSize = htsize
-	clear(table[:htsize])
-	return table
+	clear(s.LargeTable[:htsize])
+	return s.LargeTable
 }
 
 func encodeWindowBits(lgwin int, largeWindow bool, lastBytes *uint16, lastBytesBits *byte) {
@@ -217,7 +194,6 @@ func encoderInitState(s *State) {
 	if s.Hasher_ != nil {
 		s.Hasher_.Common().Is_prepared_ = false
 	}
-	s.CmdCodeNumbits = 0
 	s.StreamState = streamProcessing
 	s.IsLastBlockEmitted = false
 	s.IsInitialized = false
@@ -310,11 +286,7 @@ func encoderCompressStreamFast(s *State, op int, availableIn *uint, nextIn *[]by
 			storage[1] = byte(s.LastBytes >> 8)
 			table = getHashTable(s, s.Params.Quality, blockSize, &tableSize)
 
-			if s.Plan.Tier == quality.TierQ0 {
-				compressFragmentFast(*nextIn, blockSize, isLast, table, tableSize, s.CmdDepths[:], s.CmdBits[:], &s.CmdCodeNumbits, s.CmdCode[:], &storageIx, storage)
-			} else {
-				compressFragmentTwoPass(*nextIn, blockSize, isLast, commandBuf, literalBuf, table, tableSize, &storageIx, storage)
-			}
+			compressFragmentTwoPass(*nextIn, blockSize, isLast, commandBuf, literalBuf, table, tableSize, &storageIx, storage)
 
 			*nextIn = (*nextIn)[blockSize:]
 			*availableIn -= blockSize
@@ -443,40 +415,7 @@ func ensureInitialized(s *State) bool {
 		encodeWindowBits(lgwin, s.Params.Large_window, &s.LastBytes, &s.LastBytesBits)
 	}
 
-	if s.Plan.Tier == quality.TierQ0 {
-		s.CmdDepths = [128]byte{
-			0, 4, 4, 5, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8,
-			0, 0, 0, 4, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7,
-			7, 7, 10, 10, 10, 10, 10, 10, 0, 4, 4, 5, 5, 5, 6, 6,
-			7, 8, 8, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
-			5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 4, 4, 4, 4,
-			4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 7, 7, 7, 8, 10,
-			12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-		}
-		s.CmdBits = [128]uint16{
-			0, 0, 8, 9, 3, 35, 7, 71,
-			39, 103, 23, 47, 175, 111, 239, 31,
-			0, 0, 0, 4, 12, 2, 10, 6,
-			13, 29, 11, 43, 27, 59, 87, 55,
-			15, 79, 319, 831, 191, 703, 447, 959,
-			0, 14, 1, 25, 5, 21, 19, 51,
-			119, 159, 95, 223, 479, 991, 63, 575,
-			127, 639, 383, 895, 255, 767, 511, 1023,
-			14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			27, 59, 7, 39, 23, 55, 30, 1, 17, 9, 25, 5, 0, 8, 4, 12,
-			2, 10, 6, 21, 13, 29, 3, 19, 11, 15, 47, 31, 95, 63, 127, 255,
-			767, 2815, 1791, 3839, 511, 2559, 1535, 3583, 1023, 3071, 2047, 4095,
-		}
-		s.CmdCode = [512]byte{
-			0xff, 0x77, 0xd5, 0xbf, 0xe7, 0xde, 0xea, 0x9e, 0x51, 0x5d, 0xde, 0xc6,
-			0x70, 0x57, 0xbc, 0x58, 0x58, 0x58, 0xd8, 0xd8, 0x58, 0xd5, 0xcb, 0x8c,
-			0xea, 0xe0, 0xc3, 0x87, 0x1f, 0x83, 0xc1, 0x60, 0x1c, 0x67, 0xb2, 0xaa,
-			0x06, 0x83, 0xc1, 0x60, 0x30, 0x18, 0xcc, 0xa1, 0xce, 0x88, 0x54, 0x94,
-			0x46, 0xe1, 0xb0, 0xd0, 0x4e, 0xb2, 0xf7, 0x04, 0x00,
-		}
-		s.CmdCodeNumbits = 448
-	}
+
 
 	s.IsInitialized = true
 	return true
@@ -848,7 +787,7 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 		}
 	}
 
-	if s.Plan.Tier == quality.TierQ0 || s.Plan.Tier == quality.TierQ1 {
+	if s.Plan.Tier == quality.TierQ1 {
 		var storage []byte
 		storageIx := uint(s.LastBytesBits)
 		var tableSize uint
@@ -862,11 +801,7 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 		storage[0] = byte(s.LastBytes)
 		storage[1] = byte(s.LastBytes >> 8)
 		table = getHashTable(s, s.Params.Quality, uint(bytes), &tableSize)
-		if s.Plan.Tier == quality.TierQ0 {
-			compressFragmentFast(data[wrappedLastProcessedPos&mask:], uint(bytes), isLast, table, tableSize, s.CmdDepths[:], s.CmdBits[:], &s.CmdCodeNumbits, s.CmdCode[:], &storageIx, storage)
-		} else {
-			compressFragmentTwoPass(data[wrappedLastProcessedPos&mask:], uint(bytes), isLast, s.CommandBuf, s.LiteralBuf, table, tableSize, &storageIx, storage)
-		}
+		compressFragmentTwoPass(data[wrappedLastProcessedPos&mask:], uint(bytes), isLast, s.CommandBuf, s.LiteralBuf, table, tableSize, &storageIx, storage)
 
 		s.LastBytes = uint16(storage[storageIx>>3])
 		s.LastBytesBits = byte(storageIx & 7)

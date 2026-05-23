@@ -31,12 +31,12 @@ const (
 var kCmdHistoSeed = [128]uint32{
 	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
 }
 
 var kCmdCodeDefault = [57]byte{
@@ -245,7 +245,17 @@ func (e *Encoder) buildAndStoreLiteralPrefixCode(input []byte, input_size uint, 
 		}
 	}
 
-	return buildAndStoreHuffmanTreeFast(histogram[:], histogram_total, 8, depths, bits, storage_ix, storage)
+	buildAndStoreHuffmanTreeFast(histogram[:], histogram_total, 8, depths, bits, storage_ix, storage)
+	{
+		var literal_ratio uint = 0
+		for i = 0; i < 256; i++ {
+			if histogram[i] != 0 {
+				literal_ratio += uint(histogram[i] * uint32(depths[i]))
+			}
+		}
+
+		return (literal_ratio * 125) / histogram_total
+	}
 }
 
 func (e *Encoder) buildAndStoreCommandPrefixCode(histogram []uint32, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
@@ -645,6 +655,7 @@ emit_commands:
 				var matched uint = 5 + common.FindMatchLengthWithLimit(in[candidate+5:], in[ip+5:], uint(ip_end-ip)-5)
 				var distance int = base - candidate
 				var insertlen uint = uint(base - next_emit)
+
 				ip += int(matched)
 
 				if insertlen < 6210 {
@@ -694,6 +705,7 @@ emit_commands:
 				if ip-candidate > maxDistance {
 					break
 				}
+
 				ip += int(matched)
 				last_distance = int(base - candidate)
 				emitCopyLen(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
@@ -761,7 +773,7 @@ next_block:
 	}
 
 	if !is_last {
-		clear(cmd_code)
+		cmd_code[0] = 0
 		*cmd_code_numbits = 0
 		var startBits uint = 0
 		e.buildAndStoreCommandPrefixCodeToBuffer(cmd_histo[:], cmd_depth, cmd_bits, &startBits, cmd_code)

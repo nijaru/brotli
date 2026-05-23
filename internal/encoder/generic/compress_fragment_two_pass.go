@@ -20,6 +20,38 @@ import (
    second pass we emit them into the bit stream using prefix codes built based
    on the actual command and literal byte histograms. */
 
+const maxDistance_compress_fragment = 262128
+
+func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_bits uint, depths []byte, bits []uint16, storage_ix *uint, storage []byte) uint {
+	var i uint
+	if histogram_total == 0 {
+		bitstream.WriteBits(1, 0, storage_ix, storage) /* ISLAST */
+		bitstream.WriteBits(1, 1, storage_ix, storage) /* ISEMPTY */
+		*storage_ix = (*storage_ix + 7) &^ 7
+		return 0
+	}
+	for i = 0; i < 256; i++ {
+		if histogram[i] != 0 {
+			var adjust uint32 = 1 + 2*min(histogram[i], 11)
+			histogram[i] += adjust
+			histogram_total += uint(adjust)
+		}
+	}
+
+	bitstream.BuildAndStoreHuffmanTreeFast(histogram, histogram_total, max_bits, depths, bits, storage_ix, storage)
+	{
+		var literal_ratio uint = 0
+		for i = 0; i < 256; i++ {
+			if histogram[i] != 0 {
+				literal_ratio += uint(histogram[i] * uint32(depths[i]))
+			}
+		}
+
+		/* Estimated encoding ratio, millibytes per symbol. */
+		return (literal_ratio * 125) / histogram_total
+	}
+}
+
 func hash1(p []byte, shift uint, length uint) uint32 {
 	var h uint64 = (binary.LittleEndian.Uint64(p) << ((8 - length) * 8)) * uint64(hasher.KHashMul32)
 	return uint32(h >> shift)
