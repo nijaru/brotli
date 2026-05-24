@@ -8,20 +8,12 @@ A highly optimized, modernized, and idiomatic Go package for Brotli compression 
 
 ---
 
-## Key Enhancements
+## Features & Optimizations
 
-### Zero-Allocation Stream Resets & Flushes
-The original translated library suffered from performance overheads due to virtual interface dispatch and heap-escaping allocations when reusing writers.
-This modernized port implements clean, concrete routing inside `brotli.Writer` (tier-based routing for Q0 vs. Generic engines). Reusing a writer via `Reset()` or invoking `Flush()` executes with **zero heap allocations**, making it ideal for high-throughput HTTP proxies and server runtimes.
-
-### Surgical Decoder Modernization
-Surgically modernizes the Brotli decompression state machine. It leverages Go 1.26 primitives such as the builtin `clear()` for fast block-zeroing on hot paths, mapping directly to highly optimized CPU vector instructions.
-
-### Reduced Memory Footprint
-By pruning obsolete table representations and fast-path duplicates from the generic compression engines, the individual `brotli.Writer` memory allocation footprint is reduced by **~9 KB per instance** at levels Q1–Q11.
-
-### Parallel Compression & Custom Matchfinders
-Includes a robust multithreaded block-level encoder (`NewParallelWriter`) and customized matchfinders (`NewWriterV2`), letting you squeeze out maximum compression speeds and ratios across multi-core systems.
+* **Zero-Allocation Stream Resets**: Concrete routing inside `brotli.Writer` (tier-based routing for Q0 vs. Generic engines) guarantees that reusing a writer via `Reset()` or invoking `Flush()` executes with **zero heap allocations**, making it ideal for high-throughput HTTP proxies and server runtimes.
+* **Surgical Decoder Modernization**: Leverages Go 1.26 primitives such as the builtin `clear()` for fast block-zeroing on hot paths, mapping directly to highly optimized CPU vector instructions.
+* **Reduced Memory Footprint**: Pruning obsolete table representations and fast-path duplicates from the generic compression engines reduces individual `brotli.Writer` memory allocations by **~9 KB per instance** at levels Q1–Q11.
+* **Parallel Compression & Custom Matchfinders**: Includes a robust multithreaded block-level encoder (`NewParallelWriter`) and customized matchfinders (`NewWriterV2`), letting you squeeze out maximum compression speeds and ratios across multi-core systems.
 
 ---
 
@@ -35,17 +27,6 @@ To guarantee that this library can serve as a drop-in, zero-regression replaceme
 | **Standard Go Brotli** | Cross-Decoder Round-Trip | Go Encoder &rarr; Standard Decoder and Standard Encoder &rarr; Go Decoder across $Q0\text{–}Q11$ |
 | **Direct Bitstream Parity** | Byte-Identity Verification | $Q0$ compressed byte-identity against `brotli -q 0 -w 22` |
 | **Native Fuzzing** | Memory Safety & Fuzzing | Continuous random mutation testing with `go test -fuzz` |
-
----
-
-## Comparison with Similar Projects
-
-| Library | Pure Go? | Supports Compression? | Allocation Profile | Use Case |
-|:---|:---:|:---:|:---|:---|
-| **`github.com/nijaru/brotli`** (This port) | **Yes** | **Yes** | **Zero-alloc resets & flushes**, streamlined footprint | High-performance Go servers, proxies, and CGO-free deployments |
-| `github.com/andybalholm/brotli` (Original) | Yes | Yes | High allocations on reset/flush (due to C translation patterns) | Standard pure Go applications |
-| `github.com/google/brotli/go/cbrotli` | No (CGO) | Yes | Low | High-throughput systems where CGO overhead is acceptable |
-| `github.com/dsnet/compress/brotli` | Yes | No (Decompress only) | Low | Legacy read-only scenarios (unmaintained) |
 
 ---
 
