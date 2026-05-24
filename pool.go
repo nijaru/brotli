@@ -5,6 +5,36 @@ import (
 	"sync"
 )
 
+// Global default pools for standard compression and decompression
+var (
+	defaultWriterPool = NewWriterPool(DefaultCompression)
+	defaultReaderPool = NewReaderPool()
+)
+
+// GetWriter retrieves a default-compression (*Writer) from a package-level pool
+// and resets it to write to dst, eliminating initial allocation overhead.
+func GetWriter(dst io.Writer) *Writer {
+	return defaultWriterPool.Get(dst)
+}
+
+// PutWriter returns a Writer to the package-level default pool.
+// Before returning it, the destination is cleared to prevent memory leaks.
+func PutWriter(w *Writer) {
+	defaultWriterPool.Put(w)
+}
+
+// GetReader retrieves a (*Reader) from a package-level pool and resets it
+// to read from src, eliminating initial allocation overhead.
+func GetReader(src io.Reader) *Reader {
+	return defaultReaderPool.Get(src)
+}
+
+// PutReader returns a Reader to the package-level default pool.
+// Before returning it, the source is cleared to prevent memory leaks.
+func PutReader(r *Reader) {
+	defaultReaderPool.Put(r)
+}
+
 // WriterPool manages a thread-safe pool of Writer instances to reduce garbage
 // collection overhead and heap allocations. Each pool is specific to a compression
 // quality level to ensure reused encoders match user-requested behavior.

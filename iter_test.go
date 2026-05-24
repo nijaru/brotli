@@ -19,7 +19,10 @@ func TestReaderLines(t *testing.T) {
 
 	br := NewReader(&buf)
 	var decodedLines []string
-	for line := range br.Lines() {
+	for line, err := range br.Lines() {
+		if err != nil {
+			t.Fatalf("unexpected lines error: %v", err)
+		}
 		decodedLines = append(decodedLines, line)
 	}
 
@@ -40,14 +43,18 @@ func TestReaderChunks(t *testing.T) {
 		t.Fatalf("close failed: %v", err)
 	}
 
-	// Test standard chunk size 5
+	// Test zero-allocation chunk size 5
 	br := NewReader(bytes.NewReader(buf.Bytes()))
 	var chunks [][]byte
 	for chunk, err := range br.Chunks(5) {
 		if err != nil {
 			t.Fatalf("unexpected chunk error: %v", err)
 		}
-		chunks = append(chunks, chunk)
+		// Since the iterator yields a reused buffer directly for zero-allocation,
+		// we copy the bytes to verify correctness over all iterations.
+		copied := make([]byte, len(chunk))
+		copy(copied, chunk)
+		chunks = append(chunks, copied)
 	}
 
 	expectedChunks := [][]byte{
