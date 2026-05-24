@@ -2,7 +2,7 @@
 
 Package `brotli` implements the Brotli compression format (RFC 7932) in pure Go.
 
-This library is an optimized, allocation-free fork of the upstream `c2go`-translated port (`github.com/andybalholm/brotli`). It maintains complete API compatibility with the upstream port, allowing it to be used as a direct, high-performance replacement.
+This library is an optimized, allocation-free fork of the `c2go` port (`github.com/andybalholm/brotli`). It requires Go 1.26 or later and maintains complete API compatibility with the `c2go` implementation, allowing it to be used as a direct, high-performance replacement.
 
 ---
 
@@ -21,14 +21,16 @@ The test suite automatically verifies compliance and compatibility:
 
 | Test Target | Verification Type | Description |
 |:---|:---|:---|
-| **C Reference Library** | Differential Round-Trip | Go Encoder &rarr; C Reference Decoder and C Reference Encoder &rarr; Go Decoder across all quality levels ($Q0\text{–}Q11$) |
-| **Upstream Go Port** | Cross-Decoder Round-Trip | Go Encoder &rarr; Upstream Decoder and Upstream Encoder &rarr; Go Decoder across all quality levels ($Q0\text{–}Q11$) |
-| **Direct Bitstream Parity** | Byte-Identity Verification | $Q0$ compressed byte-identity against official C encoder (`brotli -q 0 -w 22`) |
+| **C Reference Library** | Differential Round-Trip | This package &rarr; C Reference Decoder and C Reference Encoder &rarr; This package across all quality levels ($Q0\text{–}Q11$) |
+| **c2go Port** | Cross-Decoder Round-Trip | This package &rarr; `c2go` Decoder and `c2go` Encoder &rarr; This package across all quality levels ($Q0\text{–}Q11$) |
+| **Direct Bitstream Parity** | Byte-Identity Verification | $Q0$ compressed byte-identity of this package vs. official C encoder (`brotli -q 0 -w 22`) |
 | **Native Fuzzing** | Memory Safety & Fuzzing | Continuous random mutation testing with `go test -fuzz` |
 
 ---
 
 ## Installation
+
+This package requires **Go 1.26 or later**.
 
 ```bash
 go get github.com/nijaru/brotli
@@ -52,7 +54,7 @@ import (
 
 func main() {
 	var compressed bytes.Buffer
-	original := []byte("Brotli compression in Go.")
+	original := []byte("Brotli compression.")
 
 	// Compress
 	writer := brotli.NewWriter(&compressed)
