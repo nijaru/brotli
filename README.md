@@ -1,25 +1,23 @@
-# Modernized Brotli for Go
+# brotli
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/nijaru/brotli.svg)](https://pkg.go.dev/github.com/nijaru/brotli)
-[![Go Report Card](https://goreportcard.com/badge/github.com/nijaru/brotli)](https://goreportcard.com/report/github.com/nijaru/brotli)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Package `brotli` implements the Brotli compression format (RFC 7932) in pure Go.
 
-A highly optimized, modernized, and idiomatic Go package for Brotli compression and decompression. This library is a production-ready fork and comprehensive rewrite of the original `c2go`-translated port (`github.com/andybalholm/brotli`), bringing modern Go performance and memory safety characteristics without altering the standard API.
+This library is an optimized, allocation-free fork of `github.com/andybalholm/brotli` that retains complete API compatibility.
 
 ---
 
 ## Optimizations
 
-* **Zero-Allocation Resets**: Uses concrete structural routing in `brotli.Writer` (separating Q0 and Generic paths) to ensure that writer reuse via `Reset()` and stream flushes via `Flush()` do not allocate heap memory.
-* **Go 1.26 Modernizations**: Replaces manual loops with Go 1.26 builtins (such as `clear()`) in hot paths of the decoder state machine.
-* **Reduced Memory Usage**: Prunes obsolete tables and duplicate structures from the generic compression state to reduce individual `brotli.Writer` memory allocations by approximately 9 KB per instance at levels Q1–Q11.
-* **Block-Level Parallelism & Alternative Matchfinders**: Adds a multi-threaded block encoder (`NewParallelWriter`) and optimized matchfinders (`NewWriterV2`) to support higher throughput on multi-core systems.
+* **Zero-Allocation Resets**: Reusing a writer via `Reset()` or flushing via `Flush()` performs no heap allocations by using concrete structural routing inside `brotli.Writer`.
+* **Fast State Clearing**: Uses Go builtins like `clear()` in hot decoder paths for faster memory operations.
+* **Lower Memory Footprint**: Reduces memory allocation by ~9 KB per writer instance at levels Q1–Q11 by removing redundant tables from the generic compression state.
+* **Parallel Encoding**: Includes a multi-threaded block encoder (`NewParallelWriter`) and alternative matchfinders (`NewWriterV2`) for high-concurrency systems.
 
 ---
 
 ## Correctness & Interoperability
 
-To guarantee that this library can serve as a drop-in, zero-regression replacement for standard implementations, we maintain a comprehensive, automated verification suite:
+The test suite automatically verifies compliance and compatibility:
 
 | Test Target | Verification Type | Description |
 |:---|:---|:---|
@@ -54,7 +52,7 @@ import (
 
 func main() {
 	var compressed bytes.Buffer
-	original := []byte("Modernized Brotli compression for Go 1.26!")
+	original := []byte("Brotli compression in Go.")
 
 	// Compress
 	writer := brotli.NewWriter(&compressed)
