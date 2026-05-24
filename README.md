@@ -10,29 +10,42 @@ A highly optimized, modernized, and idiomatic Go package for Brotli compression 
 
 ## Key Enhancements
 
-### ⚡ Zero-Allocation Stream Resets & Flushes
+### Zero-Allocation Stream Resets & Flushes
 The original translated library suffered from performance overheads due to virtual interface dispatch and heap-escaping allocations when reusing writers.
 This modernized port implements clean, concrete routing inside `brotli.Writer` (tier-based routing for Q0 vs. Generic engines). Reusing a writer via `Reset()` or invoking `Flush()` executes with **zero heap allocations**, making it ideal for high-throughput HTTP proxies and server runtimes.
 
-### 🧹 Surgical Decoder Modernization
+### Surgical Decoder Modernization
 Surgically modernizes the Brotli decompression state machine. It leverages Go 1.26 primitives such as the builtin `clear()` for fast block-zeroing on hot paths, mapping directly to highly optimized CPU vector instructions.
 
-### 📉 Reduced Memory Footprint
+### Reduced Memory Footprint
 By pruning obsolete table representations and fast-path duplicates from the generic compression engines, the individual `brotli.Writer` memory allocation footprint is reduced by **~9 KB per instance** at levels Q1–Q11.
 
-### 🏎️ Parallel Compression & Custom Matchfinders
+### Parallel Compression & Custom Matchfinders
 Includes a robust multithreaded block-level encoder (`NewParallelWriter`) and customized matchfinders (`NewWriterV2`), letting you squeeze out maximum compression speeds and ratios across multi-core systems.
 
 ---
 
-## Bulletproof Correctness & Interoperability
+## Correctness & Interoperability
 
-To guarantee that this library can serve as a drop-in, zero-regression replacement for standard implementations, we maintain a comprehensive testing system:
+To guarantee that this library can serve as a drop-in, zero-regression replacement for standard implementations, we maintain a comprehensive, automated verification suite:
 
-* **Official C Library Interop (`TestDifferentialCBinary`)**: Verified round-trip cross-decompression against the official Google `brotli` reference C tool in **both directions** across all 12 quality levels ($Q0\text{–}Q11$).
-* **Cross-Decoder Compatibility (`TestCrossDecoderCompatibility`)**: Verified round-trip compatibility in both directions against the standard `github.com/andybalholm/brotli` package.
-* **Continuous Native Fuzzing (`FuzzRoundTrip`)**: Runs a native Go fuzzing target testing absolute memory safety and layout robustness under extreme mutations.
-* **Strict Bitstream Parity (`TestDirectBitstreamParity`)**: Ensures Q0 bitstream parity matching against the official Google C encoder.
+| Test Target | Verification Type | Description |
+|:---|:---|:---|
+| **C Reference Library** | Differential Round-Trip | Go Encoder &rarr; C Decoder and C Encoder &rarr; Go Decoder across all quality levels ($Q0\text{–}Q11$) |
+| **Standard Go Brotli** | Cross-Decoder Round-Trip | Go Encoder &rarr; Standard Decoder and Standard Encoder &rarr; Go Decoder across $Q0\text{–}Q11$ |
+| **Direct Bitstream Parity** | Byte-Identity Verification | $Q0$ compressed byte-identity against `brotli -q 0 -w 22` |
+| **Native Fuzzing** | Memory Safety & Fuzzing | Continuous random mutation testing with `go test -fuzz` |
+
+---
+
+## Comparison with Similar Projects
+
+| Library | Pure Go? | Supports Compression? | Allocation Profile | Use Case |
+|:---|:---:|:---:|:---|:---|
+| **`github.com/nijaru/brotli`** (This port) | **Yes** | **Yes** | **Zero-alloc resets & flushes**, streamlined footprint | High-performance Go servers, proxies, and CGO-free deployments |
+| `github.com/andybalholm/brotli` (Original) | Yes | Yes | High allocations on reset/flush (due to C translation patterns) | Standard pure Go applications |
+| `github.com/google/brotli/go/cbrotli` | No (CGO) | Yes | Low | High-throughput systems where CGO overhead is acceptable |
+| `github.com/dsnet/compress/brotli` | Yes | No (Decompress only) | Low | Legacy read-only scenarios (unmaintained) |
 
 ---
 
