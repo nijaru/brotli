@@ -5,7 +5,7 @@ import (
 
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/metablock"
-	"github.com/nijaru/brotli/matchfinder"
+	match "github.com/nijaru/brotli/matchfinder"
 )
 
 func gaussianProbability(x, mean, stdDev float64) float64 {
@@ -44,7 +44,9 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []match.Match, last
 		// For the command codes we're using for insert lengths (insert + 2-byte copy),
 		// fill the histogram with a Zipf-squared distribution.
 		for i := range 24 {
-			e.commandHisto[metablock.CombineLengthCodes(uint16(i), 0, false)] = uint32(2000 / (i + 1) / (i + 1))
+			e.commandHisto[metablock.CombineLengthCodes(uint16(i), 0, false)] = uint32(
+				2000 / (i + 1) / (i + 1),
+			)
 		}
 
 		// For the command codes we're using for copy lengths (0 insert + copy
@@ -59,9 +61,13 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []match.Match, last
 		// Fill in the combined codes for short insert and copy lengths.
 		for insertCode := range 6 {
 			copyCode := 2
-			e.commandHisto[128+insertCode<<3+copyCode] = uint32(100 / (insertCode + 1) / (insertCode + 1) / copyCode)
+			e.commandHisto[128+insertCode<<3+copyCode] = uint32(
+				100 / (insertCode + 1) / (insertCode + 1) / copyCode,
+			)
 			for copyCode := 3; copyCode < 8; copyCode++ {
-				e.commandHisto[128+insertCode<<3+copyCode] = uint32(343 / (insertCode + 1) / (insertCode + 1) / copyCode)
+				e.commandHisto[128+insertCode<<3+copyCode] = uint32(
+					343 / (insertCode + 1) / (insertCode + 1) / copyCode,
+				)
 			}
 		}
 
@@ -91,7 +97,14 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []match.Match, last
 
 	var literalDepths [256]byte
 	var literalBits [256]uint16
-	bitstream.BuildAndStoreHuffmanTreeFastBW(literalHisto[:], uint(len(src)), 8, literalDepths[:], literalBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(
+		literalHisto[:],
+		uint(len(src)),
+		8,
+		literalDepths[:],
+		literalBits[:],
+		&e.bw,
+	)
 
 	var commandDepths [704]byte
 	var commandBits [704]uint16
@@ -99,7 +112,14 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []match.Match, last
 	for _, n := range e.commandHisto {
 		commandCount += int(n)
 	}
-	bitstream.BuildAndStoreHuffmanTreeFastBW(e.commandHisto[:], uint(commandCount), 10, commandDepths[:], commandBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(
+		e.commandHisto[:],
+		uint(commandCount),
+		10,
+		commandDepths[:],
+		commandBits[:],
+		&e.bw,
+	)
 
 	var distanceDepths [64]byte
 	var distanceBits [64]uint16
@@ -107,7 +127,14 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []match.Match, last
 	for _, n := range e.distanceHisto {
 		distanceCount += int(n)
 	}
-	bitstream.BuildAndStoreHuffmanTreeFastBW(e.distanceHisto[:], uint(distanceCount), 6, distanceDepths[:], distanceBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(
+		e.distanceHisto[:],
+		uint(distanceCount),
+		6,
+		distanceDepths[:],
+		distanceBits[:],
+		&e.bw,
+	)
 
 	// Reset the statistics, starting with a count of 1 for each symbol we might use.
 	for i := range 24 {
@@ -181,13 +208,19 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []match.Match, last
 				copyCode := metablock.GetCopyLengthCode(uint(m.Length - 2))
 				command := metablock.CombineLengthCodes(0, copyCode, true)
 				e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
-				e.bw.WriteBits(uint(metablock.GetCopyExtra(copyCode)), uint64(m.Length-2)-uint64(metablock.GetCopyBase(copyCode)))
+				e.bw.WriteBits(
+					uint(metablock.GetCopyExtra(copyCode)),
+					uint64(m.Length-2)-uint64(metablock.GetCopyBase(copyCode)),
+				)
 				e.commandHisto[command]++
 			default:
 				copyCode := metablock.GetCopyLengthCode(uint(m.Length - 2))
 				command := metablock.CombineLengthCodes(0, copyCode, false)
 				e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
-				e.bw.WriteBits(uint(metablock.GetCopyExtra(copyCode)), uint64(m.Length-2)-uint64(metablock.GetCopyBase(copyCode)))
+				e.bw.WriteBits(
+					uint(metablock.GetCopyExtra(copyCode)),
+					uint64(m.Length-2)-uint64(metablock.GetCopyBase(copyCode)),
+				)
 				e.bw.WriteBits(uint(distanceDepths[0]), uint64(distanceBits[0]))
 				e.commandHisto[command]++
 				e.distanceHisto[0]++

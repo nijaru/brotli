@@ -1,8 +1,9 @@
 package metablock
 
 import (
-	"github.com/nijaru/brotli/internal/common"
 	"math"
+
+	"github.com/nijaru/brotli/internal/common"
 )
 
 /* Copyright 2013 Google Inc. All Rights Reserved.
@@ -11,7 +12,13 @@ import (
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-func initialEntropyCodesLiteral(data []byte, length uint, stride uint, num_histograms uint, histograms []common.HistogramLiteral) {
+func initialEntropyCodesLiteral(
+	data []byte,
+	length uint,
+	stride uint,
+	num_histograms uint,
+	histograms []common.HistogramLiteral,
+) {
 	var seed uint32 = 7
 	var block_length uint = length / num_histograms
 	var i uint
@@ -30,7 +37,13 @@ func initialEntropyCodesLiteral(data []byte, length uint, stride uint, num_histo
 	}
 }
 
-func randomSampleLiteral(seed *uint32, data []byte, length uint, stride uint, sample *common.HistogramLiteral) {
+func randomSampleLiteral(
+	seed *uint32,
+	data []byte,
+	length uint,
+	stride uint,
+	sample *common.HistogramLiteral,
+) {
 	var pos uint = 0
 	if stride >= length {
 		stride = length
@@ -41,7 +54,13 @@ func randomSampleLiteral(seed *uint32, data []byte, length uint, stride uint, sa
 	common.HistogramAddVectorLiteral(sample, data[pos:], stride)
 }
 
-func refineEntropyCodesLiteral(data []byte, length uint, stride uint, num_histograms uint, histograms []common.HistogramLiteral) {
+func refineEntropyCodesLiteral(
+	data []byte,
+	length uint,
+	stride uint,
+	num_histograms uint,
+	histograms []common.HistogramLiteral,
+) {
 	var iters uint = kIterMulForRefining*length/stride + kMinItersForRefining
 	var seed uint32 = 7
 	var iter uint
@@ -54,7 +73,17 @@ func refineEntropyCodesLiteral(data []byte, length uint, stride uint, num_histog
 	}
 }
 
-func findBlocksLiteral(data []byte, length uint, block_switch_bitcost float64, num_histograms uint, histograms []common.HistogramLiteral, insert_cost []float64, cost []float64, switch_signal []byte, block_id []byte) uint {
+func findBlocksLiteral(
+	data []byte,
+	length uint,
+	block_switch_bitcost float64,
+	num_histograms uint,
+	histograms []common.HistogramLiteral,
+	insert_cost []float64,
+	cost []float64,
+	switch_signal []byte,
+	block_id []byte,
+) uint {
 	var data_size uint = common.HistogramDataSizeLiteral()
 	var bitmaplen uint = (num_histograms + 7) >> 3
 	var num_blocks uint = 1
@@ -140,7 +169,12 @@ func findBlocksLiteral(data []byte, length uint, block_switch_bitcost float64, n
 	return num_blocks
 }
 
-func remapBlockIdsLiteral(block_ids []byte, length uint, new_id []uint16, num_histograms uint) uint {
+func remapBlockIdsLiteral(
+	block_ids []byte,
+	length uint,
+	new_id []uint16,
+	num_histograms uint,
+) uint {
 	var next_id uint16 = 0
 	var i uint
 	const kInvalidId uint16 = 256
@@ -162,7 +196,13 @@ func remapBlockIdsLiteral(block_ids []byte, length uint, new_id []uint16, num_hi
 	return uint(next_id)
 }
 
-func buildBlockHistogramsLiteral(data []byte, length uint, block_ids []byte, num_histograms uint, histograms []common.HistogramLiteral) {
+func buildBlockHistogramsLiteral(
+	data []byte,
+	length uint,
+	block_ids []byte,
+	num_histograms uint,
+	histograms []common.HistogramLiteral,
+) {
 	var i uint
 	common.ClearHistogramsLiteral(histograms, num_histograms)
 	for i = 0; i < length; i++ {
@@ -170,7 +210,13 @@ func buildBlockHistogramsLiteral(data []byte, length uint, block_ids []byte, num
 	}
 }
 
-func clusterBlocksLiteral(data []byte, length uint, num_blocks uint, block_ids []byte, split *BlockSplit) {
+func clusterBlocksLiteral(
+	data []byte,
+	length uint,
+	num_blocks uint,
+	block_ids []byte,
+	split *BlockSplit,
+) {
 	var histogram_symbols []uint32 = make([]uint32, num_blocks)
 	var block_lengths []uint32 = make([]uint32, num_blocks)
 	var expected_num_clusters uint = clustersPerBatch * (num_blocks + histogramsPerBatch - 1) / histogramsPerBatch
@@ -190,10 +236,10 @@ func clusterBlocksLiteral(data []byte, length uint, num_blocks uint, block_ids [
 	var num_final_clusters uint
 	var new_index []uint32
 	var i uint
-	var sizes = [histogramsPerBatch]uint32{0}
-	var new_clusters = [histogramsPerBatch]uint32{0}
-	var symbols = [histogramsPerBatch]uint32{0}
-	var remap = [histogramsPerBatch]uint32{0}
+	sizes := [histogramsPerBatch]uint32{0}
+	new_clusters := [histogramsPerBatch]uint32{0}
+	symbols := [histogramsPerBatch]uint32{0}
+	remap := [histogramsPerBatch]uint32{0}
 
 	for i := 0; i < int(num_blocks); i++ {
 		block_lengths[i] = 0
@@ -226,7 +272,17 @@ func clusterBlocksLiteral(data []byte, length uint, num_blocks uint, block_ids [
 			sizes[j] = 1
 		}
 
-		num_new_clusters = HistogramCombineLiteral(histograms, sizes[:], symbols[:], new_clusters[:], []HistogramPair(pairs), num_to_combine, num_to_combine, histogramsPerBatch, max_num_pairs)
+		num_new_clusters = HistogramCombineLiteral(
+			histograms,
+			sizes[:],
+			symbols[:],
+			new_clusters[:],
+			[]HistogramPair(pairs),
+			num_to_combine,
+			num_to_combine,
+			histogramsPerBatch,
+			max_num_pairs,
+		)
 		if all_histograms_capacity < (all_histograms_size + num_new_clusters) {
 			var _new_size uint = all_histograms_capacity
 			if _new_size == 0 {
@@ -269,7 +325,17 @@ func clusterBlocksLiteral(data []byte, length uint, num_blocks uint, block_ids [
 		clusters[i] = uint32(i)
 	}
 
-	num_final_clusters = HistogramCombineLiteral(all_histograms, cluster_size, histogram_symbols, clusters, pairs, num_clusters, num_blocks, common.MaxNumberOfBlockTypes, max_num_pairs)
+	num_final_clusters = HistogramCombineLiteral(
+		all_histograms,
+		cluster_size,
+		histogram_symbols,
+		clusters,
+		pairs,
+		num_clusters,
+		num_blocks,
+		common.MaxNumberOfBlockTypes,
+		max_num_pairs,
+	)
 	pairs = nil
 	cluster_size = nil
 
@@ -343,7 +409,16 @@ func clusterBlocksLiteral(data []byte, length uint, num_blocks uint, block_ids [
 	}
 }
 
-func splitByteVectorLiteral(data []byte, length uint, literals_per_histogram uint, max_histograms uint, sampling_stride_length uint, block_switch_cost float64, params *common.EncoderParams, split *BlockSplit) {
+func splitByteVectorLiteral(
+	data []byte,
+	length uint,
+	literals_per_histogram uint,
+	max_histograms uint,
+	sampling_stride_length uint,
+	block_switch_cost float64,
+	params *common.EncoderParams,
+	split *BlockSplit,
+) {
 	var data_size uint = common.HistogramDataSizeLiteral()
 	var num_histograms uint = length/literals_per_histogram + 1
 	if num_histograms > max_histograms {
@@ -389,7 +464,17 @@ func splitByteVectorLiteral(data []byte, length uint, literals_per_histogram uin
 
 		var i uint
 		for i = 0; i < iters; i++ {
-			num_blocks = findBlocksLiteral(data, length, block_switch_cost, num_histograms, histograms, insert_cost, cost, switch_signal, block_ids)
+			num_blocks = findBlocksLiteral(
+				data,
+				length,
+				block_switch_cost,
+				num_histograms,
+				histograms,
+				insert_cost,
+				cost,
+				switch_signal,
+				block_ids,
+			)
 			num_histograms = remapBlockIdsLiteral(block_ids, length, new_id, num_histograms)
 			buildBlockHistogramsLiteral(data, length, block_ids, num_histograms, histograms)
 		}

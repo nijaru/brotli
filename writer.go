@@ -7,7 +7,7 @@ import (
 	"github.com/nijaru/brotli/internal/encoder/generic"
 	"github.com/nijaru/brotli/internal/encoder/q0"
 	"github.com/nijaru/brotli/internal/quality"
-	"github.com/nijaru/brotli/matchfinder"
+	match "github.com/nijaru/brotli/matchfinder"
 )
 
 const (

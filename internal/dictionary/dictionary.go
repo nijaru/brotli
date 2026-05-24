@@ -14,8 +14,10 @@ type Dictionary struct {
 	Data                []byte
 }
 
-const MinDictionaryWordLength = 4
-const MaxDictionaryWordLength = 24
+const (
+	MinDictionaryWordLength = 4
+	MaxDictionaryWordLength = 24
+)
 
 var DictionaryData = []byte{
 	116,

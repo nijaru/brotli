@@ -18,40 +18,52 @@ const ContextMapMaxRle = 16
 const MaxNumberOfBlockTypes = 256
 
 /* Specification: 3.3. Alphabet sizes: insert-and-copy length */
-const NumLiteralSymbols = 256
-const NumCommandSymbols = 704
-const NumBlockLenSymbols = 26
+const (
+	NumLiteralSymbols  = 256
+	NumCommandSymbols  = 704
+	NumBlockLenSymbols = 26
+)
 
-const MaxContextMapSymbols = (MaxNumberOfBlockTypes + ContextMapMaxRle)
-const MaxBlockTypeSymbols = (MaxNumberOfBlockTypes + 2)
+const (
+	MaxContextMapSymbols = (MaxNumberOfBlockTypes + ContextMapMaxRle)
+	MaxBlockTypeSymbols  = (MaxNumberOfBlockTypes + 2)
+)
 
 /* Specification: 3.5. Complex prefix codes */
-const RepeatPreviousCodeLength = 16
-const RepeatZeroCodeLength = 17
-const CodeLengthCodes = (RepeatZeroCodeLength + 1)
+const (
+	RepeatPreviousCodeLength = 16
+	RepeatZeroCodeLength     = 17
+	CodeLengthCodes          = (RepeatZeroCodeLength + 1)
+)
 
 /* "code length of 8 is repeated" */
 const InitialRepeatedCodeLength = 8
 
 /* "Large Window Brotli" */
-const LargeMaxDistanceBits = 62
-const LargeMinWbits = 10
-const LargeMaxWbits = 30
+const (
+	LargeMaxDistanceBits = 62
+	LargeMinWbits        = 10
+	LargeMaxWbits        = 30
+)
 
 /* Specification: 4. Encoding of distances */
-const NumDistanceShortCodes = 16
-const MaxNpostfix = 3
-const MaxNdirect = 120
-const MaxDistanceBits = 24
+const (
+	NumDistanceShortCodes = 16
+	MaxNpostfix           = 3
+	MaxNdirect            = 120
+	MaxDistanceBits       = 24
+)
 
 func DistanceAlphabetSize(NPOSTFIX uint, NDIRECT uint, MAXNBITS uint) uint {
 	return NumDistanceShortCodes + NDIRECT + uint(MAXNBITS<<(NPOSTFIX+1))
 }
 
 /* numDistanceSymbols == 1128 */
-const NumDistanceSymbols = 1128
-const MaxDistance = 0x3FFFFFC
-const MaxAllowedDistance = 0x7FFFFFFC
+const (
+	NumDistanceSymbols = 1128
+	MaxDistance        = 0x3FFFFFC
+	MaxAllowedDistance = 0x7FFFFFFC
+)
 
 /* 7.1. Context modes and context ID lookup for literals */
 /* "context IDs for literals are in the range of 0..63" */
@@ -118,32 +130,32 @@ type PrefixCodeRange struct {
 }
 
 var BlockLengthPrefixCode = [NumBlockLenSymbols]PrefixCodeRange{
-	PrefixCodeRange{1, 2},
-	PrefixCodeRange{5, 2},
-	PrefixCodeRange{9, 2},
-	PrefixCodeRange{13, 2},
-	PrefixCodeRange{17, 3},
-	PrefixCodeRange{25, 3},
-	PrefixCodeRange{33, 3},
-	PrefixCodeRange{41, 3},
-	PrefixCodeRange{49, 4},
-	PrefixCodeRange{65, 4},
-	PrefixCodeRange{81, 4},
-	PrefixCodeRange{97, 4},
-	PrefixCodeRange{113, 5},
-	PrefixCodeRange{145, 5},
-	PrefixCodeRange{177, 5},
-	PrefixCodeRange{209, 5},
-	PrefixCodeRange{241, 6},
-	PrefixCodeRange{305, 6},
-	PrefixCodeRange{369, 7},
-	PrefixCodeRange{497, 8},
-	PrefixCodeRange{753, 9},
-	PrefixCodeRange{1265, 10},
-	PrefixCodeRange{2289, 11},
-	PrefixCodeRange{4337, 12},
-	PrefixCodeRange{8433, 13},
-	PrefixCodeRange{16625, 24},
+	{1, 2},
+	{5, 2},
+	{9, 2},
+	{13, 2},
+	{17, 3},
+	{25, 3},
+	{33, 3},
+	{41, 3},
+	{49, 4},
+	{65, 4},
+	{81, 4},
+	{97, 4},
+	{113, 5},
+	{145, 5},
+	{177, 5},
+	{209, 5},
+	{241, 6},
+	{305, 6},
+	{369, 7},
+	{497, 8},
+	{753, 9},
+	{1265, 10},
+	{2289, 11},
+	{4337, 12},
+	{8433, 13},
+	{16625, 24},
 }
 
 func ComputeRbBits(params *EncoderParams) int {
@@ -190,7 +202,13 @@ func EnsureCapacity[T any](s *[]T, offset *uint, capacity uint) {
 	}
 }
 
-func PrefixEncodeCopyDistance(distance_code uint, num_direct_distance_codes uint, distance_postfix_bits uint, code *uint16, extra_bits *uint32) {
+func PrefixEncodeCopyDistance(
+	distance_code uint,
+	num_direct_distance_codes uint,
+	distance_postfix_bits uint,
+	code *uint16,
+	extra_bits *uint32,
+) {
 	if distance_code < NumDistanceShortCodes+num_direct_distance_codes {
 		*code = uint16(distance_code)
 		*extra_bits = 0

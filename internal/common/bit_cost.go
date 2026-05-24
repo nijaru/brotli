@@ -39,10 +39,12 @@ func BitsEntropy(population []uint32, size uint) float64 {
 	return retval
 }
 
-const KOneSymbolHistogramCost float64 = 12
-const KTwoSymbolHistogramCost float64 = 20
-const KThreeSymbolHistogramCost float64 = 28
-const KFourSymbolHistogramCost float64 = 37
+const (
+	KOneSymbolHistogramCost   float64 = 12
+	KTwoSymbolHistogramCost   float64 = 20
+	KThreeSymbolHistogramCost float64 = 28
+	KFourSymbolHistogramCost  float64 = 37
+)
 
 func PopulationCostLiteral(histogram *HistogramLiteral) float64 {
 	var data_size uint = HistogramDataSizeLiteral()
@@ -82,7 +84,9 @@ func PopulationCostLiteral(histogram *HistogramLiteral) float64 {
 		if histo2 > histomax {
 			histomax = histo2
 		}
-		return KThreeSymbolHistogramCost + 2*(float64(histo0)+float64(histo1)+float64(histo2)) - float64(histomax)
+		return KThreeSymbolHistogramCost + 2*(float64(histo0)+float64(histo1)+float64(histo2)) - float64(
+			histomax,
+		)
 	}
 
 	if count == 4 {
@@ -100,7 +104,9 @@ func PopulationCostLiteral(histogram *HistogramLiteral) float64 {
 		if histo3 > histomax {
 			histomax = histo3
 		}
-		return KFourSymbolHistogramCost + 3*(float64(histo0)+float64(histo1)+float64(histo2)+float64(histo3)) - 2*float64(histomax)
+		return KFourSymbolHistogramCost + 3*(float64(histo0)+float64(histo1)+float64(histo2)+float64(histo3)) - 2*float64(
+			histomax,
+		)
 	}
 
 	var max_bits float64 = float64(Log2FloorNonZero(data_size-1) + 1)

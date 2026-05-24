@@ -41,7 +41,12 @@ func TestNewPlan(t *testing.T) {
 			t.Errorf("Q%d: blockSplit=%v, want %v", tt.quality, p.BlockSplit, tt.wantBlock)
 		}
 		if p.ContextModeling != tt.wantContext {
-			t.Errorf("Q%d: contextModeling=%v, want %v", tt.quality, p.ContextModeling, tt.wantContext)
+			t.Errorf(
+				"Q%d: contextModeling=%v, want %v",
+				tt.quality,
+				p.ContextModeling,
+				tt.wantContext,
+			)
 		}
 		if p.HQContext != tt.wantHQCtx {
 			t.Errorf("Q%d: hqContext=%v, want %v", tt.quality, p.HQContext, tt.wantHQCtx)

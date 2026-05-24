@@ -1,8 +1,9 @@
 package bitstream
 
 import (
-	"github.com/nijaru/brotli/internal/common"
 	"math"
+
+	"github.com/nijaru/brotli/internal/common"
 )
 
 /* Copyright 2010 Google Inc. All Rights Reserved.
@@ -114,7 +115,13 @@ func SortHuffmanTree(v0 HuffmanTree, v1 HuffmanTree) bool {
 	return v0.Index_right_or_value_ > v1.Index_right_or_value_
 }
 
-func CreateHuffmanTree(data []uint32, length uint, tree_limit int, tree []HuffmanTree, depth []byte) {
+func CreateHuffmanTree(
+	data []uint32,
+	length uint,
+	tree_limit int,
+	tree []HuffmanTree,
+	depth []byte,
+) {
 	var count_limit uint32
 	var sentinel HuffmanTree
 	InitHuffmanTree(&sentinel, math.MaxUint32, -1, -1)
@@ -197,7 +204,14 @@ func Reverse(v []byte, start uint, end uint) {
 	}
 }
 
-func WriteHuffmanTreeRepetitions(previous_value byte, value byte, repetitions uint, tree_size *uint, tree []byte, extra_bits_data []byte) {
+func WriteHuffmanTreeRepetitions(
+	previous_value byte,
+	value byte,
+	repetitions uint,
+	tree_size *uint,
+	tree []byte,
+	extra_bits_data []byte,
+) {
 	if previous_value != value {
 		tree[*tree_size] = value
 		extra_bits_data[*tree_size] = 0
@@ -239,7 +253,12 @@ func WriteHuffmanTreeRepetitions(previous_value byte, value byte, repetitions ui
 	}
 }
 
-func WriteHuffmanTreeRepetitionsZeros(repetitions uint, tree_size *uint, tree []byte, extra_bits_data []byte) {
+func WriteHuffmanTreeRepetitionsZeros(
+	repetitions uint,
+	tree_size *uint,
+	tree []byte,
+	extra_bits_data []byte,
+) {
 	if repetitions == 11 {
 		tree[*tree_size] = 0
 		extra_bits_data[*tree_size] = 0
@@ -372,7 +391,8 @@ func OptimizeHuffmanCountsForRLE(length uint, counts []uint32, good_for_rle []by
 	limit = uint(256*(counts[0]+counts[1]+counts[2])/3 + 420)
 	sum = 0
 	for i = 0; i <= length; i++ {
-		if i == length || good_for_rle[i] != 0 || (i != 0 && good_for_rle[i-1] != 0) || (256*counts[i]-uint32(limit)+uint32(streak_limit)) >= uint32(2*streak_limit) {
+		if i == length || good_for_rle[i] != 0 || (i != 0 && good_for_rle[i-1] != 0) ||
+			(256*counts[i]-uint32(limit)+uint32(streak_limit)) >= uint32(2*streak_limit) {
 			if stride >= 4 || (stride >= 3 && sum == 0) {
 				var k uint
 				var count uint = (sum + stride/2) / stride
@@ -420,7 +440,12 @@ func OptimizeHuffmanCountsForRLE(length uint, counts []uint32, good_for_rle []by
 	}
 }
 
-func DecideOverRLEUse(depth []byte, length uint, use_rle_for_non_zero *bool, use_rle_for_zero *bool) {
+func DecideOverRLEUse(
+	depth []byte,
+	length uint,
+	use_rle_for_non_zero *bool,
+	use_rle_for_zero *bool,
+) {
 	var total_reps_zero uint = 0
 	var total_reps_non_zero uint = 0
 	var count_reps_zero uint = 1
@@ -451,7 +476,13 @@ func DecideOverRLEUse(depth []byte, length uint, use_rle_for_non_zero *bool, use
 	*use_rle_for_zero = total_reps_zero > count_reps_zero*2
 }
 
-func WriteHuffmanTree(depth []byte, length uint, tree_size *uint, tree []byte, extra_bits_data []byte) {
+func WriteHuffmanTree(
+	depth []byte,
+	length uint,
+	tree_size *uint,
+	tree []byte,
+	extra_bits_data []byte,
+) {
 	var previous_value byte = common.InitialRepeatedCodeLength
 	var i uint
 	var use_rle_for_non_zero bool = false
@@ -517,7 +548,7 @@ const maxHuffmanBits = 16
 
 /* Get the actual bit values for a tree of bit depths. */
 func ConvertBitDepthsToSymbols(depth []byte, len uint, bits []uint16) {
-	var bl_count = [maxHuffmanBits]uint16{0}
+	bl_count := [maxHuffmanBits]uint16{0}
 	var next_code [maxHuffmanBits]uint16
 	var i uint
 	/* In Brotli, all bit depths are [1..15]

@@ -11,8 +11,10 @@ func (err decodeError) Error() string {
 	return "brotli: " + decoderErrorString(int(err))
 }
 
-var errExcessiveInput = errors.New("brotli: excessive input")
-var errInvalidState = errors.New("brotli: invalid state")
+var (
+	errExcessiveInput = errors.New("brotli: excessive input")
+	errInvalidState   = errors.New("brotli: invalid state")
+)
 
 // readBufSize is a "good" buffer size that avoids excessive round-trips
 // between C and Go but doesn't waste too much memory on buffering.

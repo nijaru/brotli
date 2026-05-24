@@ -98,7 +98,16 @@ func InitBlockSplit(self *BlockSplit) {
 	self.Lengths_alloc_size = 0
 }
 
-func SplitBlock(cmds []Command, data []byte, pos uint, mask uint, params *common.EncoderParams, literal_split *BlockSplit, insert_and_copy_split *BlockSplit, dist_split *BlockSplit) {
+func SplitBlock(
+	cmds []Command,
+	data []byte,
+	pos uint,
+	mask uint,
+	params *common.EncoderParams,
+	literal_split *BlockSplit,
+	insert_and_copy_split *BlockSplit,
+	dist_split *BlockSplit,
+) {
 	{
 		var literals_count uint = countLiterals(cmds)
 		var literals []byte = make([]byte, literals_count)
@@ -108,7 +117,16 @@ func SplitBlock(cmds []Command, data []byte, pos uint, mask uint, params *common
 
 		/* Create the block split on the array of literals.
 		   Literal histograms have alphabet size 256. */
-		splitByteVectorLiteral(literals, literals_count, kSymbolsPerLiteralHistogram, kMaxLiteralHistograms, kLiteralStrideLength, kLiteralBlockSwitchCost, params, literal_split)
+		splitByteVectorLiteral(
+			literals,
+			literals_count,
+			kSymbolsPerLiteralHistogram,
+			kMaxLiteralHistograms,
+			kLiteralStrideLength,
+			kLiteralBlockSwitchCost,
+			params,
+			literal_split,
+		)
 
 		literals = nil
 	}
@@ -121,7 +139,15 @@ func SplitBlock(cmds []Command, data []byte, pos uint, mask uint, params *common
 		}
 
 		/* Create the block split on the array of command prefixes. */
-		splitByteVectorCommand(insert_and_copy_codes, kSymbolsPerCommandHistogram, kMaxCommandHistograms, kCommandStrideLength, kCommandBlockSwitchCost, params, insert_and_copy_split)
+		splitByteVectorCommand(
+			insert_and_copy_codes,
+			kSymbolsPerCommandHistogram,
+			kMaxCommandHistograms,
+			kCommandStrideLength,
+			kCommandBlockSwitchCost,
+			params,
+			insert_and_copy_split,
+		)
 
 		/* TODO: reuse for distances? */
 
@@ -141,7 +167,16 @@ func SplitBlock(cmds []Command, data []byte, pos uint, mask uint, params *common
 		}
 
 		/* Create the block split on the array of distance prefixes. */
-		splitByteVectorDistance(distance_prefixes, j, kSymbolsPerDistanceHistogram, kMaxCommandHistograms, kCommandStrideLength, kDistanceBlockSwitchCost, params, dist_split)
+		splitByteVectorDistance(
+			distance_prefixes,
+			j,
+			kSymbolsPerDistanceHistogram,
+			kMaxCommandHistograms,
+			kCommandStrideLength,
+			kDistanceBlockSwitchCost,
+			params,
+			dist_split,
+		)
 
 		distance_prefixes = nil
 	}

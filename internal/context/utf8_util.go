@@ -42,8 +42,11 @@ func parseAsUTF8(symbol *int, input []byte, size uint) uint {
 	}
 
 	/* 4-byte UFT8 */
-	if size > 3 && input[0]&0xF8 == 0xF0 && input[1]&0xC0 == 0x80 && input[2]&0xC0 == 0x80 && input[3]&0xC0 == 0x80 {
-		*symbol = (int(input[0])&0x07)<<18 | (int(input[1])&0x3F)<<12 | (int(input[2])&0x3F)<<6 | int(input[3])&0x3F
+	if size > 3 && input[0]&0xF8 == 0xF0 && input[1]&0xC0 == 0x80 && input[2]&0xC0 == 0x80 &&
+		input[3]&0xC0 == 0x80 {
+		*symbol = (int(input[0])&0x07)<<18 | (int(input[1])&0x3F)<<12 | (int(input[2])&0x3F)<<6 | int(
+			input[3],
+		)&0x3F
 		if *symbol > 0xFFFF && *symbol <= 0x10FFFF {
 			return 4
 		}

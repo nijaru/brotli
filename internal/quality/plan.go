@@ -2,62 +2,62 @@ package quality
 
 // Quality thresholds.
 const (
-	Q0                                        = 0
-	Q1                                        = 1
-	QZopfli                                   = 10
-	QHQZopfli                                 = 11
-	MinQualityForBlockSplit                   = 4
-	MinQualityForNonzeroDistanceParams        = 4
-	MinQualityForOptimizeHistograms           = 4
-	MinQualityForExtensiveReferenceSearch     = 5
-	MinQualityForContextModeling              = 5
-	MinQualityForHqContextModeling            = 7
-	MinQualityForHqBlockSplitting             = 10
-	MaxNumDelayedSymbols                      = 0x2FFF
-	MaxQualityForStaticEntropyCodes           = 2
-	MinWindowBits                             = 10
-	MaxWindowBits                             = 24
-	LargeMaxWindowBits                        = 30
-	MinInputBlockBits                         = 16
-	MaxInputBlockBits                         = 24
-	MinQuality                                = 0
-	MaxQuality                                = 11
-	MaxZopfliLenQuality10                     = 150
-	MaxZopfliLenQuality11                     = 325
-	LongCopyQuickStep                         = 16384
-	MaxZopfliCandidatesQ10                    = 1
-	MaxZopfliCandidatesQ11                    = 5
-	SparseSearchSpreeLow                      = 64
-	SparseSearchSpreeHigh                     = 512
+	Q0                                    = 0
+	Q1                                    = 1
+	QZopfli                               = 10
+	QHQZopfli                             = 11
+	MinQualityForBlockSplit               = 4
+	MinQualityForNonzeroDistanceParams    = 4
+	MinQualityForOptimizeHistograms       = 4
+	MinQualityForExtensiveReferenceSearch = 5
+	MinQualityForContextModeling          = 5
+	MinQualityForHqContextModeling        = 7
+	MinQualityForHqBlockSplitting         = 10
+	MaxNumDelayedSymbols                  = 0x2FFF
+	MaxQualityForStaticEntropyCodes       = 2
+	MinWindowBits                         = 10
+	MaxWindowBits                         = 24
+	LargeMaxWindowBits                    = 30
+	MinInputBlockBits                     = 16
+	MaxInputBlockBits                     = 24
+	MinQuality                            = 0
+	MaxQuality                            = 11
+	MaxZopfliLenQuality10                 = 150
+	MaxZopfliLenQuality11                 = 325
+	LongCopyQuickStep                     = 16384
+	MaxZopfliCandidatesQ10                = 1
+	MaxZopfliCandidatesQ11                = 5
+	SparseSearchSpreeLow                  = 64
+	SparseSearchSpreeHigh                 = 512
 )
 
 // Tier identifies the encoder strategy for a quality level.
 type Tier int
 
 const (
-	TierQ0     Tier = iota // quality 0: single-pass fast
-	TierQ1                 // quality 1: two-pass fast
-	TierGeneric            // quality 2-9: generic metablock
-	TierZopfli             // quality 10-11: zopfli optimization
+	TierQ0      Tier = iota // quality 0: single-pass fast
+	TierQ1                  // quality 1: two-pass fast
+	TierGeneric             // quality 2-9: generic metablock
+	TierZopfli              // quality 10-11: zopfli optimization
 )
 
 // Plan carries all quality-derived parameters, computed once at writer creation.
 type Plan struct {
-	Tier             Tier
-	StaticEntropy    bool    // quality <= 2: use precomputed Huffman codes
-	BlockSplit       bool    // quality >= 4: use block splitting
-	ContextModeling  bool    // quality >= 5: use context-aware literal encoding
-	HQContext        bool    // quality >= 7: high-quality context modeling
-	HQBlockSplit     bool    // quality >= 10: high-quality block splitting
-	DistanceParams   bool    // quality >= 4: nonzero distance parameters
-	OptimizeHisto    bool    // quality >= 4: optimize histogram clusters
-	ExtensiveRef     bool    // quality >= 5: extensive distance reference search
-	Lgblock          int     // input block log size (computed from quality + lgwin)
-	Lgwin            int     // window bits
-	MaxZopfliLen     int     // 150 for Q10, 325 for Q11
-	ZopfliCandidates int     // 1 for Q10, 5 for Q11
-	SparseSearchSpree int    // 64 for Q<9, 512 for Q>=9
-	LargeWindow      bool    // enable large window (lgwin > 24)
+	Tier              Tier
+	StaticEntropy     bool // quality <= 2: use precomputed Huffman codes
+	BlockSplit        bool // quality >= 4: use block splitting
+	ContextModeling   bool // quality >= 5: use context-aware literal encoding
+	HQContext         bool // quality >= 7: high-quality context modeling
+	HQBlockSplit      bool // quality >= 10: high-quality block splitting
+	DistanceParams    bool // quality >= 4: nonzero distance parameters
+	OptimizeHisto     bool // quality >= 4: optimize histogram clusters
+	ExtensiveRef      bool // quality >= 5: extensive distance reference search
+	Lgblock           int  // input block log size (computed from quality + lgwin)
+	Lgwin             int  // window bits
+	MaxZopfliLen      int  // 150 for Q10, 325 for Q11
+	ZopfliCandidates  int  // 1 for Q10, 5 for Q11
+	SparseSearchSpree int  // 64 for Q<9, 512 for Q>=9
+	LargeWindow       bool // enable large window (lgwin > 24)
 }
 
 // NewPlan computes all quality-derived parameters.
@@ -107,21 +107,21 @@ func NewPlan(quality, lgwin, lgblock int, sizeHint uint64, largeWindow bool) Pla
 	}
 
 	return Plan{
-		Tier:            tier,
-		StaticEntropy:   quality <= 2,
-		BlockSplit:      quality >= 4,
-		ContextModeling: quality >= 5,
-		HQContext:       quality >= 7,
-		HQBlockSplit:    quality >= 10,
-		DistanceParams:  quality >= 4,
-		OptimizeHisto:   quality >= 4,
-		ExtensiveRef:    quality >= 5,
-		Lgblock:         lgblock,
-		Lgwin:           lgwin,
-		MaxZopfliLen:    zopfliLen(quality),
-		ZopfliCandidates: zopfliCandidates(quality),
+		Tier:              tier,
+		StaticEntropy:     quality <= 2,
+		BlockSplit:        quality >= 4,
+		ContextModeling:   quality >= 5,
+		HQContext:         quality >= 7,
+		HQBlockSplit:      quality >= 10,
+		DistanceParams:    quality >= 4,
+		OptimizeHisto:     quality >= 4,
+		ExtensiveRef:      quality >= 5,
+		Lgblock:           lgblock,
+		Lgwin:             lgwin,
+		MaxZopfliLen:      zopfliLen(quality),
+		ZopfliCandidates:  zopfliCandidates(quality),
 		SparseSearchSpree: sparseSearchSpree(quality),
-		LargeWindow:     largeWindow,
+		LargeWindow:       largeWindow,
 	}
 }
 

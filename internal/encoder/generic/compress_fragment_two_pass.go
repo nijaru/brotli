@@ -22,7 +22,15 @@ import (
 
 const maxDistance_compress_fragment = 262128
 
-func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_bits uint, depths []byte, bits []uint16, storage_ix *uint, storage []byte) uint {
+func buildAndStoreHuffmanTreeFast(
+	histogram []uint32,
+	histogram_total uint,
+	max_bits uint,
+	depths []byte,
+	bits []uint16,
+	storage_ix *uint,
+	storage []byte,
+) uint {
 	var i uint
 	if histogram_total == 0 {
 		bitstream.WriteBits(1, 0, storage_ix, storage) /* ISLAST */
@@ -38,7 +46,15 @@ func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_
 		}
 	}
 
-	bitstream.BuildAndStoreHuffmanTreeFast(histogram, histogram_total, max_bits, depths, bits, storage_ix, storage)
+	bitstream.BuildAndStoreHuffmanTreeFast(
+		histogram,
+		histogram_total,
+		max_bits,
+		depths,
+		bits,
+		storage_ix,
+		storage,
+	)
 	{
 		var literal_ratio uint = 0
 		for i = 0; i < 256; i++ {
@@ -80,9 +96,15 @@ Builds a command and distance prefix code (each 64 symbols) into "depth" and
 
 	"bits" based on "histogram" and stores it into the bit stream.
 */
-func buildAndStoreCommandPrefixCode(histogram []uint32, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
+func buildAndStoreCommandPrefixCode(
+	histogram []uint32,
+	depth []byte,
+	bits []uint16,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var tree [129]bitstream.HuffmanTree
-	var cmd_depth = [common.NumCommandSymbols]byte{0}
+	cmd_depth := [common.NumCommandSymbols]byte{0}
 	/* Tree size for building a tree over 64 symbols is 2 * 64 + 1. */
 
 	var cmd_bits [64]uint16
@@ -126,7 +148,13 @@ func buildAndStoreCommandPrefixCode(histogram []uint32, depth []byte, bits []uin
 			cmd_depth[448+8*i] = depth[16+i]
 		}
 
-		bitstream.StoreHuffmanTree(cmd_depth[:], common.NumCommandSymbols, tree[:], storage_ix, storage)
+		bitstream.StoreHuffmanTree(
+			cmd_depth[:],
+			common.NumCommandSymbols,
+			tree[:],
+			storage_ix,
+			storage,
+		)
 	}
 
 	bitstream.StoreHuffmanTree(depth[64:], 64, tree[:], storage_ix, storage)
@@ -276,7 +304,17 @@ func storeMetaBlockHeaderBW(len uint, is_uncompressed bool, bw *bitstream.BitWri
 	bw.WriteSingleBit(is_uncompressed)
 }
 
-func createCommands(input []byte, block_size uint, input_size uint, base_ip_ptr []byte, table []int, table_bits uint, min_match uint, literals *[]byte, commands *[]uint32) {
+func createCommands(
+	input []byte,
+	block_size uint,
+	input_size uint,
+	base_ip_ptr []byte,
+	table []int,
+	table_bits uint,
+	min_match uint,
+	literals *[]byte,
+	commands *[]uint32,
+) {
 	var ip int = 0
 	var shift uint = 64 - table_bits
 	var ip_end int = int(block_size)
@@ -509,18 +547,26 @@ var storeCommands_kNumExtraBits = [128]uint32{
 	9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16,
 	17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 23, 24, 24,
 }
+
 var storeCommands_kInsertOffset = [24]uint32{
 	0, 1, 2, 3, 4, 5, 6, 8, 10, 14, 18, 26, 34, 50, 66, 98,
 	130, 194, 322, 578, 1090, 2114, 6210, 22594,
 }
 
-func storeCommands(literals []byte, num_literals uint, commands []uint32, num_commands uint, storage_ix *uint, storage []byte) {
+func storeCommands(
+	literals []byte,
+	num_literals uint,
+	commands []uint32,
+	num_commands uint,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var lit_depths [256]byte
 	var lit_bits [256]uint16
-	var lit_histo = [256]uint32{0}
-	var cmd_depths = [128]byte{0}
-	var cmd_bits = [128]uint16{0}
-	var cmd_histo = [128]uint32{0}
+	lit_histo := [256]uint32{0}
+	cmd_depths := [128]byte{0}
+	cmd_bits := [128]uint16{0}
+	cmd_histo := [128]uint32{0}
 	var i uint
 	for i = 0; i < num_literals; i++ {
 		lit_histo[literals[i]]++
@@ -547,13 +593,23 @@ func storeCommands(literals []byte, num_literals uint, commands []uint32, num_co
 		var extra uint32 = cmd >> 8
 		common.Assert(code < 128)
 		bitstream.WriteBits(uint(cmd_depths[code]), uint64(cmd_bits[code]), storage_ix, storage)
-		bitstream.WriteBits(uint(storeCommands_kNumExtraBits[code]), uint64(extra), storage_ix, storage)
+		bitstream.WriteBits(
+			uint(storeCommands_kNumExtraBits[code]),
+			uint64(extra),
+			storage_ix,
+			storage,
+		)
 		if code < 24 {
 			var insert uint32 = storeCommands_kInsertOffset[code] + extra
 			var j uint32
 			for j = 0; j < insert; j++ {
 				var lit byte = literals[0]
-				bitstream.WriteBits(uint(lit_depths[lit]), uint64(lit_bits[lit]), storage_ix, storage)
+				bitstream.WriteBits(
+					uint(lit_depths[lit]),
+					uint64(lit_bits[lit]),
+					storage_ix,
+					storage,
+				)
 				literals = literals[1:]
 			}
 		}
@@ -570,7 +626,7 @@ func shouldCompress(input []byte, input_size uint, num_literals uint) bool {
 	if float64(num_literals) < minRatio*corpus_size {
 		return true
 	} else {
-		var literal_histo = [256]uint32{0}
+		literal_histo := [256]uint32{0}
 		var max_total_bit_cost float64 = corpus_size * 8 * minRatio / sampleRate
 		var i uint
 		for i = 0; i < input_size; i += sampleRate {
@@ -606,7 +662,18 @@ func emitUncompressedMetaBlock(input []byte, input_size uint, storage_ix *uint, 
 	storage[*storage_ix>>3] = 0
 }
 
-func compressFragmentTwoPassImpl(input []byte, input_size uint, is_last bool, command_buf []uint32, literal_buf []byte, table []int, table_bits uint, min_match uint, storage_ix *uint, storage []byte) {
+func compressFragmentTwoPassImpl(
+	input []byte,
+	input_size uint,
+	is_last bool,
+	command_buf []uint32,
+	literal_buf []byte,
+	table []int,
+	table_bits uint,
+	min_match uint,
+	storage_ix *uint,
+	storage []byte,
+) {
 	/* Save the start of the first block for position and distance computations.
 	 */
 	var base_ip []byte = input
@@ -616,7 +683,17 @@ func compressFragmentTwoPassImpl(input []byte, input_size uint, is_last bool, co
 		var commands []uint32 = command_buf
 		var literals []byte = literal_buf
 		var num_literals uint
-		createCommands(input, block_size, input_size, base_ip, table, table_bits, min_match, &literals, &commands)
+		createCommands(
+			input,
+			block_size,
+			input_size,
+			base_ip,
+			table,
+			table_bits,
+			min_match,
+			&literals,
+			&commands,
+		)
 		num_literals = uint(-cap(literals) + cap(literal_buf))
 		if shouldCompress(input, block_size, num_literals) {
 			var num_commands uint = uint(-cap(commands) + cap(command_buf))
@@ -654,7 +731,17 @@ Compresses "input" string to the "*storage" buffer as one or more complete
 	OUTPUT: maximal copy distance <= |input_size|
 	OUTPUT: maximal copy distance <= BROTLI_MAX_BACKWARD_LIMIT(18)
 */
-func compressFragmentTwoPass(input []byte, input_size uint, is_last bool, command_buf []uint32, literal_buf []byte, table []int, table_size uint, storage_ix *uint, storage []byte) {
+func compressFragmentTwoPass(
+	input []byte,
+	input_size uint,
+	is_last bool,
+	command_buf []uint32,
+	literal_buf []byte,
+	table []int,
+	table_size uint,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var initial_storage_ix uint = *storage_ix
 	var table_bits uint = uint(common.Log2FloorNonZero(table_size))
 	var min_match uint
@@ -663,7 +750,18 @@ func compressFragmentTwoPass(input []byte, input_size uint, is_last bool, comman
 	} else {
 		min_match = 6
 	}
-	compressFragmentTwoPassImpl(input, input_size, is_last, command_buf, literal_buf, table, table_bits, min_match, storage_ix, storage)
+	compressFragmentTwoPassImpl(
+		input,
+		input_size,
+		is_last,
+		command_buf,
+		literal_buf,
+		table,
+		table_bits,
+		min_match,
+		storage_ix,
+		storage,
+	)
 
 	/* If output is larger than single uncompressed block, rewrite it. */
 	if *storage_ix-initial_storage_ix > 31+(input_size<<3) {

@@ -122,7 +122,11 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 		// Look for a repeat match one byte after the current position.
 		if matches[0] == (absoluteMatch{}) && len(e.Dst) > 0 {
 			prevDistance := e.Dst[len(e.Dst)-1].Distance
-			if binary.LittleEndian.Uint32(src[i+1:]) == binary.LittleEndian.Uint32(src[i+1-prevDistance:]) {
+			if binary.LittleEndian.Uint32(
+				src[i+1:],
+			) == binary.LittleEndian.Uint32(
+				src[i+1-prevDistance:],
+			) {
 				// We have a 4-byte match.
 				m := extendMatch2(src, i+1, i+1-prevDistance, e.NextEmit+1)
 				if m.End-m.Start >= q.MinLength {
@@ -239,7 +243,10 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 						if pos <= matches[2].Match {
 							break
 						}
-						if bytes.Equal(src[matches[2].Start:matches[2].End], src[pos:pos+matches[2].End-matches[2].Start]) {
+						if bytes.Equal(
+							src[matches[2].Start:matches[2].End],
+							src[pos:pos+matches[2].End-matches[2].Start],
+						) {
 							matches[2].Match = pos
 							break
 						}

@@ -36,4 +36,3 @@ func NewReader(src io.Reader) *Reader {
 	r.Reset(src)
 	return r
 }
-

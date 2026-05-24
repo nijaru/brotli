@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nijaru/brotli/matchfinder"
+	match "github.com/nijaru/brotli/matchfinder"
 )
 
 func test(t *testing.T, filename string, m match.MatchFinder, blockSize int) {

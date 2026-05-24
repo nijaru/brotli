@@ -2,6 +2,7 @@ package hasher
 
 import (
 	"encoding/binary"
+
 	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/dictionary"
 )
@@ -81,7 +82,16 @@ Stores the hash of the next 4 bytes and in a single tree-traversal, the
 
 	This function must be called with increasing cur_ix positions.
 */
-func storeAndFindMatchesH10(self *H10, data []byte, cur_ix uint, ring_buffer_mask uint, max_length uint, max_backward uint, best_len *uint, matches []BackwardMatch) []BackwardMatch {
+func storeAndFindMatchesH10(
+	self *H10,
+	data []byte,
+	cur_ix uint,
+	ring_buffer_mask uint,
+	max_length uint,
+	max_backward uint,
+	best_len *uint,
+	matches []BackwardMatch,
+) []BackwardMatch {
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var max_comp_len uint = min(max_length, 128)
 	var should_reroot_tree bool = (max_length >= 128)
@@ -112,7 +122,11 @@ func storeAndFindMatchesH10(self *H10, data []byte, cur_ix uint, ring_buffer_mas
 		{
 			var cur_len uint = min(best_len_left, best_len_right)
 			var len uint
-			len = cur_len + common.FindMatchLengthWithLimit(data[cur_ix_masked+cur_len:], data[prev_ix_masked+cur_len:], max_length-cur_len)
+			len = cur_len + common.FindMatchLengthWithLimit(
+				data[cur_ix_masked+cur_len:],
+				data[prev_ix_masked+cur_len:],
+				max_length-cur_len,
+			)
 			if matches != nil && len > *best_len {
 				*best_len = uint(len)
 				initBackwardMatch(&matches[0], backward, uint(len))
@@ -161,7 +175,18 @@ Finds all backward matches of &data[cur_ix & ring_buffer_mask] up to the
 	sorted by strictly increasing length and (non-strictly) increasing
 	distance.
 */
-func FindAllMatchesH10(handle *H10, dict *common.EncoderDictionary, data []byte, ring_buffer_mask uint, cur_ix uint, max_length uint, max_backward uint, gap uint, params *common.EncoderParams, matches []BackwardMatch) uint {
+func FindAllMatchesH10(
+	handle *H10,
+	dict *common.EncoderDictionary,
+	data []byte,
+	ring_buffer_mask uint,
+	cur_ix uint,
+	max_length uint,
+	max_backward uint,
+	gap uint,
+	params *common.EncoderParams,
+	matches []BackwardMatch,
+) uint {
 	var orig_matches []BackwardMatch = matches
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var best_len uint = 1
@@ -199,7 +224,16 @@ func FindAllMatchesH10(handle *H10, dict *common.EncoderDictionary, data []byte,
 	}
 
 	if best_len < max_length {
-		matches = storeAndFindMatchesH10(handle, data, cur_ix, ring_buffer_mask, max_length, max_backward, &best_len, matches)
+		matches = storeAndFindMatchesH10(
+			handle,
+			data,
+			cur_ix,
+			ring_buffer_mask,
+			max_length,
+			max_backward,
+			&best_len,
+			matches,
+		)
 	}
 
 	for i = 0; i <= dictionary.MaxStaticDictionaryMatchLen; i++ {
@@ -210,7 +244,13 @@ func FindAllMatchesH10(handle *H10, dict *common.EncoderDictionary, data []byte,
 		if minlen < 4 {
 			minlen = 4
 		}
-		if dictionary.FindAllStaticDictionaryMatches(params, data[cur_ix_masked:], minlen, max_length, dict_matches[0:]) {
+		if dictionary.FindAllStaticDictionaryMatches(
+			params,
+			data[cur_ix_masked:],
+			minlen,
+			max_length,
+			dict_matches[0:],
+		) {
 			var maxlen uint = min(dictionary.MaxStaticDictionaryMatchLen, max_length)
 			var l uint
 			for l = minlen; l <= maxlen; l++ {
@@ -259,7 +299,12 @@ func (h *H10) StoreRange(data []byte, mask uint, ix_start uint, ix_end uint) {
 	}
 }
 
-func (h *H10) StitchToPreviousBlock(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint) {
+func (h *H10) StitchToPreviousBlock(
+	num_bytes uint,
+	position uint,
+	ringbuffer []byte,
+	ringbuffer_mask uint,
+) {
 	if num_bytes >= h.HashTypeLength()-1 && position >= 128 {
 		var i_start uint = position - 128 + 1
 		var i_end uint = min(position, i_start+num_bytes)
@@ -290,7 +335,18 @@ func (h *H10) StitchToPreviousBlock(num_bytes uint, position uint, ringbuffer []
 /* MAX_NUM_MATCHES == 64 + MAX_TREE_SEARCH_DEPTH */
 const MaxNumMatchesH10 = 128
 
-func (*H10) FindLongestMatch(dict *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *SearchResult) {
+func (*H10) FindLongestMatch(
+	dict *common.EncoderDictionary,
+	data []byte,
+	ring_buffer_mask uint,
+	distance_cache []int,
+	cur_ix uint,
+	max_length uint,
+	max_backward uint,
+	gap uint,
+	max_distance uint,
+	out *SearchResult,
+) {
 	panic("unimplemented")
 }
 

@@ -2,6 +2,7 @@ package dictionary
 
 import (
 	"encoding/binary"
+
 	"github.com/nijaru/brotli/internal/common"
 )
 
@@ -17,8 +18,10 @@ const MaxStaticDictionaryMatchLen = 37
 
 const KInvalidMatch uint32 = 0xFFFFFFF
 
-const kDictNumBits = 15
-const kDictHashMul32 uint32 = 0x1e35a7bd
+const (
+	kDictNumBits          = 15
+	kDictHashMul32 uint32 = 0x1e35a7bd
+)
 
 func hash(data []byte) uint32 {
 	var h uint32 = binary.LittleEndian.Uint32(data) * kDictHashMul32
@@ -74,7 +77,13 @@ func isMatch(d *Dictionary, w DictWord, data []byte, max_length uint) bool {
 	}
 }
 
-func FindAllStaticDictionaryMatches(dict *common.EncoderParams, data []byte, min_length uint, max_length uint, matches []uint32) bool {
+func FindAllStaticDictionaryMatches(
+	dict *common.EncoderParams,
+	data []byte,
+	min_length uint,
+	max_length uint,
+	matches []uint32,
+) bool {
 	// Note: The original signature was (dict *encoderDictionary, ...)
 	// But encoderDictionary is now in common.EncoderDictionary.
 	// We need to fix this once we have EncoderDictionary fully defined.
@@ -109,7 +118,8 @@ func FindAllStaticDictionaryMatches(dict *common.EncoderParams, data []byte, min
 				   "" + BROTLI_TRANSFORM_OMIT_LAST_1 + "ing " */
 				if matchlen >= l-1 {
 					addMatch(id+12*n, l-1, l, matches)
-					if l+2 < max_length && data[l-1] == 'i' && data[l] == 'n' && data[l+1] == 'g' && data[l+2] == ' ' {
+					if l+2 < max_length && data[l-1] == 'i' && data[l] == 'n' && data[l+1] == 'g' &&
+						data[l+2] == ' ' {
 						addMatch(id+49*n, l+3, l, matches)
 					}
 
@@ -593,7 +603,8 @@ func FindAllStaticDictionaryMatches(dict *common.EncoderParams, data []byte, min
 
 	if max_length >= 6 {
 		/* Transforms with prefixes "e ", "s ", ", " and "\xC2\xA0" */
-		if (data[1] == ' ' && (data[0] == 'e' || data[0] == 's' || data[0] == ',')) || (data[0] == 0xC2 && data[1] == 0xA0) {
+		if (data[1] == ' ' && (data[0] == 'e' || data[0] == 's' || data[0] == ',')) ||
+			(data[0] == 0xC2 && data[1] == 0xA0) {
 			var offset uint = uint(d.Buckets[hash(data[2:])])
 			var end bool = offset == 0
 			for !end {
@@ -605,7 +616,6 @@ func FindAllStaticDictionaryMatches(dict *common.EncoderParams, data []byte, min
 				end = !(w.Len&0x80 == 0)
 				w.Len = byte(l)
 				if w.Transform == 0 && isMatch(d.Words.(*Dictionary), w, data[2:], max_length-2) {
-
 					if data[0] == 0xC2 {
 						addMatch(id+102*n, l+2, l, matches)
 						has_found_match = true
@@ -626,7 +636,8 @@ func FindAllStaticDictionaryMatches(dict *common.EncoderParams, data []byte, min
 
 	if max_length >= 9 {
 		/* Transforms with prefixes " the " and ".com/" */
-		if (data[0] == ' ' && data[1] == 't' && data[2] == 'h' && data[3] == 'e' && data[4] == ' ') || (data[0] == '.' && data[1] == 'c' && data[2] == 'o' && data[3] == 'm' && data[4] == '/') {
+		if (data[0] == ' ' && data[1] == 't' && data[2] == 'h' && data[3] == 'e' && data[4] == ' ') ||
+			(data[0] == '.' && data[1] == 'c' && data[2] == 'o' && data[3] == 'm' && data[4] == '/') {
 			var offset uint = uint(d.Buckets[hash(data[5:])])
 			var end bool = offset == 0
 			for !end {
@@ -650,9 +661,11 @@ func FindAllStaticDictionaryMatches(dict *common.EncoderParams, data []byte, min
 					if l+5 < max_length {
 						var s []byte = data[l+5:]
 						if data[0] == ' ' {
-							if l+8 < max_length && s[0] == ' ' && s[1] == 'o' && s[2] == 'f' && s[3] == ' ' {
+							if l+8 < max_length && s[0] == ' ' && s[1] == 'o' && s[2] == 'f' &&
+								s[3] == ' ' {
 								addMatch(id+62*n, l+9, l, matches)
-								if l+12 < max_length && s[4] == 't' && s[5] == 'h' && s[6] == 'e' && s[7] == ' ' {
+								if l+12 < max_length && s[4] == 't' && s[5] == 'h' && s[6] == 'e' &&
+									s[7] == ' ' {
 									addMatch(id+73*n, l+13, l, matches)
 								}
 							}

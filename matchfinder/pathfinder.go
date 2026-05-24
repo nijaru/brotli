@@ -153,7 +153,11 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 		if i >= prevMatch.End && prevMatch != (absoluteMatch{}) {
 			// Look for a repeat match at i+1.
 			prevDistance := prevMatch.Start - prevMatch.Match
-			if binary.LittleEndian.Uint32(src[i+1:]) == binary.LittleEndian.Uint32(src[i+1-prevDistance:]) {
+			if binary.LittleEndian.Uint32(
+				src[i+1:],
+			) == binary.LittleEndian.Uint32(
+				src[i+1-prevDistance:],
+			) {
 				m := extendMatch2(src, i+1, i+1-prevDistance, i+1)
 				if m.End-m.Start > q.MinLength {
 					currentMatch = m
@@ -181,14 +185,16 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 			}
 			if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
 				m := extendMatch2(src, i, candidate, max(historyLen, prevMatch.Start))
-				if m.End-m.Start > q.MinLength && m.End-m.Start > currentMatch.End-currentMatch.Start {
+				if m.End-m.Start > q.MinLength &&
+					m.End-m.Start > currentMatch.End-currentMatch.Start {
 					currentMatch = m
 					foundMatches = append(foundMatches, m)
 				}
 			}
 		}
 
-		if i < prevMatch.End && currentMatch.End-currentMatch.Start <= prevMatch.End-prevMatch.Start {
+		if i < prevMatch.End &&
+			currentMatch.End-currentMatch.Start <= prevMatch.End-prevMatch.Start {
 			// We were looking for an overlapping match, but we didn't find one longer
 			// than the previous match. So we'll go back to sequential search,
 			// starting right after the previous match.

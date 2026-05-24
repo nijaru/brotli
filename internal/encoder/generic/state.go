@@ -44,12 +44,12 @@ type State struct {
 	CommandBuf       []uint32
 	LiteralBuf       []byte
 	// Zopfli reusable buffers (Q10-Q11)
-	ZopfliNodes       []zopfliNode
+	ZopfliNodes        []zopfliNode
 	ZopfliMatches      []hasher.BackwardMatch
 	ZopfliNumMatches   []uint32
 	ZopfliLiteralCosts []float32
 	ZopfliCostDist     []float32
-	TinyBuf          struct {
+	TinyBuf            struct {
 		U64 [2]uint64
 		U8  [16]byte
 	}

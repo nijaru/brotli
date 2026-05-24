@@ -3,10 +3,11 @@ package q0
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/nijaru/brotli/internal/decoder"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/nijaru/brotli/internal/decoder"
 )
 
 func Decode(encodedData []byte) ([]byte, error) {
@@ -104,7 +105,13 @@ func TestStreamingParity(t *testing.T) {
 	part2 := e2.Encode(nil, data[half:], nil, true)
 	twoShot := append(part1, part2...)
 
-	t.Logf("One-shot length: %d, Two-shot length: %d (part1=%d, part2=%d)", len(oneShot), len(twoShot), len(part1), len(part2))
+	t.Logf(
+		"One-shot length: %d, Two-shot length: %d (part1=%d, part2=%d)",
+		len(oneShot),
+		len(twoShot),
+		len(part1),
+		len(part2),
+	)
 
 	// Find where one-shot and two-shot diverge
 	minLen := len(oneShot)
@@ -119,7 +126,12 @@ func TestStreamingParity(t *testing.T) {
 		}
 	}
 	if divergeIdx != -1 {
-		t.Logf("Divergence at byte %d: oneShot=0x%02x, twoShot=0x%02x", divergeIdx, oneShot[divergeIdx], twoShot[divergeIdx])
+		t.Logf(
+			"Divergence at byte %d: oneShot=0x%02x, twoShot=0x%02x",
+			divergeIdx,
+			oneShot[divergeIdx],
+			twoShot[divergeIdx],
+		)
 		start := divergeIdx - 10
 		if start < 0 {
 			start = 0
@@ -152,4 +164,3 @@ func TestStreamingParity(t *testing.T) {
 		t.Fatal("Decompress one-shot mismatch")
 	}
 }
-

@@ -17,7 +17,15 @@ Computes the bit cost reduction by combining out[idx1] and out[idx2] and if
 
 	it is below a threshold, stores the pair (idx1, idx2) in the *pairs queue.
 */
-func compareAndPushToQueueCommand(out []common.HistogramCommand, cluster_size []uint32, idx1 uint32, idx2 uint32, max_num_pairs uint, pairs []HistogramPair, num_pairs *uint) {
+func compareAndPushToQueueCommand(
+	out []common.HistogramCommand,
+	cluster_size []uint32,
+	idx1 uint32,
+	idx2 uint32,
+	max_num_pairs uint,
+	pairs []HistogramPair,
+	num_pairs *uint,
+) {
 	var is_good_pair bool = false
 	var p HistogramPair
 	p.Idx2 = 0
@@ -80,7 +88,17 @@ func compareAndPushToQueueCommand(out []common.HistogramCommand, cluster_size []
 	}
 }
 
-func HistogramCombineCommand(out []common.HistogramCommand, cluster_size []uint32, symbols []uint32, clusters []uint32, pairs []HistogramPair, num_clusters uint, symbols_size uint, max_clusters uint, max_num_pairs uint) uint {
+func HistogramCombineCommand(
+	out []common.HistogramCommand,
+	cluster_size []uint32,
+	symbols []uint32,
+	clusters []uint32,
+	pairs []HistogramPair,
+	num_clusters uint,
+	symbols_size uint,
+	max_clusters uint,
+	max_num_pairs uint,
+) uint {
 	var cost_diff_threshold float64 = 0.0
 	var min_cluster_size uint = 1
 	var num_pairs uint = 0
@@ -91,7 +109,15 @@ func HistogramCombineCommand(out []common.HistogramCommand, cluster_size []uint3
 		for idx1 = 0; idx1 < num_clusters; idx1++ {
 			var idx2 uint
 			for idx2 = idx1 + 1; idx2 < num_clusters; idx2++ {
-				compareAndPushToQueueCommand(out, cluster_size, clusters[idx1], clusters[idx2], max_num_pairs, pairs[0:], &num_pairs)
+				compareAndPushToQueueCommand(
+					out,
+					cluster_size,
+					clusters[idx1],
+					clusters[idx2],
+					max_num_pairs,
+					pairs[0:],
+					&num_pairs,
+				)
 			}
 		}
 	}
@@ -132,7 +158,8 @@ func HistogramCombineCommand(out []common.HistogramCommand, cluster_size []uint3
 			var copy_to_idx uint = 0
 			for i = 0; i < num_pairs; i++ {
 				var p *HistogramPair = &pairs[i]
-				if p.Idx1 == best_idx1 || p.Idx2 == best_idx1 || p.Idx1 == best_idx2 || p.Idx2 == best_idx2 {
+				if p.Idx1 == best_idx1 || p.Idx2 == best_idx1 || p.Idx1 == best_idx2 ||
+					p.Idx2 == best_idx2 {
 					/* Remove invalid pair from the queue. */
 					continue
 				}
@@ -154,7 +181,15 @@ func HistogramCombineCommand(out []common.HistogramCommand, cluster_size []uint3
 
 		/* Push new pairs formed with the combined histogram to the heap. */
 		for i = 0; i < num_clusters; i++ {
-			compareAndPushToQueueCommand(out, cluster_size, best_idx1, clusters[i], max_num_pairs, pairs[0:], &num_pairs)
+			compareAndPushToQueueCommand(
+				out,
+				cluster_size,
+				best_idx1,
+				clusters[i],
+				max_num_pairs,
+				pairs[0:],
+				&num_pairs,
+			)
 		}
 	}
 
@@ -162,7 +197,10 @@ func HistogramCombineCommand(out []common.HistogramCommand, cluster_size []uint3
 }
 
 /* What is the bit cost of moving histogram from cur_symbol to candidate. */
-func HistogramBitCostDistanceCommand(histogram *common.HistogramCommand, candidate *common.HistogramCommand) float64 {
+func HistogramBitCostDistanceCommand(
+	histogram *common.HistogramCommand,
+	candidate *common.HistogramCommand,
+) float64 {
 	if histogram.Total_count_ == 0 {
 		return 0.0
 	} else {

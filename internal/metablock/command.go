@@ -119,7 +119,6 @@ func GetDistanceCode(distance int) DistanceCode {
 	return DistanceCode{distcode, uint(nbits), uint64(extra)}
 }
 
-
 type Command struct {
 	Insert_len_  uint32
 	Copy_len_    uint32
@@ -129,7 +128,13 @@ type Command struct {
 }
 
 /* distance_code is e.g. 0 for same-as-last short code, or 16 for offset 1. */
-func MakeCommand(dist *common.DistanceParams, insertlen uint, copylen uint, copylen_code_delta int, distance_code uint) (cmd Command) {
+func MakeCommand(
+	dist *common.DistanceParams,
+	insertlen uint,
+	copylen uint,
+	copylen_code_delta int,
+	distance_code uint,
+) (cmd Command) {
 	/* Don't rely on signed int representation, use honest casts. */
 	var delta uint32 = uint32(byte(int8(copylen_code_delta)))
 	cmd.Insert_len_ = uint32(insertlen)
@@ -138,8 +143,19 @@ func MakeCommand(dist *common.DistanceParams, insertlen uint, copylen uint, copy
 	/* The distance prefix and extra bits are stored in this Command as if
 	   npostfix and ndirect were 0, they are only recomputed later after the
 	   clustering if needed. */
-	common.PrefixEncodeCopyDistance(distance_code, uint(dist.Num_direct_distance_codes), uint(dist.Distance_postfix_bits), &cmd.Dist_prefix_, &cmd.Dist_extra_)
-	GetLengthCode(insertlen, uint(int(copylen)+copylen_code_delta), (cmd.Dist_prefix_&0x3FF == 0), &cmd.Cmd_prefix_)
+	common.PrefixEncodeCopyDistance(
+		distance_code,
+		uint(dist.Num_direct_distance_codes),
+		uint(dist.Distance_postfix_bits),
+		&cmd.Dist_prefix_,
+		&cmd.Dist_extra_,
+	)
+	GetLengthCode(
+		insertlen,
+		uint(int(copylen)+copylen_code_delta),
+		(cmd.Dist_prefix_&0x3FF == 0),
+		&cmd.Cmd_prefix_,
+	)
 
 	return cmd
 }
@@ -154,7 +170,9 @@ func MakeInsertCommand(insertlen uint) (cmd Command) {
 }
 
 func CommandRestoreDistanceCode(self *Command, dist *common.DistanceParams) uint32 {
-	if uint32(self.Dist_prefix_&0x3FF) < common.NumDistanceShortCodes+dist.Num_direct_distance_codes {
+	if uint32(
+		self.Dist_prefix_&0x3FF,
+	) < common.NumDistanceShortCodes+dist.Num_direct_distance_codes {
 		return uint32(self.Dist_prefix_) & 0x3FF
 	} else {
 		var dcode uint32 = uint32(self.Dist_prefix_) & 0x3FF

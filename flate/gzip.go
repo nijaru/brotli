@@ -4,7 +4,7 @@ import (
 	"hash/crc32"
 	"time"
 
-	"github.com/nijaru/brotli/matchfinder"
+	match "github.com/nijaru/brotli/matchfinder"
 )
 
 func NewGZIPEncoder() match.Encoder {
@@ -28,7 +28,8 @@ func (g *gzipEncoder) Reset() {
 }
 
 func appendUint32(dst []byte, n uint32) []byte {
-	return append(dst,
+	return append(
+		dst,
 		byte(n),
 		byte(n>>8),
 		byte(n>>16),
@@ -38,13 +39,15 @@ func appendUint32(dst []byte, n uint32) []byte {
 
 func (g *gzipEncoder) Encode(dst []byte, src []byte, matches []match.Match, lastBlock bool) []byte {
 	if !g.wroteHeader {
-		dst = append(dst,
+		dst = append(
+			dst,
 			0x1f, 0x8b, // magic number
 			8, // CM = flate
 			0, // FLG
 		)
 		dst = appendUint32(dst, uint32(time.Now().Unix()))
-		dst = append(dst,
+		dst = append(
+			dst,
 			0,   // XFL
 			255, // OS (unspecified)
 		)

@@ -74,7 +74,7 @@ func (br *BitReader) FillBitWindow(nBits uint32) {
 	if br.BitPos >= 32 {
 		br.Val >>= 32
 		br.BitPos ^= 32 /* here same as -= 32 because of the if condition */
-		br.Val |= (uint64(binary.LittleEndian.Uint32(br.Input[br.BytePos:]))) << 32
+		br.Val |= uint64(binary.LittleEndian.Uint32(br.Input[br.BytePos:])) << 32
 		br.BytePos += 4
 	}
 }
@@ -89,7 +89,7 @@ func (br *BitReader) PullByte() bool {
 	}
 
 	br.Val >>= 8
-	br.Val |= (uint64(br.Input[br.BytePos])) << 56
+	br.Val |= uint64(br.Input[br.BytePos]) << 56
 	br.BitPos -= 8
 	br.BytePos++
 	return true

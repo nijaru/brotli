@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/nijaru/brotli/internal/encoder/generic"
-	"github.com/nijaru/brotli/matchfinder"
+	match "github.com/nijaru/brotli/matchfinder"
 	"github.com/xyproto/randomstring"
 )
 
@@ -71,6 +71,7 @@ func TestEncoderEmptyWrite(t *testing.T) {
 		t.Errorf("Close()=%v, want nil", err)
 	}
 }
+
 func TestIssue22(t *testing.T) {
 	f, err := os.Open("testdata/issue22.gz")
 	if err != nil {
@@ -329,7 +330,8 @@ func TestDecoderStreaming(t *testing.T) {
 			}
 			wantLen := len(segment)
 			got := make([]byte, wantLen)
-			if n, err := reader.Read(got); err != nil || n != wantLen || !bytes.Equal(got, segment) {
+			if n, err := reader.Read(got); err != nil || n != wantLen ||
+				!bytes.Equal(got, segment) {
 				t.Fatalf("read[%d]=%q,%v,%v, want %q,%v,%v", k, got, n, err, segment, wantLen, nil)
 			}
 		})
@@ -368,7 +370,6 @@ func TestReader(t *testing.T) {
 			"<%d bytes>",
 			got, len(content))
 	}
-
 }
 
 func TestDecode(t *testing.T) {
@@ -595,6 +596,7 @@ func BenchmarkEncodeV2(b *testing.B) {
 		w.Close()
 	}
 }
+
 func BenchmarkEncodeLevelsResetV2(b *testing.B) {
 	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
 	if err != nil {
@@ -747,55 +749,120 @@ func benchmarkFastEncoder(b *testing.B, filename string, m match.MatchFinder, bl
 }
 
 func TestEncodeM4(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 18, DistanceBitCost: 66}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 18, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func TestEncodeM4Chain256(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 18, DistanceBitCost: 66, ChainLength: 256}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 18, DistanceBitCost: 66, ChainLength: 256},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func TestEncodeM4Chain1(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 18, ChainLength: 1, DistanceBitCost: 66}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 18, ChainLength: 1, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain1(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 1, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 1, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain2(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 2, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 2, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain4(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 4, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 4, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain8(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 8, HashLen: 5, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 8, HashLen: 5, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain16(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 16, HashLen: 5, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 16, HashLen: 5, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain32(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 32, HashLen: 5, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 32, HashLen: 5, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain64(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 64, HashLen: 5, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 64, HashLen: 5, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain128(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 128, HashLen: 5, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 128, HashLen: 5, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM4Chain256(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.M4{MaxDistance: 1 << 20, ChainLength: 256, HashLen: 5, DistanceBitCost: 66}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.M4{MaxDistance: 1 << 20, ChainLength: 256, HashLen: 5, DistanceBitCost: 66},
+		1<<16,
+	)
 }
 
 func TestEncodePathfinder(t *testing.T) {
@@ -803,51 +870,111 @@ func TestEncodePathfinder(t *testing.T) {
 }
 
 func TestEncodePathfinderChain256(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 18, ChainLength: 256}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 18, ChainLength: 256},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinder(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20},
+		1<<16,
+	)
 }
 
 func TestEncodePathfinderChain1(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 18, ChainLength: 1}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 18, ChainLength: 1},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain1(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 1}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 1},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain2(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 2}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 2},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain4(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 4}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 4},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain8(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 8, HashLen: 5}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 8, HashLen: 5},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain16(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 16, HashLen: 5}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 16, HashLen: 5},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain32(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 32, HashLen: 5}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 32, HashLen: 5},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain64(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 64, HashLen: 5}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 64, HashLen: 5},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain128(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 128, HashLen: 5}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 128, HashLen: 5},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodePathfinderChain256(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 256, HashLen: 4, MinLength: 3}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Pathfinder{MaxDistance: 1 << 20, ChainLength: 256, HashLen: 4, MinLength: 3},
+		1<<16,
+	)
 }
 
 func TestEncodeM0(t *testing.T) {
@@ -871,11 +998,21 @@ func BenchmarkEncodeZFast(b *testing.B) {
 }
 
 func BenchmarkEncodeZFastFast(b *testing.B) {
-	benchmarkFastEncoder(b, "testdata/Isaac.Newton-Opticks.txt", &match.ZFast{MaxDistance: 1 << 20}, 1<<16)
+	benchmarkFastEncoder(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.ZFast{MaxDistance: 1 << 20},
+		1<<16,
+	)
 }
 
 func TestEncodeZFastFast(t *testing.T) {
-	testFastEncoder(t, "testdata/Isaac.Newton-Opticks.txt", &match.ZFast{MaxDistance: 1 << 20}, 1<<16)
+	testFastEncoder(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.ZFast{MaxDistance: 1 << 20},
+		1<<16,
+	)
 }
 
 func TestEncodeZM(t *testing.T) {
@@ -887,7 +1024,12 @@ func BenchmarkEncodeZM(b *testing.B) {
 }
 
 func BenchmarkEncodeZMFast(b *testing.B) {
-	benchmarkFastEncoder(b, "testdata/Isaac.Newton-Opticks.txt", &match.ZM{MaxDistance: 1 << 20}, 1<<16)
+	benchmarkFastEncoder(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.ZM{MaxDistance: 1 << 20},
+		1<<16,
+	)
 }
 
 func TestEncodeZMFast(t *testing.T) {
@@ -911,11 +1053,21 @@ func BenchmarkEncodeBargain2(b *testing.B) {
 }
 
 func TestEncodeBargain2Skip(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.Bargain2{MaxDistance: 1 << 20, Skip: true}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Bargain2{MaxDistance: 1 << 20, Skip: true},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeBargain2Skip(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Bargain2{MaxDistance: 1 << 20, Skip: true}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Bargain2{MaxDistance: 1 << 20, Skip: true},
+		1<<16,
+	)
 }
 
 func TestEncodeBargain3(t *testing.T) {
@@ -927,11 +1079,21 @@ func BenchmarkEncodeBargain3(b *testing.B) {
 }
 
 func TestEncodeBargain3Skip(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.Bargain3{MaxDistance: 1 << 20, Skip: true}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Bargain3{MaxDistance: 1 << 20, Skip: true},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeBargain3Skip(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Bargain3{MaxDistance: 1 << 20, Skip: true}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Bargain3{MaxDistance: 1 << 20, Skip: true},
+		1<<16,
+	)
 }
 
 func TestEncodeBargain1(t *testing.T) {
@@ -943,11 +1105,21 @@ func BenchmarkEncodeBargain1(b *testing.B) {
 }
 
 func TestEncodeBargain1Skip(t *testing.T) {
-	test(t, "testdata/Isaac.Newton-Opticks.txt", &match.Bargain1{MaxDistance: 1 << 20, Skip: true}, 1<<16)
+	test(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Bargain1{MaxDistance: 1 << 20, Skip: true},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeBargain1Skip(b *testing.B) {
-	benchmark(b, "testdata/Isaac.Newton-Opticks.txt", &match.Bargain1{MaxDistance: 1 << 20, Skip: true}, 1<<16)
+	benchmark(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.Bargain1{MaxDistance: 1 << 20, Skip: true},
+		1<<16,
+	)
 }
 
 func TestEncodeZDFast(t *testing.T) {
@@ -959,11 +1131,21 @@ func BenchmarkEncodeZDFast(b *testing.B) {
 }
 
 func BenchmarkEncodeZDFastFast(b *testing.B) {
-	benchmarkFastEncoder(b, "testdata/Isaac.Newton-Opticks.txt", &match.ZDFast{MaxDistance: 1 << 20}, 1<<16)
+	benchmarkFastEncoder(
+		b,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.ZDFast{MaxDistance: 1 << 20},
+		1<<16,
+	)
 }
 
 func TestEncodeZDFastFast(t *testing.T) {
-	testFastEncoder(t, "testdata/Isaac.Newton-Opticks.txt", &match.ZDFast{MaxDistance: 1 << 20}, 1<<16)
+	testFastEncoder(
+		t,
+		"testdata/Isaac.Newton-Opticks.txt",
+		&match.ZDFast{MaxDistance: 1 << 20},
+		1<<16,
+	)
 }
 
 func BenchmarkEncodeM0Fast(b *testing.B) {

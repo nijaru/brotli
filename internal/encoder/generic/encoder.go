@@ -3,7 +3,7 @@ package generic
 import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/metablock"
-	"github.com/nijaru/brotli/matchfinder"
+	match "github.com/nijaru/brotli/matchfinder"
 )
 
 // An Encoder implements the match.Encoder interface, writing in Brotli format.
@@ -70,7 +70,11 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 			// If the stream ends with unmatched bytes, we need a dummy copy length.
 			copyCode = 2
 		}
-		command := metablock.CombineLengthCodes(insertCode, copyCode, i > 0 && m.Distance == matches[i-1].Distance)
+		command := metablock.CombineLengthCodes(
+			insertCode,
+			copyCode,
+			i > 0 && m.Distance == matches[i-1].Distance,
+		)
 		commandHisto[command]++
 		commandCount++
 
@@ -119,15 +123,36 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 
 	var literalDepths [256]byte
 	var literalBits [256]uint16
-	bitstream.BuildAndStoreHuffmanTreeFastBW(literalHisto[:], uint(literalCount), 8, literalDepths[:], literalBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(
+		literalHisto[:],
+		uint(literalCount),
+		8,
+		literalDepths[:],
+		literalBits[:],
+		&e.bw,
+	)
 
 	var commandDepths [704]byte
 	var commandBits [704]uint16
-	bitstream.BuildAndStoreHuffmanTreeFastBW(commandHisto[:], uint(commandCount), 10, commandDepths[:], commandBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(
+		commandHisto[:],
+		uint(commandCount),
+		10,
+		commandDepths[:],
+		commandBits[:],
+		&e.bw,
+	)
 
 	var distanceDepths [64]byte
 	var distanceBits [64]uint16
-	bitstream.BuildAndStoreHuffmanTreeFastBW(distanceHisto[:], uint(distanceCount), 6, distanceDepths[:], distanceBits[:], &e.bw)
+	bitstream.BuildAndStoreHuffmanTreeFastBW(
+		distanceHisto[:],
+		uint(distanceCount),
+		6,
+		distanceDepths[:],
+		distanceBits[:],
+		&e.bw,
+	)
 
 	pos = 0
 	for i, m := range matches {
@@ -137,13 +162,23 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 			// If the stream ends with unmatched bytes, we need a dummy copy length.
 			copyCode = 2
 		}
-		command := metablock.CombineLengthCodes(insertCode, copyCode, i > 0 && m.Distance == matches[i-1].Distance)
+		command := metablock.CombineLengthCodes(
+			insertCode,
+			copyCode,
+			i > 0 && m.Distance == matches[i-1].Distance,
+		)
 		e.bw.WriteBits(uint(commandDepths[command]), uint64(commandBits[command]))
 		if metablock.GetInsertExtra(insertCode) > 0 {
-			e.bw.WriteBits(uint(metablock.GetInsertExtra(insertCode)), uint64(m.Unmatched)-uint64(metablock.GetInsertBase(insertCode)))
+			e.bw.WriteBits(
+				uint(metablock.GetInsertExtra(insertCode)),
+				uint64(m.Unmatched)-uint64(metablock.GetInsertBase(insertCode)),
+			)
 		}
 		if metablock.GetCopyExtra(copyCode) > 0 {
-			e.bw.WriteBits(uint(metablock.GetCopyExtra(copyCode)), uint64(m.Length)-uint64(metablock.GetCopyBase(copyCode)))
+			e.bw.WriteBits(
+				uint(metablock.GetCopyExtra(copyCode)),
+				uint64(m.Length)-uint64(metablock.GetCopyBase(copyCode)),
+			)
 		}
 
 		if m.Unmatched > 0 {

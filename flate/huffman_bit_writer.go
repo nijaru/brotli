@@ -4,9 +4,7 @@
 
 package flate
 
-import (
-	"github.com/nijaru/brotli/matchfinder"
-)
+import match "github.com/nijaru/brotli/matchfinder"
 
 const (
 	// The largest offset code.
@@ -114,7 +112,8 @@ func (w *huffmanBitWriter) writeBits(b int32, nb uint) {
 		bits := w.bits
 		w.bits >>= 48
 		w.nbits -= 48
-		w.dst = append(w.dst,
+		w.dst = append(
+			w.dst,
 			byte(bits),
 			byte(bits>>8),
 			byte(bits>>16),
@@ -149,7 +148,11 @@ func (w *huffmanBitWriter) writeBytes(bytes []byte) {
 //	numLiterals      The number of literals in literalEncoding
 //	numOffsets       The number of offsets in offsetEncoding
 //	litenc, offenc   The literal and offset encoder to use
-func (w *huffmanBitWriter) generateCodegen(numLiterals int, numOffsets int, litEnc, offEnc *huffmanEncoder) {
+func (w *huffmanBitWriter) generateCodegen(
+	numLiterals int,
+	numOffsets int,
+	litEnc, offEnc *huffmanEncoder,
+) {
 	for i := range w.codegenFreq {
 		w.codegenFreq[i] = 0
 	}
@@ -237,7 +240,10 @@ func (w *huffmanBitWriter) generateCodegen(numLiterals int, numOffsets int, litE
 }
 
 // dynamicSize returns the size of dynamically encoded data in bits.
-func (w *huffmanBitWriter) dynamicSize(litEnc, offEnc *huffmanEncoder, extraBits int) (size, numCodegens int) {
+func (w *huffmanBitWriter) dynamicSize(
+	litEnc, offEnc *huffmanEncoder,
+	extraBits int,
+) (size, numCodegens int) {
 	numCodegens = len(w.codegenFreq)
 	for numCodegens > 4 && w.codegenFreq[codegenOrder[numCodegens-1]] == 0 {
 		numCodegens--
@@ -283,7 +289,8 @@ func (w *huffmanBitWriter) writeCode(c hcode) {
 		bits := w.bits
 		w.bits >>= 48
 		w.nbits -= 48
-		w.dst = append(w.dst,
+		w.dst = append(
+			w.dst,
 			byte(bits),
 			byte(bits>>8),
 			byte(bits>>16),
@@ -299,7 +306,12 @@ func (w *huffmanBitWriter) writeCode(c hcode) {
 //	numLiterals  The number of literals specified in codegen
 //	numOffsets   The number of offsets specified in codegen
 //	numCodegens  The number of codegens used in codegen
-func (w *huffmanBitWriter) writeDynamicHeader(numLiterals int, numOffsets int, numCodegens int, isEof bool) {
+func (w *huffmanBitWriter) writeDynamicHeader(
+	numLiterals int,
+	numOffsets int,
+	numCodegens int,
+	isEof bool,
+) {
 	var firstBits int32 = 4
 	if isEof {
 		firstBits = 5
@@ -370,7 +382,11 @@ func (w *huffmanBitWriter) writeBlock(matches []match.Match, eof bool, input []b
 		// against stored encoding.
 		for lengthCode := lengthCodesStart + 8; lengthCode < numLiterals; lengthCode++ {
 			// First eight length codes have extra size = 0.
-			extraBits += int(w.literalFreq[lengthCode]) * int(lengthExtraBits[lengthCode-lengthCodesStart])
+			extraBits += int(
+				w.literalFreq[lengthCode],
+			) * int(
+				lengthExtraBits[lengthCode-lengthCodesStart],
+			)
 		}
 		for offsetCode := 4; offsetCode < numOffsets; offsetCode++ {
 			// First four offset codes have extra size = 0.
@@ -380,9 +396,9 @@ func (w *huffmanBitWriter) writeBlock(matches []match.Match, eof bool, input []b
 
 	// Figure out smallest code.
 	// Fixed Huffman baseline.
-	var literalEncoding = fixedLiteralEncoding
-	var offsetEncoding = fixedOffsetEncoding
-	var size = w.fixedSize(extraBits)
+	literalEncoding := fixedLiteralEncoding
+	offsetEncoding := fixedOffsetEncoding
+	size := w.fixedSize(extraBits)
 
 	// Dynamic Huffman?
 	var numCodegens int
@@ -422,7 +438,10 @@ func (w *huffmanBitWriter) writeBlock(matches []match.Match, eof bool, input []b
 // literalFreq and offsetFreq, and generates literalEncoding
 // and offsetEncoding.
 // The number of literal and offset tokens is returned.
-func (w *huffmanBitWriter) makeStatistics(matches []match.Match, input []byte) (numLiterals, numOffsets int) {
+func (w *huffmanBitWriter) makeStatistics(
+	matches []match.Match,
+	input []byte,
+) (numLiterals, numOffsets int) {
 	for i := range w.literalFreq {
 		w.literalFreq[i] = 0
 	}
@@ -469,7 +488,11 @@ func (w *huffmanBitWriter) makeStatistics(matches []match.Match, input []byte) (
 
 // writeTokens writes a slice of tokens to the output.
 // codes for literal and offset encoding must be supplied.
-func (w *huffmanBitWriter) writeTokens(matches []match.Match, input []byte, leCodes, oeCodes []hcode) {
+func (w *huffmanBitWriter) writeTokens(
+	matches []match.Match,
+	input []byte,
+	leCodes, oeCodes []hcode,
+) {
 	pos := 0
 	for _, m := range matches {
 		for _, c := range input[pos : pos+m.Unmatched] {
@@ -503,7 +526,12 @@ func (w *huffmanBitWriter) writeTokens(matches []match.Match, input []byte, leCo
 	}
 }
 
-func (w *huffmanBitWriter) Encode(dst []byte, src []byte, matches []match.Match, lastBlock bool) []byte {
+func (w *huffmanBitWriter) Encode(
+	dst []byte,
+	src []byte,
+	matches []match.Match,
+	lastBlock bool,
+) []byte {
 	w.dst = dst
 
 	w.writeBlock(matches, lastBlock, src)

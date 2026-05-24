@@ -286,7 +286,17 @@ func encoderCompressStreamFast(s *State, op int, availableIn *uint, nextIn *[]by
 			storage[1] = byte(s.LastBytes >> 8)
 			table = getHashTable(s, s.Params.Quality, blockSize, &tableSize)
 
-			compressFragmentTwoPass(*nextIn, blockSize, isLast, commandBuf, literalBuf, table, tableSize, &storageIx, storage)
+			compressFragmentTwoPass(
+				*nextIn,
+				blockSize,
+				isLast,
+				commandBuf,
+				literalBuf,
+				table,
+				tableSize,
+				&storageIx,
+				storage,
+			)
 
 			*nextIn = (*nextIn)[blockSize:]
 			*availableIn -= blockSize
@@ -372,7 +382,8 @@ func updateSizeHint(s *State, availableIn uint) {
 		tail := uint64(availableIn)
 		limit := uint32(1 << 30)
 		var total uint32
-		if (delta >= uint64(limit)) || (tail >= uint64(limit)) || ((delta + tail) >= uint64(limit)) {
+		if (delta >= uint64(limit)) || (tail >= uint64(limit)) ||
+			((delta + tail) >= uint64(limit)) {
 			total = limit
 		} else {
 			total = uint32(delta + tail)
@@ -415,8 +426,6 @@ func ensureInitialized(s *State) bool {
 		encodeWindowBits(lgwin, s.Params.Large_window, &s.LastBytes, &s.LastBytesBits)
 	}
 
-
-
 	s.IsInitialized = true
 	return true
 }
@@ -442,14 +451,21 @@ var kStaticContextMapComplexUTF8 = [64]uint32{
 	1, 1, 9, 10, 1, 1, 9, 10, 1, 1, 9, 10, 1, 1, 9, 10,
 }
 
-func shouldCompress_encode(data []byte, mask uint, lastFlushPos uint64, bytes uint, numLiterals uint, numCommands uint) bool {
+func shouldCompress_encode(
+	data []byte,
+	mask uint,
+	lastFlushPos uint64,
+	bytes uint,
+	numLiterals uint,
+	numCommands uint,
+) bool {
 	/* TODO: find more precise minimal block overhead. */
 	if bytes <= 2 {
 		return false
 	}
 	if numCommands < (bytes>>8)+2 {
 		if float64(numLiterals) > 0.99*float64(bytes) {
-			var literalHisto = [256]uint32{0}
+			literalHisto := [256]uint32{0}
 			const kSampleRate uint32 = 13
 			const kMinEntropy float64 = 7.92
 			bitCostThreshold := float64(bytes) * kMinEntropy / float64(kSampleRate)
@@ -476,16 +492,29 @@ func optimizeHistograms(numDistanceCodes uint32, mb *metablock.MetaBlockSplit) {
 		bitstream.OptimizeHuffmanCountsForRLE(256, mb.Literal_histograms[i].Data_[:], goodForRle[:])
 	}
 	for i := uint(0); i < mb.Command_histograms_size; i++ {
-		bitstream.OptimizeHuffmanCountsForRLE(common.NumCommandSymbols, mb.Command_histograms[i].Data_[:], goodForRle[:])
+		bitstream.OptimizeHuffmanCountsForRLE(
+			common.NumCommandSymbols,
+			mb.Command_histograms[i].Data_[:],
+			goodForRle[:],
+		)
 	}
 	for i := uint(0); i < mb.Distance_histograms_size; i++ {
-		bitstream.OptimizeHuffmanCountsForRLE(uint(numDistanceCodes), mb.Distance_histograms[i].Data_[:], goodForRle[:])
+		bitstream.OptimizeHuffmanCountsForRLE(
+			uint(numDistanceCodes),
+			mb.Distance_histograms[i].Data_[:],
+			goodForRle[:],
+		)
 	}
 }
 
-func chooseContextMap(qLevel int, bigramHisto []uint32, numLiteralContexts *uint, literalContextMap *[]uint32) {
-	var monogramHisto = [3]uint32{0}
-	var twoPrefixHisto = [6]uint32{0}
+func chooseContextMap(
+	qLevel int,
+	bigramHisto []uint32,
+	numLiteralContexts *uint,
+	literalContextMap *[]uint32,
+) {
+	monogramHisto := [3]uint32{0}
+	twoPrefixHisto := [6]uint32{0}
 	var total uint
 	var i uint
 	var dummy uint
@@ -526,14 +555,23 @@ func chooseContextMap(qLevel int, bigramHisto []uint32, numLiteralContexts *uint
 	}
 }
 
-func shouldUseComplexStaticContextMap(input []byte, startPos uint, length uint, mask uint, qLevel int, Size_hint uint, numLiteralContexts *uint, literalContextMap *[]uint32) bool {
+func shouldUseComplexStaticContextMap(
+	input []byte,
+	startPos uint,
+	length uint,
+	mask uint,
+	qLevel int,
+	Size_hint uint,
+	numLiteralContexts *uint,
+	literalContextMap *[]uint32,
+) bool {
 	/* Try the more complex static context map only for long data. */
 	if Size_hint < 1<<20 {
 		return false
 	} else {
 		endPos := startPos + length
-		var combinedHisto = [32]uint32{0}
-		var contextHisto = [13][32]uint32{[32]uint32{0}}
+		combinedHisto := [32]uint32{0}
+		contextHisto := [13][32]uint32{{0}}
 		var total uint32 = 0
 		var entropy [3]float64
 		var dummy uint
@@ -588,7 +626,16 @@ func shouldUseComplexStaticContextMap(input []byte, startPos uint, length uint, 
 	}
 }
 
-func decideOverLiteralContextModeling(input []byte, startPos uint, length uint, mask uint, qLevel int, Size_hint uint, numLiteralContexts *uint, literalContextMap *[]uint32) {
+func decideOverLiteralContextModeling(
+	input []byte,
+	startPos uint,
+	length uint,
+	mask uint,
+	qLevel int,
+	Size_hint uint,
+	numLiteralContexts *uint,
+	literalContextMap *[]uint32,
+) {
 	if qLevel < quality.MinQualityForContextModeling || length < 64 {
 		return
 	} else if shouldUseComplexStaticContextMap(input, startPos, length, mask, qLevel, Size_hint, numLiteralContexts, literalContextMap) {
@@ -599,9 +646,9 @@ func decideOverLiteralContextModeling(input []byte, startPos uint, length uint, 
 		   UTF8 data faster we only examine 64 byte long strides at every 4kB
 		   intervals. */
 
-		var bigramPrefixHisto = [9]uint32{0}
+		bigramPrefixHisto := [9]uint32{0}
 		for ; startPos+64 <= endPos; startPos += 4096 {
-			var lut = [4]int{0, 0, 1, 2}
+			lut := [4]int{0, 0, 1, 2}
 			strideEndPos := startPos + 64
 			prev := lut[input[startPos&mask]>>6] * 3
 			var pos uint
@@ -616,7 +663,23 @@ func decideOverLiteralContextModeling(input []byte, startPos uint, length uint, 
 	}
 }
 
-func writeMetaBlockInternal(data []byte, mask uint, lastFlushPos uint64, bytes uint, isLast bool, literalContextMode int, params *common.EncoderParams, prevByte byte, prevByte2 byte, numLiterals uint, commands []metablock.Command, savedDistCache []int, distCache []int, storageIx *uint, storage []byte) {
+func writeMetaBlockInternal(
+	data []byte,
+	mask uint,
+	lastFlushPos uint64,
+	bytes uint,
+	isLast bool,
+	literalContextMode int,
+	params *common.EncoderParams,
+	prevByte byte,
+	prevByte2 byte,
+	numLiterals uint,
+	commands []metablock.Command,
+	savedDistCache []int,
+	distCache []int,
+	storageIx *uint,
+	storage []byte,
+) {
 	wrappedLastFlushPos := wrapPosition(lastFlushPos)
 	var lastBytes uint16
 	var lastBytesBits byte
@@ -636,14 +699,32 @@ func writeMetaBlockInternal(data []byte, mask uint, lastFlushPos uint64, bytes u
 		   CreateBackwardReferences is now unused. */
 		copy(distCache, savedDistCache[:4])
 
-		bitstream.StoreUncompressedMetaBlock(isLast, data, uint(wrappedLastFlushPos), mask, bytes, storageIx, storage)
+		bitstream.StoreUncompressedMetaBlock(
+			isLast,
+			data,
+			uint(wrappedLastFlushPos),
+			mask,
+			bytes,
+			storageIx,
+			storage,
+		)
 		return
 	}
 
 	lastBytes = uint16(storage[1])<<8 | uint16(storage[0])
 	lastBytesBits = byte(*storageIx)
 	if params.Quality < quality.MinQualityForBlockSplit {
-		bitstream.StoreMetaBlockTrivial(data, uint(wrappedLastFlushPos), bytes, mask, isLast, params, commands, storageIx, storage)
+		bitstream.StoreMetaBlockTrivial(
+			data,
+			uint(wrappedLastFlushPos),
+			bytes,
+			mask,
+			isLast,
+			params,
+			commands,
+			storageIx,
+			storage,
+		)
 	} else {
 		mb := metablock.GetMetaBlockSplit()
 		if params.Quality < quality.MinQualityForHqBlockSplitting {
@@ -681,7 +762,15 @@ func writeMetaBlockInternal(data []byte, mask uint, lastFlushPos uint64, bytes u
 		storage[0] = byte(lastBytes)
 		storage[1] = byte(lastBytes >> 8)
 		*storageIx = uint(lastBytesBits)
-		bitstream.StoreUncompressedMetaBlock(isLast, data, uint(wrappedLastFlushPos), mask, bytes, storageIx, storage)
+		bitstream.StoreUncompressedMetaBlock(
+			isLast,
+			data,
+			uint(wrappedLastFlushPos),
+			mask,
+			bytes,
+			storageIx,
+			storage,
+		)
 	}
 }
 
@@ -700,7 +789,8 @@ func chooseDistanceParams(params *common.EncoderParams) {
 		}
 
 		ndirectMsb = (numDirectDistanceCodes >> distancePostfixBits) & 0x0F
-		if distancePostfixBits > common.MaxNpostfix || numDirectDistanceCodes > common.MaxNdirect || ndirectMsb<<distancePostfixBits != numDirectDistanceCodes {
+		if distancePostfixBits > common.MaxNpostfix || numDirectDistanceCodes > common.MaxNdirect ||
+			ndirectMsb<<distancePostfixBits != numDirectDistanceCodes {
 			distancePostfixBits = 0
 			numDirectDistanceCodes = 0
 		}
@@ -709,10 +799,17 @@ func chooseDistanceParams(params *common.EncoderParams) {
 	metablock.InitDistanceParams(params, distancePostfixBits, numDirectDistanceCodes)
 }
 
-func chooseContextMode(params *common.EncoderParams, data []byte, pos uint, mask uint, length uint) int {
+func chooseContextMode(
+	params *common.EncoderParams,
+	data []byte,
+	pos uint,
+	mask uint,
+	length uint,
+) int {
 	/* We only do the computation for the option of something else than
 	   CONTEXT_UTF8 for the highest qualities */
-	if params.Quality >= 10 && !context.IsMostlyUTF8(data, pos, mask, length, context.KMinUTF8Ratio) {
+	if params.Quality >= 10 &&
+		!context.IsMostlyUTF8(data, pos, mask, length, context.KMinUTF8Ratio) {
 		return 1 // contextSigned
 	}
 
@@ -730,7 +827,7 @@ func extendLastCommand(s *State, bytes *uint32, wrappedLastProcessedPos *uint32)
 	lastCommand := &s.Commands[len(s.Commands)-1]
 	data := s.Ringbuffer_.Buffer_
 	mask := s.Ringbuffer_.Mask_
-	maxBackwardDistance := ((uint64(1)) << s.Params.Lgwin) - common.WindowGap
+	maxBackwardDistance := (uint64(1) << s.Params.Lgwin) - common.WindowGap
 	lastCopyLen := uint64(lastCommand.Copy_len_) & 0x1FFFFFF
 	lastProcessedPos := s.LastProcessedPos - lastCopyLen
 	var maxDistance uint64
@@ -741,7 +838,8 @@ func extendLastCommand(s *State, bytes *uint32, wrappedLastProcessedPos *uint32)
 	}
 	cmdDist := uint64(s.DistCache[0])
 	distanceCode := metablock.CommandRestoreDistanceCode(lastCommand, &s.Params.Dist)
-	if distanceCode < common.NumDistanceShortCodes || uint64(distanceCode-(common.NumDistanceShortCodes-1)) == cmdDist {
+	if distanceCode < common.NumDistanceShortCodes ||
+		uint64(distanceCode-(common.NumDistanceShortCodes-1)) == cmdDist {
 		if cmdDist <= maxDistance {
 			for *bytes != 0 && data[*wrappedLastProcessedPos&mask] == data[(uint64(*wrappedLastProcessedPos)-cmdDist)&uint64(mask)] {
 				lastCommand.Copy_len_++
@@ -750,7 +848,12 @@ func extendLastCommand(s *State, bytes *uint32, wrappedLastProcessedPos *uint32)
 			}
 		}
 
-		metablock.GetLengthCode(uint(lastCommand.Insert_len_), uint(int(lastCommand.Copy_len_&0x1FFFFFF)+int(lastCommand.Copy_len_>>25)), (lastCommand.Dist_prefix_&0x3FF == 0), &lastCommand.Cmd_prefix_)
+		metablock.GetLengthCode(
+			uint(lastCommand.Insert_len_),
+			uint(int(lastCommand.Copy_len_&0x1FFFFFF)+int(lastCommand.Copy_len_>>25)),
+			(lastCommand.Dist_prefix_&0x3FF == 0),
+			&lastCommand.Cmd_prefix_,
+		)
 	}
 }
 
@@ -801,7 +904,17 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 		storage[0] = byte(s.LastBytes)
 		storage[1] = byte(s.LastBytes >> 8)
 		table = getHashTable(s, s.Params.Quality, uint(bytes), &tableSize)
-		compressFragmentTwoPass(data[wrappedLastProcessedPos&mask:], uint(bytes), isLast, s.CommandBuf, s.LiteralBuf, table, tableSize, &storageIx, storage)
+		compressFragmentTwoPass(
+			data[wrappedLastProcessedPos&mask:],
+			uint(bytes),
+			isLast,
+			s.CommandBuf,
+			s.LiteralBuf,
+			table,
+			tableSize,
+			&storageIx,
+			storage,
+		)
 
 		s.LastBytes = uint16(storage[storageIx>>3])
 		s.LastBytesBits = byte(storageIx & 7)
@@ -823,16 +936,44 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 	}
 
 	chooseHasher(&s.Params, &s.Params.Hasher)
-	hasher.InitOrStitchToPreviousBlock(&s.Hasher_, data, uint(mask), &s.Params, uint(wrappedLastProcessedPos), uint(bytes), isLast)
+	hasher.InitOrStitchToPreviousBlock(
+		&s.Hasher_,
+		data,
+		uint(mask),
+		&s.Params,
+		uint(wrappedLastProcessedPos),
+		uint(bytes),
+		isLast,
+	)
 
-	literalContextMode = chooseContextMode(&s.Params, data, uint(wrapPosition(s.LastFlushPos)), uint(mask), uint(s.InputPos-s.LastFlushPos))
+	literalContextMode = chooseContextMode(
+		&s.Params,
+		data,
+		uint(wrapPosition(s.LastFlushPos)),
+		uint(mask),
+		uint(s.InputPos-s.LastFlushPos),
+	)
 
 	if len(s.Commands) != 0 && s.LastInsertLen == 0 {
 		extendLastCommand(s, &bytes, &wrappedLastProcessedPos)
 	}
 
 	if s.Params.Quality == 10 {
-		createZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.Params, s.Hasher_.(*hasher.H10), s.DistCache[:], &s.LastInsertLen, &s.Commands, &s.NumLiterals, &s.ZopfliNodes, &s.ZopfliLiteralCosts, &s.ZopfliCostDist)
+		createZopfliBackwardReferences(
+			uint(bytes),
+			uint(wrappedLastProcessedPos),
+			data,
+			uint(mask),
+			&s.Params,
+			s.Hasher_.(*hasher.H10),
+			s.DistCache[:],
+			&s.LastInsertLen,
+			&s.Commands,
+			&s.NumLiterals,
+			&s.ZopfliNodes,
+			&s.ZopfliLiteralCosts,
+			&s.ZopfliCostDist,
+		)
 	} else if s.Params.Quality == 11 {
 		createHqZopfliBackwardReferences(uint(bytes), uint(wrappedLastProcessedPos), data, uint(mask), &s.Params, s.Hasher_, s.DistCache[:], &s.LastInsertLen, &s.Commands, &s.NumLiterals, &s.ZopfliNodes, &s.ZopfliMatches, &s.ZopfliNumMatches, &s.ZopfliLiteralCosts, &s.ZopfliCostDist)
 	} else {
@@ -847,7 +988,9 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 		nextInputFitsMetablock := (processedBytes+inputBlockSize(s) <= maxLength)
 		shouldFlush := (!s.Plan.BlockSplit && s.NumLiterals+uint(len(s.Commands)) >= quality.MaxNumDelayedSymbols)
 
-		if !isLast && !forceFlush && !shouldFlush && nextInputFitsMetablock && s.NumLiterals < maxLiterals && len(s.Commands) < maxCommands {
+		if !isLast && !forceFlush && !shouldFlush && nextInputFitsMetablock &&
+			s.NumLiterals < maxLiterals &&
+			len(s.Commands) < maxCommands {
 			if updateLastProcessedPos(s) {
 				hasher.HasherReset(s.Hasher_)
 			}
@@ -871,7 +1014,23 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 		storageIx := uint(s.LastBytesBits)
 		storage[0] = byte(s.LastBytes)
 		storage[1] = byte(s.LastBytes >> 8)
-		writeMetaBlockInternal(data, uint(mask), s.LastFlushPos, uint(metablockSize), isLast, literalContextMode, &s.Params, s.PrevByte, s.PrevByte2, s.NumLiterals, s.Commands, s.SavedDistCache[:], s.DistCache[:], &storageIx, storage)
+		writeMetaBlockInternal(
+			data,
+			uint(mask),
+			s.LastFlushPos,
+			uint(metablockSize),
+			isLast,
+			literalContextMode,
+			&s.Params,
+			s.PrevByte,
+			s.PrevByte2,
+			s.NumLiterals,
+			s.Commands,
+			s.SavedDistCache[:],
+			s.DistCache[:],
+			&storageIx,
+			storage,
+		)
 		s.LastBytes = uint16(storage[storageIx>>3])
 		s.LastBytesBits = byte(storageIx & 7)
 		s.LastFlushPos = s.InputPos
@@ -952,7 +1111,8 @@ func CompressStream(s *State, op int, availableIn *uint, nextIn *[]byte) bool {
 
 		if s.StreamState == streamProcessing {
 			if remainingBlockSize == 0 || op != operationProcess {
-				isLast := (*availableIn == 0) && op == operationFinish && unprocessedInputSize(s) == 0
+				isLast := (*availableIn == 0) && op == operationFinish &&
+					unprocessedInputSize(s) == 0
 				forceFlush := (*availableIn == 0) && op == operationFlush
 				updateSizeHint(s, *availableIn)
 				if !encodeData(s, isLast, forceFlush) {

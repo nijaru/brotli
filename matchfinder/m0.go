@@ -119,7 +119,12 @@ func (m M0) FindMatches(dst []Match, src []byte) []Match {
 			if m.MaxDistance != 0 && newBase-newCandidate > m.MaxDistance {
 				okDistance = false
 			}
-			if okDistance && binary.LittleEndian.Uint32(src[newBase:]) == binary.LittleEndian.Uint32(src[newCandidate:]) {
+			if okDistance &&
+				binary.LittleEndian.Uint32(
+					src[newBase:],
+				) == binary.LittleEndian.Uint32(
+					src[newCandidate:],
+				) {
 				newS := extendMatch(src, newCandidate+4, newBase+4)
 				if newS-newBase > s-base+1 {
 					s = newS

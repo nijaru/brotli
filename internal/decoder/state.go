@@ -97,90 +97,90 @@ type Reader struct {
 	buf []byte // scratch space for reading from src
 	in  []byte // current chunk to decode; usually aliases buf
 
-	state        int
+	state       int
 	loopCounter int
-	br           bitstream.BitReader
-	buffer       struct {
+	br          bitstream.BitReader
+	buffer      struct {
 		u64 uint64
 		u8  [8]byte
 	}
-	bufferLength               uint32
-	pos                         int
+	bufferLength              uint32
+	pos                       int
 	maxBackwardDistance       int
-	maxDistance                 int
-	ringbufferSize             int
-	ringbufferMask             int
+	maxDistance               int
+	ringbufferSize            int
+	ringbufferMask            int
 	distRbIdx                 int
-	distRb                     [4]int
-	errorCode                  int
-	sub_loopCounter            uint32
-	ringbuffer                  []byte
-	ringbufferEnd              []byte
-	htreeCommand               []bitstream.HuffmanCode
-	contextLookup              []byte
+	distRb                    [4]int
+	errorCode                 int
+	sub_loopCounter           uint32
+	ringbuffer                []byte
+	ringbufferEnd             []byte
+	htreeCommand              []bitstream.HuffmanCode
+	contextLookup             []byte
 	contextMapSlice           []byte
 	dist_contextMapSlice      []byte
-	literalHGroup              bitstream.HuffmanTreeGroup
+	literalHGroup             bitstream.HuffmanTreeGroup
 	insertCopyHGroup          bitstream.HuffmanTreeGroup
-	distanceHGroup             bitstream.HuffmanTreeGroup
+	distanceHGroup            bitstream.HuffmanTreeGroup
 	blockTypeTrees            []bitstream.HuffmanCode
 	blockLenTrees             []bitstream.HuffmanCode
 	trivialLiteralContext     int
-	distanceContext            int
-	metaBlockRemainingLen    int
+	distanceContext           int
+	metaBlockRemainingLen     int
 	blockLengthIndex          uint32
-	blockLength                [3]uint32
+	blockLength               [3]uint32
 	numBlockTypes             [3]uint32
 	blockTypeRb               [6]uint32
 	distancePostfixBits       uint32
-	numDirectDistanceCodes   uint32
+	numDirectDistanceCodes    uint32
 	distancePostfixMask       int
 	numDistHtrees             uint32
 	distContextMap            []byte
-	literalHtree               []bitstream.HuffmanCode
+	literalHtree              []bitstream.HuffmanCode
 	distHtreeIndex            byte
 	repeatCodeLen             uint32
 	prevCodeLen               uint32
-	copyLength                 int
-	distanceCode               int
-	rbRoundtrips               uint
+	copyLength                int
+	distanceCode              int
+	rbRoundtrips              uint
 	partialPosOut             uint
-	symbol                      uint32
-	repeat                      uint32
-	space                       uint32
-	table                       [32]bitstream.HuffmanCode
-	symbolLists                bitstream.SymbolList
+	symbol                    uint32
+	repeat                    uint32
+	space                     uint32
+	table                     [32]bitstream.HuffmanCode
+	symbolLists               bitstream.SymbolList
 	symbolsListsArray         [bitstream.HuffmanMaxCodeLength + 1 + common.NumCommandSymbols]uint16
-	nextSymbol                 [32]int
-	codeLengthCodeLengths    [common.CodeLengthCodes]byte
+	nextSymbol                [32]int
+	codeLengthCodeLengths     [common.CodeLengthCodes]byte
 	codeLengthHisto           [16]uint16
-	htreeIndex                 int
-	next                        []bitstream.HuffmanCode
-	contextIndex               uint32
-	maxRunLengthPrefix       uint32
-	code                        uint32
+	htreeIndex                int
+	next                      []bitstream.HuffmanCode
+	contextIndex              uint32
+	maxRunLengthPrefix        uint32
+	code                      uint32
 	contextMapTable           [bitstream.HuffmanMaxSize272]bitstream.HuffmanCode
 	substateMetablockHeader   int
 	substateTreeGroup         int
 	substateContextMap        int
-	substateUncompressed       int
-	substateHuffman            int
+	substateUncompressed      int
+	substateHuffman           int
 	substateDecodeUint8       int
-	substate_read_blockLength  int
+	substate_read_blockLength int
 	isLastMetablock           uint
-	isUncompressed             uint
-	isMetadata                 uint
+	isUncompressed            uint
+	isMetadata                uint
 	shouldWrapRingbuffer      uint
 	cannyRingbufferAllocation uint
-	largeWindow                bool
-	sizeNibbles                uint
-	windowBits                 uint32
-	new_ringbufferSize         int
-	num_literalHtrees          uint32
-	contextMap                 []byte
-	contextModes               []byte
-	dictionary                  *dictionary.Dictionary
-	transforms                  *dictionary.Transforms
+	largeWindow               bool
+	sizeNibbles               uint
+	windowBits                uint32
+	new_ringbufferSize        int
+	num_literalHtrees         uint32
+	contextMap                []byte
+	contextModes              []byte
+	dictionary                *dictionary.Dictionary
+	transforms                *dictionary.Transforms
 	trivialLiteralContexts    [8]uint32
 }
 
@@ -289,7 +289,13 @@ func decoderStateCleanupAfterMetablock(s *Reader) {
 	s.distanceHGroup.HTrees = nil
 }
 
-func decoderHuffmanTreeGroupInit(s *Reader, group *bitstream.HuffmanTreeGroup, alphabetSize uint32, maxSymbol uint32, nTrees uint32) bool {
+func decoderHuffmanTreeGroupInit(
+	s *Reader,
+	group *bitstream.HuffmanTreeGroup,
+	alphabetSize uint32,
+	maxSymbol uint32,
+	nTrees uint32,
+) bool {
 	var max_table_size uint = uint(bitstream.KMaxHuffmanTableSize[(alphabetSize+31)>>5])
 	group.AlphabetSize = uint16(alphabetSize)
 	group.MaxSymbol = uint16(maxSymbol)

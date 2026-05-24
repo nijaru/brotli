@@ -6,7 +6,7 @@ import (
 	"github.com/nijaru/brotli/internal/bitstream"
 	"github.com/nijaru/brotli/internal/common"
 	"github.com/nijaru/brotli/internal/hasher"
-	"github.com/nijaru/brotli/matchfinder"
+	match "github.com/nijaru/brotli/matchfinder"
 )
 
 /* Copyright 2015 Google Inc. All Rights Reserved.
@@ -120,7 +120,7 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 		copy(storage, dst)
 	}
 	var storageIx uint = uint(len(dst)) << 3
-	
+
 	if e.lastBytesBits > 0 {
 		storage[storageIx>>3] = byte(e.lastBytes)
 		storageIx += uint(e.lastBytesBits)
@@ -146,7 +146,19 @@ func (e *Encoder) Encode(dst []byte, src []byte, matches []match.Match, lastBloc
 		}
 		table := e.getTable(tableSize)
 
-		e.compressFragmentFast(src, inputSize, lastBlock, table, tableSize, e.CmdDepths[:], e.CmdBits[:], &e.CmdCodeNumbits, e.CmdCode[:], &storageIx, storage)
+		e.compressFragmentFast(
+			src,
+			inputSize,
+			lastBlock,
+			table,
+			tableSize,
+			e.CmdDepths[:],
+			e.CmdBits[:],
+			&e.CmdCodeNumbits,
+			e.CmdCode[:],
+			&storageIx,
+			storage,
+		)
 	} else if lastBlock {
 		bitstream.WriteBits(1, 1, &storageIx, storage) // islast
 		bitstream.WriteBits(1, 1, &storageIx, storage) // isempty
@@ -186,7 +198,15 @@ func isMatch5(p1 []byte, p2 []byte) bool {
 		p1[4] == p2[4]
 }
 
-func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_bits uint, depths []byte, bits []uint16, storage_ix *uint, storage []byte) uint {
+func buildAndStoreHuffmanTreeFast(
+	histogram []uint32,
+	histogram_total uint,
+	max_bits uint,
+	depths []byte,
+	bits []uint16,
+	storage_ix *uint,
+	storage []byte,
+) uint {
 	var i uint
 	if histogram_total == 0 {
 		bitstream.WriteBits(1, 0, storage_ix, storage) /* ISLAST */
@@ -202,7 +222,15 @@ func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_
 		}
 	}
 
-	bitstream.BuildAndStoreHuffmanTreeFast(histogram, histogram_total, max_bits, depths, bits, storage_ix, storage)
+	bitstream.BuildAndStoreHuffmanTreeFast(
+		histogram,
+		histogram_total,
+		max_bits,
+		depths,
+		bits,
+		storage_ix,
+		storage,
+	)
 	{
 		var literal_ratio uint = 0
 		for i = 0; i < 256; i++ {
@@ -216,8 +244,15 @@ func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_
 	}
 }
 
-func (e *Encoder) buildAndStoreLiteralPrefixCode(input []byte, input_size uint, depths []byte, bits []uint16, storage_ix *uint, storage []byte) uint {
-	var histogram = [256]uint32{0}
+func (e *Encoder) buildAndStoreLiteralPrefixCode(
+	input []byte,
+	input_size uint,
+	depths []byte,
+	bits []uint16,
+	storage_ix *uint,
+	storage []byte,
+) uint {
+	histogram := [256]uint32{0}
 	var histogram_total uint
 	var i uint
 	if input_size < 1<<15 {
@@ -245,7 +280,15 @@ func (e *Encoder) buildAndStoreLiteralPrefixCode(input []byte, input_size uint, 
 		}
 	}
 
-	buildAndStoreHuffmanTreeFast(histogram[:], histogram_total, 8, depths, bits, storage_ix, storage)
+	buildAndStoreHuffmanTreeFast(
+		histogram[:],
+		histogram_total,
+		8,
+		depths,
+		bits,
+		storage_ix,
+		storage,
+	)
 	{
 		var literal_ratio uint = 0
 		for i = 0; i < 256; i++ {
@@ -258,7 +301,13 @@ func (e *Encoder) buildAndStoreLiteralPrefixCode(input []byte, input_size uint, 
 	}
 }
 
-func (e *Encoder) buildAndStoreCommandPrefixCode(histogram []uint32, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
+func (e *Encoder) buildAndStoreCommandPrefixCode(
+	histogram []uint32,
+	depth []byte,
+	bits []uint16,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var tree [129]bitstream.HuffmanTree
 	var cmd_depth [common.NumCommandSymbols]byte
 	var i int
@@ -301,7 +350,13 @@ func (e *Encoder) buildAndStoreCommandPrefixCode(histogram []uint32, depth []byt
 	bitstream.StoreHuffmanTree(depth[64:], 64, tree[:], storage_ix, storage)
 }
 
-func (e *Encoder) buildAndStoreCommandPrefixCodeToBuffer(histogram []uint32, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
+func (e *Encoder) buildAndStoreCommandPrefixCodeToBuffer(
+	histogram []uint32,
+	depth []byte,
+	bits []uint16,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var tree [129]bitstream.HuffmanTree
 	var cmd_depth [common.NumCommandSymbols]byte
 	var i int
@@ -344,7 +399,14 @@ func (e *Encoder) buildAndStoreCommandPrefixCodeToBuffer(histogram []uint32, dep
 	bitstream.StoreHuffmanTree(depth[64:], 64, tree[:], storage_ix, storage)
 }
 
-func emitInsertLen(insertlen uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
+func emitInsertLen(
+	insertlen uint,
+	depth []byte,
+	bits []uint16,
+	histo []uint32,
+	storage_ix *uint,
+	storage []byte,
+) {
 	if insertlen < 6 {
 		var code uint = insertlen + 40
 		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
@@ -371,7 +433,14 @@ func emitInsertLen(insertlen uint, depth []byte, bits []uint16, histo []uint32, 
 	}
 }
 
-func emitLongInsertLen(insertlen uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
+func emitLongInsertLen(
+	insertlen uint,
+	depth []byte,
+	bits []uint16,
+	histo []uint32,
+	storage_ix *uint,
+	storage []byte,
+) {
 	if insertlen < 22594 {
 		bitstream.WriteBits(uint(depth[62]), uint64(bits[62]), storage_ix, storage)
 		bitstream.WriteBits(14, uint64(insertlen)-6210, storage_ix, storage)
@@ -383,7 +452,14 @@ func emitLongInsertLen(insertlen uint, depth []byte, bits []uint16, histo []uint
 	}
 }
 
-func emitCopyLen(copylen uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
+func emitCopyLen(
+	copylen uint,
+	depth []byte,
+	bits []uint16,
+	histo []uint32,
+	storage_ix *uint,
+	storage []byte,
+) {
 	if copylen < 10 {
 		var code uint = copylen + 14
 		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
@@ -410,7 +486,14 @@ func emitCopyLen(copylen uint, depth []byte, bits []uint16, histo []uint32, stor
 	}
 }
 
-func emitCopyLenLastDistance(copylen uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
+func emitCopyLenLastDistance(
+	copylen uint,
+	depth []byte,
+	bits []uint16,
+	histo []uint32,
+	storage_ix *uint,
+	storage []byte,
+) {
 	if copylen < 12 {
 		var code uint = copylen - 4
 		bitstream.WriteBits(uint(depth[code]), uint64(bits[code]), storage_ix, storage)
@@ -449,7 +532,14 @@ func emitCopyLenLastDistance(copylen uint, depth []byte, bits []uint16, histo []
 	}
 }
 
-func emitDistance(distance uint, depth []byte, bits []uint16, histo []uint32, storage_ix *uint, storage []byte) {
+func emitDistance(
+	distance uint,
+	depth []byte,
+	bits []uint16,
+	histo []uint32,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var d uint = distance + 3
 	var nbits uint32 = common.Log2FloorNonZero(d) - 1
 	var prefix uint = (d >> nbits) & 1
@@ -460,7 +550,14 @@ func emitDistance(distance uint, depth []byte, bits []uint16, histo []uint32, st
 	histo[distcode]++
 }
 
-func emitLiterals(input []byte, len uint, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
+func emitLiterals(
+	input []byte,
+	len uint,
+	depth []byte,
+	bits []uint16,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var j uint
 	for j = 0; j < len; j++ {
 		var lit byte = input[j]
@@ -517,7 +614,7 @@ func updateBits(n_bits uint, bits uint32, pos uint, array []byte) {
 }
 
 func (e *Encoder) shouldMergeBlock(data []byte, len uint, depths []byte) bool {
-	var histo = [256]uint{0}
+	histo := [256]uint{0}
 	const kSampleRate uint = 43
 	var i uint
 	for i = 0; i < len; i += kSampleRate {
@@ -525,7 +622,7 @@ func (e *Encoder) shouldMergeBlock(data []byte, len uint, depths []byte) bool {
 	}
 	{
 		var total uint = (len + kSampleRate - 1) / kSampleRate
-		var r float64 = (common.FastLog2(total) + 0.5) * float64(total) + 200
+		var r float64 = (common.FastLog2(total)+0.5)*float64(total) + 200
 		for i = 0; i < 256; i++ {
 			r -= float64(histo[i]) * (float64(depths[i]) + common.FastLog2(histo[i]))
 		}
@@ -559,7 +656,13 @@ func shouldUseUncompressedMode(compressed uint, insertlen uint, literal_ratio ui
 	}
 }
 
-func emitUncompressedMetaBlock1(begin []byte, end []byte, storage_ix_start uint, storage_ix *uint, storage []byte) {
+func emitUncompressedMetaBlock1(
+	begin []byte,
+	end []byte,
+	storage_ix_start uint,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var length uint = uint(len(begin) - len(end))
 	rewindBitPosition1(storage_ix_start, storage_ix, storage)
 	storeMetaBlockHeader1(length, true, storage_ix, storage)
@@ -569,7 +672,19 @@ func emitUncompressedMetaBlock1(begin []byte, end []byte, storage_ix_start uint,
 	storage[*storage_ix>>3] = 0
 }
 
-func (e *Encoder) compressFragmentFastImpl(in []byte, input_size uint, is_last bool, table []int, table_bits uint, cmd_depth []byte, cmd_bits []uint16, cmd_code_numbits *uint, cmd_code []byte, storage_ix *uint, storage []byte) {
+func (e *Encoder) compressFragmentFastImpl(
+	in []byte,
+	input_size uint,
+	is_last bool,
+	table []int,
+	table_bits uint,
+	cmd_depth []byte,
+	cmd_bits []uint16,
+	cmd_code_numbits *uint,
+	cmd_code []byte,
+	storage_ix *uint,
+	storage []byte,
+) {
 	var shift uint = 64 - table_bits
 	var cmd_histo [128]uint32
 	var ip_end int
@@ -597,13 +712,25 @@ func (e *Encoder) compressFragmentFastImpl(in []byte, input_size uint, is_last b
 	/* No block splits, no contexts. */
 	bitstream.WriteBits(13, 0, storage_ix, storage)
 
-	literal_ratio = e.buildAndStoreLiteralPrefixCode(in[input:], block_size, lit_depth[:], lit_bits[:], storage_ix, storage)
+	literal_ratio = e.buildAndStoreLiteralPrefixCode(
+		in[input:],
+		block_size,
+		lit_depth[:],
+		lit_bits[:],
+		storage_ix,
+		storage,
+	)
 	{
 		var i uint
 		for i = 0; i+7 < *cmd_code_numbits; i += 8 {
 			bitstream.WriteBits(8, uint64(cmd_code[i>>3]), storage_ix, storage)
 		}
-		bitstream.WriteBits(*cmd_code_numbits&7, uint64(cmd_code[*cmd_code_numbits>>3]), storage_ix, storage)
+		bitstream.WriteBits(
+			*cmd_code_numbits&7,
+			uint64(cmd_code[*cmd_code_numbits>>3]),
+			storage_ix,
+			storage,
+		)
 	}
 
 emit_commands:
@@ -660,7 +787,7 @@ emit_commands:
 
 				if insertlen < 6210 {
 					emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-				} else if shouldUseUncompressedMode(uint(next_emit - metablockStart), insertlen, literal_ratio) {
+				} else if shouldUseUncompressedMode(uint(next_emit-metablockStart), insertlen, literal_ratio) {
 					emitUncompressedMetaBlock1(in[metablockStart:], in[base:], mlen_storage_ix-3, storage_ix, storage)
 					input_size -= uint(base - input)
 					input = base
@@ -669,16 +796,35 @@ emit_commands:
 				} else {
 					emitLongInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 				}
-				emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
+				emitLiterals(
+					in[next_emit:],
+					insertlen,
+					lit_depth[:],
+					lit_bits[:],
+					storage_ix,
+					storage,
+				)
 
 				if distance == last_distance {
-					bitstream.WriteBits(uint(cmd_depth[64]), uint64(cmd_bits[64]), storage_ix, storage)
+					bitstream.WriteBits(
+						uint(cmd_depth[64]),
+						uint64(cmd_bits[64]),
+						storage_ix,
+						storage,
+					)
 					cmd_histo[64]++
 				} else {
 					emitDistance(uint(distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 					last_distance = distance
 				}
-				emitCopyLenLastDistance(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+				emitCopyLenLastDistance(
+					matched,
+					cmd_depth,
+					cmd_bits,
+					cmd_histo[:],
+					storage_ix,
+					storage,
+				)
 
 				next_emit = ip
 				if ip >= ip_limit {
@@ -709,7 +855,14 @@ emit_commands:
 				ip += int(matched)
 				last_distance = int(base - candidate)
 				emitCopyLen(matched, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
-				emitDistance(uint(last_distance), cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+				emitDistance(
+					uint(last_distance),
+					cmd_depth,
+					cmd_bits,
+					cmd_histo[:],
+					storage_ix,
+					storage,
+				)
 
 				next_emit = ip
 				if ip >= ip_limit {
@@ -739,7 +892,8 @@ emit_remainder:
 	input_size -= block_size
 	block_size = min(input_size, mergeBlockSize)
 
-	if input_size > 0 && total_block_size+block_size <= 1<<20 && e.shouldMergeBlock(in[input:], block_size, lit_depth[:]) {
+	if input_size > 0 && total_block_size+block_size <= 1<<20 &&
+		e.shouldMergeBlock(in[input:], block_size, lit_depth[:]) {
 		total_block_size += block_size
 		updateBits(20, uint32(total_block_size-1), mlen_storage_ix, storage)
 		goto emit_commands
@@ -750,7 +904,7 @@ emit_remainder:
 		if insertlen < 6210 {
 			emitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
 			emitLiterals(in[next_emit:], insertlen, lit_depth[:], lit_bits[:], storage_ix, storage)
-		} else if shouldUseUncompressedMode(uint(next_emit - metablockStart), insertlen, literal_ratio) {
+		} else if shouldUseUncompressedMode(uint(next_emit-metablockStart), insertlen, literal_ratio) {
 			emitUncompressedMetaBlock1(in[metablockStart:], in[ip_end:], mlen_storage_ix-3, storage_ix, storage)
 		} else {
 			emitLongInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
@@ -776,12 +930,30 @@ next_block:
 		cmd_code[0] = 0
 		*cmd_code_numbits = 0
 		var startBits uint = 0
-		e.buildAndStoreCommandPrefixCodeToBuffer(cmd_histo[:], cmd_depth, cmd_bits, &startBits, cmd_code)
+		e.buildAndStoreCommandPrefixCodeToBuffer(
+			cmd_histo[:],
+			cmd_depth,
+			cmd_bits,
+			&startBits,
+			cmd_code,
+		)
 		*cmd_code_numbits = startBits
 	}
 }
 
-func (e *Encoder) compressFragmentFast(input []byte, input_size uint, is_last bool, table []int, table_size uint, cmd_depth []byte, cmd_bits []uint16, cmd_code_numbits *uint, cmd_code []byte, storage_ix *uint, storage []byte) {
+func (e *Encoder) compressFragmentFast(
+	input []byte,
+	input_size uint,
+	is_last bool,
+	table []int,
+	table_size uint,
+	cmd_depth []byte,
+	cmd_bits []uint16,
+	cmd_code_numbits *uint,
+	cmd_code []byte,
+	storage_ix *uint,
+	storage []byte,
+) {
 	if input_size == 0 {
 		assert(is_last)
 		bitstream.WriteBits(1, 1, storage_ix, storage)
@@ -791,10 +963,28 @@ func (e *Encoder) compressFragmentFast(input []byte, input_size uint, is_last bo
 	}
 
 	initial_storage_ix := *storage_ix
-	e.compressFragmentFastImpl(input, input_size, is_last, table, uint(common.Log2FloorNonZero(table_size)), cmd_depth, cmd_bits, cmd_code_numbits, cmd_code, storage_ix, storage)
+	e.compressFragmentFastImpl(
+		input,
+		input_size,
+		is_last,
+		table,
+		uint(common.Log2FloorNonZero(table_size)),
+		cmd_depth,
+		cmd_bits,
+		cmd_code_numbits,
+		cmd_code,
+		storage_ix,
+		storage,
+	)
 
 	if *storage_ix-initial_storage_ix > 31+(input_size<<3) {
-		emitUncompressedMetaBlock1(input, input[input_size:], initial_storage_ix, storage_ix, storage)
+		emitUncompressedMetaBlock1(
+			input,
+			input[input_size:],
+			initial_storage_ix,
+			storage_ix,
+			storage,
+		)
 	}
 
 	if is_last {
@@ -829,4 +1019,3 @@ func (e *Encoder) Flush() []byte {
 	}
 	return storage[:(sealBits+7)>>3]
 }
-

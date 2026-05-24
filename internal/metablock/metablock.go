@@ -2,6 +2,7 @@ package metablock
 
 import (
 	"sync"
+
 	"github.com/nijaru/brotli/internal/common"
 )
 
@@ -64,13 +65,17 @@ func InitDistanceParams(params *common.EncoderParams, npostfix uint32, ndirect u
 	dist_params.Distance_postfix_bits = npostfix
 	dist_params.Num_direct_distance_codes = ndirect
 
-	alphabet_size = uint32(common.DistanceAlphabetSize(uint(npostfix), uint(ndirect), common.MaxDistanceBits))
+	alphabet_size = uint32(
+		common.DistanceAlphabetSize(uint(npostfix), uint(ndirect), common.MaxDistanceBits),
+	)
 	max_distance = ndirect + (1 << (common.MaxDistanceBits + npostfix + 2)) - (1 << (npostfix + 2))
 
 	if params.Large_window {
-		var bound = [common.MaxNpostfix + 1]uint32{0, 4, 12, 28}
+		bound := [common.MaxNpostfix + 1]uint32{0, 4, 12, 28}
 		var postfix uint32 = 1 << npostfix
-		alphabet_size = uint32(common.DistanceAlphabetSize(uint(npostfix), uint(ndirect), common.LargeMaxDistanceBits))
+		alphabet_size = uint32(
+			common.DistanceAlphabetSize(uint(npostfix), uint(ndirect), common.LargeMaxDistanceBits),
+		)
 
 		/* The maximum distance is set so that no distance symbol used can encode
 		   a distance larger than BROTLI_MAX_ALLOWED_DISTANCE with all
@@ -88,15 +93,26 @@ func InitDistanceParams(params *common.EncoderParams, npostfix uint32, ndirect u
 	dist_params.Max_distance = uint(max_distance)
 }
 
-func RecomputeDistancePrefixes(cmds []Command, orig_params *common.DistanceParams, new_params *common.DistanceParams) {
-	if orig_params.Distance_postfix_bits == new_params.Distance_postfix_bits && orig_params.Num_direct_distance_codes == new_params.Num_direct_distance_codes {
+func RecomputeDistancePrefixes(
+	cmds []Command,
+	orig_params *common.DistanceParams,
+	new_params *common.DistanceParams,
+) {
+	if orig_params.Distance_postfix_bits == new_params.Distance_postfix_bits &&
+		orig_params.Num_direct_distance_codes == new_params.Num_direct_distance_codes {
 		return
 	}
 
 	for i := range cmds {
 		var cmd *Command = &cmds[i]
 		if CommandCopyLen(cmd) != 0 && cmd.Cmd_prefix_ >= 128 {
-			common.PrefixEncodeCopyDistance(uint(CommandRestoreDistanceCode(cmd, orig_params)), uint(new_params.Num_direct_distance_codes), uint(new_params.Distance_postfix_bits), &cmd.Dist_prefix_, &cmd.Dist_extra_)
+			common.PrefixEncodeCopyDistance(
+				uint(CommandRestoreDistanceCode(cmd, orig_params)),
+				uint(new_params.Num_direct_distance_codes),
+				uint(new_params.Distance_postfix_bits),
+				&cmd.Dist_prefix_,
+				&cmd.Dist_extra_,
+			)
 		}
 	}
 }

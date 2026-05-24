@@ -26,7 +26,7 @@ func utf8Position(last uint, c uint, clamp uint) uint {
 }
 
 func decideMultiByteStatsLevel(pos uint, len uint, mask uint, data []byte) uint {
-	var counts = [3]uint{0} /* should be 2, but 1 compresses better. */
+	counts := [3]uint{0} /* should be 2, but 1 compresses better. */
 	var max_utf8 uint = 1
 	var last_c uint = 0
 	var i uint
@@ -50,10 +50,10 @@ func decideMultiByteStatsLevel(pos uint, len uint, mask uint, data []byte) uint 
 func estimateBitCostsForLiteralsUTF8(pos uint, len uint, mask uint, data []byte, cost []float32) {
 	var max_utf8 uint = decideMultiByteStatsLevel(pos, uint(len), mask, data)
 	/* Bootstrap histograms. */
-	var histogram = [3][256]uint{[256]uint{0}}
+	histogram := [3][256]uint{{0}}
 	var window_half uint = 495
 	var in_window uint = min(window_half, uint(len))
-	var in_window_utf8 = [3]uint{0}
+	in_window_utf8 := [3]uint{0}
 	/* max_utf8 is 0 (normal ASCII single byte modeling),
 	   1 (for 2-byte UTF-8 modeling), or 2 (for 3-byte UTF-8 modeling). */
 
@@ -147,7 +147,7 @@ func EstimateBitCostsForLiterals(pos uint, len uint, mask uint, data []byte, cos
 		estimateBitCostsForLiteralsUTF8(pos, uint(len), mask, data, cost)
 		return
 	} else {
-		var histogram = [256]uint{0}
+		histogram := [256]uint{0}
 		var window_half uint = 2000
 		var in_window uint = min(window_half, uint(len))
 		var i uint

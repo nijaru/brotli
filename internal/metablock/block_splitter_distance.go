@@ -10,7 +10,13 @@ import (
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-func initialEntropyCodesDistance(data []uint16, length uint, stride uint, num_histograms uint, histograms []common.HistogramDistance) {
+func initialEntropyCodesDistance(
+	data []uint16,
+	length uint,
+	stride uint,
+	num_histograms uint,
+	histograms []common.HistogramDistance,
+) {
 	var seed uint32 = 7
 	var block_length uint = length / num_histograms
 	var i uint
@@ -29,7 +35,13 @@ func initialEntropyCodesDistance(data []uint16, length uint, stride uint, num_hi
 	}
 }
 
-func randomSampleDistance(seed *uint32, data []uint16, length uint, stride uint, sample *common.HistogramDistance) {
+func randomSampleDistance(
+	seed *uint32,
+	data []uint16,
+	length uint,
+	stride uint,
+	sample *common.HistogramDistance,
+) {
 	var pos uint = 0
 	if stride >= length {
 		stride = length
@@ -40,7 +52,13 @@ func randomSampleDistance(seed *uint32, data []uint16, length uint, stride uint,
 	common.HistogramAddVectorDistance(sample, data[pos:], stride)
 }
 
-func refineEntropyCodesDistance(data []uint16, length uint, stride uint, num_histograms uint, histograms []common.HistogramDistance) {
+func refineEntropyCodesDistance(
+	data []uint16,
+	length uint,
+	stride uint,
+	num_histograms uint,
+	histograms []common.HistogramDistance,
+) {
 	var iters uint = kIterMulForRefining*length/stride + kMinItersForRefining
 	var seed uint32 = 7
 	var iter uint
@@ -53,7 +71,17 @@ func refineEntropyCodesDistance(data []uint16, length uint, stride uint, num_his
 	}
 }
 
-func findBlocksDistance(data []uint16, length uint, block_switch_bitcost float64, num_histograms uint, histograms []common.HistogramDistance, insert_cost []float64, cost []float64, switch_signal []byte, block_id []byte) uint {
+func findBlocksDistance(
+	data []uint16,
+	length uint,
+	block_switch_bitcost float64,
+	num_histograms uint,
+	histograms []common.HistogramDistance,
+	insert_cost []float64,
+	cost []float64,
+	switch_signal []byte,
+	block_id []byte,
+) uint {
 	var data_size uint = common.HistogramDataSizeDistance()
 	var bitmaplen uint = (num_histograms + 7) >> 3
 	var num_blocks uint = 1
@@ -139,7 +167,12 @@ func findBlocksDistance(data []uint16, length uint, block_switch_bitcost float64
 	return num_blocks
 }
 
-func remapBlockIdsDistance(block_ids []byte, length uint, new_id []uint16, num_histograms uint) uint {
+func remapBlockIdsDistance(
+	block_ids []byte,
+	length uint,
+	new_id []uint16,
+	num_histograms uint,
+) uint {
 	var next_id uint16 = 0
 	var i uint
 	const kInvalidId uint16 = 256
@@ -161,7 +194,13 @@ func remapBlockIdsDistance(block_ids []byte, length uint, new_id []uint16, num_h
 	return uint(next_id)
 }
 
-func buildBlockHistogramsDistance(data []uint16, length uint, block_ids []byte, num_histograms uint, histograms []common.HistogramDistance) {
+func buildBlockHistogramsDistance(
+	data []uint16,
+	length uint,
+	block_ids []byte,
+	num_histograms uint,
+	histograms []common.HistogramDistance,
+) {
 	var i uint
 	common.ClearHistogramsDistance(histograms, num_histograms)
 	for i = 0; i < length; i++ {
@@ -169,7 +208,13 @@ func buildBlockHistogramsDistance(data []uint16, length uint, block_ids []byte, 
 	}
 }
 
-func clusterBlocksDistance(data []uint16, length uint, num_blocks uint, block_ids []byte, split *BlockSplit) {
+func clusterBlocksDistance(
+	data []uint16,
+	length uint,
+	num_blocks uint,
+	block_ids []byte,
+	split *BlockSplit,
+) {
 	var histogram_symbols []uint32 = make([]uint32, num_blocks)
 	var block_lengths []uint32 = make([]uint32, num_blocks)
 	var expected_num_clusters uint = clustersPerBatch * (num_blocks + histogramsPerBatch - 1) / histogramsPerBatch
@@ -189,10 +234,10 @@ func clusterBlocksDistance(data []uint16, length uint, num_blocks uint, block_id
 	var num_final_clusters uint
 	var new_index []uint32
 	var i uint
-	var sizes = [histogramsPerBatch]uint32{0}
-	var new_clusters = [histogramsPerBatch]uint32{0}
-	var symbols = [histogramsPerBatch]uint32{0}
-	var remap = [histogramsPerBatch]uint32{0}
+	sizes := [histogramsPerBatch]uint32{0}
+	new_clusters := [histogramsPerBatch]uint32{0}
+	symbols := [histogramsPerBatch]uint32{0}
+	remap := [histogramsPerBatch]uint32{0}
 
 	for i := 0; i < int(num_blocks); i++ {
 		block_lengths[i] = 0
@@ -225,7 +270,17 @@ func clusterBlocksDistance(data []uint16, length uint, num_blocks uint, block_id
 			sizes[j] = 1
 		}
 
-		num_new_clusters = HistogramCombineDistance(histograms, sizes[:], symbols[:], new_clusters[:], []HistogramPair(pairs), num_to_combine, num_to_combine, histogramsPerBatch, max_num_pairs)
+		num_new_clusters = HistogramCombineDistance(
+			histograms,
+			sizes[:],
+			symbols[:],
+			new_clusters[:],
+			[]HistogramPair(pairs),
+			num_to_combine,
+			num_to_combine,
+			histogramsPerBatch,
+			max_num_pairs,
+		)
 		if all_histograms_capacity < (all_histograms_size + num_new_clusters) {
 			var _new_size uint = all_histograms_capacity
 			if _new_size == 0 {
@@ -268,7 +323,17 @@ func clusterBlocksDistance(data []uint16, length uint, num_blocks uint, block_id
 		clusters[i] = uint32(i)
 	}
 
-	num_final_clusters = HistogramCombineDistance(all_histograms, cluster_size, histogram_symbols, clusters, pairs, num_clusters, num_blocks, common.MaxNumberOfBlockTypes, max_num_pairs)
+	num_final_clusters = HistogramCombineDistance(
+		all_histograms,
+		cluster_size,
+		histogram_symbols,
+		clusters,
+		pairs,
+		num_clusters,
+		num_blocks,
+		common.MaxNumberOfBlockTypes,
+		max_num_pairs,
+	)
 	pairs = nil
 	cluster_size = nil
 
@@ -342,7 +407,16 @@ func clusterBlocksDistance(data []uint16, length uint, num_blocks uint, block_id
 	}
 }
 
-func splitByteVectorDistance(data []uint16, length uint, distances_per_histogram uint, max_histograms uint, sampling_stride_length uint, block_switch_cost float64, params *common.EncoderParams, split *BlockSplit) {
+func splitByteVectorDistance(
+	data []uint16,
+	length uint,
+	distances_per_histogram uint,
+	max_histograms uint,
+	sampling_stride_length uint,
+	block_switch_cost float64,
+	params *common.EncoderParams,
+	split *BlockSplit,
+) {
 	var data_size uint = common.HistogramDataSizeDistance()
 	var num_histograms uint = length/distances_per_histogram + 1
 	if num_histograms > max_histograms {
@@ -388,7 +462,17 @@ func splitByteVectorDistance(data []uint16, length uint, distances_per_histogram
 
 		var i uint
 		for i = 0; i < iters; i++ {
-			num_blocks = findBlocksDistance(data, length, block_switch_cost, num_histograms, histograms, insert_cost, cost, switch_signal, block_ids)
+			num_blocks = findBlocksDistance(
+				data,
+				length,
+				block_switch_cost,
+				num_histograms,
+				histograms,
+				insert_cost,
+				cost,
+				switch_signal,
+				block_ids,
+			)
 			num_histograms = remapBlockIdsDistance(block_ids, length, new_id, num_histograms)
 			buildBlockHistogramsDistance(data, length, block_ids, num_histograms, histograms)
 		}

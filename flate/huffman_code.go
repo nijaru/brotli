@@ -100,8 +100,10 @@ func generateFixedOffsetEncoding() *huffmanEncoder {
 	return h
 }
 
-var fixedLiteralEncoding *huffmanEncoder = generateFixedLiteralEncoding()
-var fixedOffsetEncoding *huffmanEncoder = generateFixedOffsetEncoding()
+var (
+	fixedLiteralEncoding *huffmanEncoder = generateFixedLiteralEncoding()
+	fixedOffsetEncoding  *huffmanEncoder = generateFixedOffsetEncoding()
+)
 
 func (h *huffmanEncoder) bitLength(freq []int32) int {
 	var total int

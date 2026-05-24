@@ -86,8 +86,8 @@ func ConstructHuffmanCode(bits byte, Value uint16) HuffmanCode {
 /* max_symbol is needed due to simple codes since log2(alphabet_size) could be
    greater than log2(max_symbol). */
 type HuffmanTreeGroup struct {
-	HTrees        [][]HuffmanCode
-	Codes         []HuffmanCode
+	HTrees       [][]HuffmanCode
+	Codes        []HuffmanCode
 	AlphabetSize uint16
 	MaxSymbol    uint16
 	NumHTrees    uint16
@@ -237,7 +237,12 @@ func BuildCodeLengthsHuffmanTable(table []HuffmanCode, code_lengths []byte, coun
 	}
 }
 
-func BuildHuffmanTable(root_table []HuffmanCode, root_bits int, symbol_lists SymbolList, count []uint16) uint32 {
+func BuildHuffmanTable(
+	root_table []HuffmanCode,
+	root_bits int,
+	symbol_lists SymbolList,
+	count []uint16,
+) uint32 {
 	var code HuffmanCode /* current table entry */
 	var table []HuffmanCode
 	var len int
@@ -315,7 +320,10 @@ func BuildHuffmanTable(root_table []HuffmanCode, root_bits int, symbol_lists Sym
 				total_size += table_size
 				sub_key = ReverseBits8(key)
 				key += key_step
-				root_table[sub_key] = ConstructHuffmanCode(byte(table_bits+root_bits), uint16(uint64(uint(-cap(table)+cap(root_table)))-sub_key))
+				root_table[sub_key] = ConstructHuffmanCode(
+					byte(table_bits+root_bits),
+					uint16(uint64(uint(-cap(table)+cap(root_table)))-sub_key),
+				)
 				sub_key = 0
 			}
 
@@ -332,7 +340,12 @@ func BuildHuffmanTable(root_table []HuffmanCode, root_bits int, symbol_lists Sym
 	return uint32(total_size)
 }
 
-func BuildSimpleHuffmanTable(table []HuffmanCode, root_bits int, val []uint16, num_symbols uint32) uint32 {
+func BuildSimpleHuffmanTable(
+	table []HuffmanCode,
+	root_bits int,
+	val []uint16,
+	num_symbols uint32,
+) uint32 {
 	var table_size uint32 = 1
 	var goal_size uint32 = 1 << uint(root_bits)
 	switch num_symbols {

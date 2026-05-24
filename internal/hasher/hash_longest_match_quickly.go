@@ -2,6 +2,7 @@ package hasher
 
 import (
 	"encoding/binary"
+
 	"github.com/nijaru/brotli/internal/common"
 )
 
@@ -23,9 +24,12 @@ func (*hashLongestMatchQuickly) StoreLookahead() uint {
 	return 8
 }
 
-/* HashBytes is the function that chooses the bucket to place
-   the address in. The HashLongestMatch and hashLongestMatchQuickly
-   classes have separate, different implementations of hashing. */
+/*
+HashBytes is the function that chooses the bucket to place
+
+	the address in. The HashLongestMatch and hashLongestMatchQuickly
+	classes have separate, different implementations of hashing.
+*/
 func (h *hashLongestMatchQuickly) HashBytes(data []byte) uint32 {
 	var hash uint64 = ((binary.LittleEndian.Uint64(data) << (64 - 8*h.hashLen)) * kHashMul64)
 
@@ -34,11 +38,14 @@ func (h *hashLongestMatchQuickly) HashBytes(data []byte) uint32 {
 	return uint32(hash >> (64 - h.bucketBits))
 }
 
-/* A (forgetful) hash table to the data seen by the compressor, to
-   help create backward references to previous data.
+/*
+A (forgetful) hash table to the data seen by the compressor, to
 
-   This is a hash map of fixed size (1 << 16). Starting from the
-   given index, 1 buckets are used to store values of a key. */
+	help create backward references to previous data.
+
+	This is a hash map of fixed size (1 << 16). Starting from the
+	given index, 1 buckets are used to store values of a key.
+*/
 type hashLongestMatchQuickly struct {
 	hasherCommon
 
@@ -76,9 +83,12 @@ func (h *hashLongestMatchQuickly) Prepare(one_shot bool, input_size uint, data [
 	}
 }
 
-/* Look at 5 bytes at &data[ix & mask].
-   Compute a hash from these, and store the value somewhere within
-   [ix .. ix+3]. */
+/*
+Look at 5 bytes at &data[ix & mask].
+
+	Compute a hash from these, and store the value somewhere within
+	[ix .. ix+3].
+*/
 func (h *hashLongestMatchQuickly) Store(data []byte, mask uint, ix uint) {
 	var key uint32 = h.HashBytes(data[ix&mask:])
 	var off uint32 = uint32(ix>>3) % uint32(h.bucketSweep)
@@ -93,7 +103,12 @@ func (h *hashLongestMatchQuickly) StoreRange(data []byte, mask uint, ix_start ui
 	}
 }
 
-func (h *hashLongestMatchQuickly) StitchToPreviousBlock(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint) {
+func (h *hashLongestMatchQuickly) StitchToPreviousBlock(
+	num_bytes uint,
+	position uint,
+	ringbuffer []byte,
+	ringbuffer_mask uint,
+) {
 	if num_bytes >= h.HashTypeLength()-1 && position >= 3 {
 		/* Prepare the hashes for three last bytes of the last write.
 		   These could not be calculated before, since they require knowledge
@@ -107,15 +122,29 @@ func (h *hashLongestMatchQuickly) StitchToPreviousBlock(num_bytes uint, position
 func (*hashLongestMatchQuickly) PrepareDistanceCache(distance_cache []int) {
 }
 
-/* Find a longest backward match of &data[cur_ix & ring_buffer_mask]
-   up to the length of max_length and stores the position cur_ix in the
-   hash table.
+/*
+Find a longest backward match of &data[cur_ix & ring_buffer_mask]
 
-   Does not look for matches longer than max_length.
-   Does not look for matches further away than max_backward.
-   Writes the best match into |out|.
-   |out|->score is updated only if a better match is found. */
-func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDictionary, data []byte, ring_buffer_mask uint, distance_cache []int, cur_ix uint, max_length uint, max_backward uint, gap uint, max_distance uint, out *SearchResult) {
+	up to the length of max_length and stores the position cur_ix in the
+	hash table.
+
+	Does not look for matches longer than max_length.
+	Does not look for matches further away than max_backward.
+	Writes the best match into |out|.
+	|out|->score is updated only if a better match is found.
+*/
+func (h *hashLongestMatchQuickly) FindLongestMatch(
+	dictionary *common.EncoderDictionary,
+	data []byte,
+	ring_buffer_mask uint,
+	distance_cache []int,
+	cur_ix uint,
+	max_length uint,
+	max_backward uint,
+	gap uint,
+	max_distance uint,
+	out *SearchResult,
+) {
 	var best_len_in uint = out.Len
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var key uint32 = h.HashBytes(data[cur_ix_masked:])
@@ -182,7 +211,7 @@ func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDic
 		var i int
 		prev_ix = uint(bucket[0])
 		bucket = bucket[1:]
-		for i = 0; i < h.bucketSweep; (func() { i++; tmp3 := bucket; bucket = bucket[1:]; prev_ix = uint(tmp3[0]) })() {
+		for i = 0; i < h.bucketSweep; func() { i++; tmp3 := bucket; bucket = bucket[1:]; prev_ix = uint(tmp3[0]) }() {
 			var backward uint = cur_ix - prev_ix
 			var len uint
 			prev_ix &= uint(uint32(ring_buffer_mask))
@@ -210,7 +239,16 @@ func (h *hashLongestMatchQuickly) FindLongestMatch(dictionary *common.EncoderDic
 	}
 
 	if h.useDictionary && min_score == out.Score {
-		searchInStaticDictionary(dictionary, h, data[cur_ix_masked:], max_length, max_backward+gap, max_distance, out, true)
+		searchInStaticDictionary(
+			dictionary,
+			h,
+			data[cur_ix_masked:],
+			max_length,
+			max_backward+gap,
+			max_distance,
+			out,
+			true,
+		)
 	}
 
 	h.buckets[key+uint32((cur_ix>>3)%uint(h.bucketSweep))] = uint32(cur_ix)

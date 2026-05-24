@@ -30,5 +30,17 @@ func HistogramPairIsLess(p1 *HistogramPair, p2 *HistogramPair) bool {
 /* Returns entropy reduction of the context map when we combine two clusters. */
 func ClusterCostDiff(size_a uint, size_b uint) float64 {
 	var size_c uint = size_a + size_b
-	return float64(size_a)*common.FastLog2(size_a) + float64(size_b)*common.FastLog2(size_b) - float64(size_c)*common.FastLog2(size_c)
+	return float64(
+		size_a,
+	)*common.FastLog2(
+		size_a,
+	) + float64(
+		size_b,
+	)*common.FastLog2(
+		size_b,
+	) - float64(
+		size_c,
+	)*common.FastLog2(
+		size_c,
+	)
 }

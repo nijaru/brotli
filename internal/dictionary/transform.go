@@ -564,7 +564,13 @@ func shiftTransform(word []byte, word_len int, parameter uint16) int {
 	return 1
 }
 
-func TransformDictionaryWord(dst []byte, word []byte, len int, trans *Transforms, transform_idx int) int {
+func TransformDictionaryWord(
+	dst []byte,
+	word []byte,
+	len int,
+	trans *Transforms,
+	transform_idx int,
+) int {
 	var idx int = 0
 	var prefix []byte = transformPrefix(trans, transform_idx)
 	var type_ byte = transformType(trans, transform_idx)
