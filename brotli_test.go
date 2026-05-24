@@ -13,6 +13,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"os/exec"
 	"strconv"
 	"testing"
 	"time"
@@ -1313,4 +1314,117 @@ func TestCrossDecoderCompatibility(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDifferentialCBinary(t *testing.T) {
+	// Look for the "brotli" reference C command line tool in the system PATH
+	brotliPath, err := exec.LookPath("brotli")
+	if err != nil {
+		t.Skip(
+			"Reference 'brotli' C CLI tool not found in PATH, skipping differential interop tests",
+		)
+		return
+	}
+
+	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name string
+		data []byte
+	}{
+		{"Hello", []byte("Hello, C Brotli World!")},
+		{"Opticks", opticks},
+		{"Empty", []byte{}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for level := BestSpeed; level <= BestCompression; level++ {
+				t.Run(fmt.Sprintf("Level_%d", level), func(t *testing.T) {
+					// 1. Compress with OUR Go encoder
+					var compressedBuf bytes.Buffer
+					w := NewWriterOptions(&compressedBuf, WriterOptions{Quality: level})
+					w.Write(tc.data)
+					if err := w.Close(); err != nil {
+						t.Fatalf("our encoder failed to close: %v", err)
+					}
+
+					// 2. Decompress using official Brotli C binary: brotli -d -c
+					cDecompressCmd := exec.Command(brotliPath, "-d", "-c")
+					cDecompressCmd.Stdin = &compressedBuf
+					var cDecompressed bytes.Buffer
+					cDecompressCmd.Stdout = &cDecompressed
+					if err := cDecompressCmd.Run(); err != nil {
+						t.Fatalf(
+							"reference C brotli binary failed to decompress our output: %v",
+							err,
+						)
+					}
+					if !bytes.Equal(tc.data, cDecompressed.Bytes()) {
+						t.Fatalf("decompressed data mismatch from C brotli tool")
+					}
+
+					// 3. Compress using official Brotli C binary: brotli -c -q <level>
+					cCompressCmd := exec.Command(brotliPath, "-c", "-q", strconv.Itoa(level))
+					cCompressCmd.Stdin = bytes.NewReader(tc.data)
+					var cCompressed bytes.Buffer
+					cCompressCmd.Stdout = &cCompressed
+					if err := cCompressCmd.Run(); err != nil {
+						t.Fatalf("reference C brotli binary failed to compress: %v", err)
+					}
+
+					// 4. Decompress using OUR Go decoder
+					ourR := NewReader(&cCompressed)
+					ourDecompressed, err := io.ReadAll(ourR)
+					if err != nil {
+						t.Fatalf(
+							"our decoder failed to decompress reference C brotli output: %v",
+							err,
+						)
+					}
+					if !bytes.Equal(tc.data, ourDecompressed) {
+						t.Fatalf("our decompressed data mismatch from C brotli input")
+					}
+				})
+			}
+		})
+	}
+}
+
+func FuzzRoundTrip(f *testing.F) {
+	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err == nil {
+		f.Add(opticks)
+	}
+	f.Add([]byte("Hello, Brotli Fuzzing!"))
+	f.Add([]byte{})
+
+	f.Fuzz(func(t *testing.T, original []byte) {
+		// Test multiple quality levels dynamically
+		for _, level := range []int{0, 1, 5, 9, 11} {
+			// Compress with our Go encoder
+			var compressed bytes.Buffer
+			w := NewWriterOptions(&compressed, WriterOptions{Quality: level})
+			_, err := w.Write(original)
+			if err != nil {
+				t.Fatalf("Level %d: write failed: %v", level, err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatalf("Level %d: close failed: %v", level, err)
+			}
+
+			// Decompress with our Go decoder
+			r := NewReader(&compressed)
+			decompressed, err := io.ReadAll(r)
+			if err != nil {
+				t.Fatalf("Level %d: decompress failed: %v", level, err)
+			}
+			if !bytes.Equal(original, decompressed) {
+				t.Fatalf("Level %d: original and decompressed data mismatch", level)
+			}
+		}
+	})
 }
