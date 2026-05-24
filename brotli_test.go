@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	andybrotli "github.com/andybalholm/brotli"
 	"github.com/nijaru/brotli/internal/encoder/generic"
 	match "github.com/nijaru/brotli/matchfinder"
 	"github.com/xyproto/randomstring"
@@ -1249,5 +1250,67 @@ func BenchmarkParallelEncode(b *testing.B) {
 		w := NewParallelWriter(io.Discard, 6, 8)
 		w.Write(data)
 		w.Close()
+	}
+}
+
+func TestCrossDecoderCompatibility(t *testing.T) {
+	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name string
+		data []byte
+	}{
+		{"Hello", []byte("Hello, Brotli World!")},
+		{"Opticks", opticks},
+		{"Empty", []byte{}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for level := BestSpeed; level <= BestCompression; level++ {
+				t.Run(fmt.Sprintf("Level_%d", level), func(t *testing.T) {
+					// 1. Compress with OUR encoder
+					var compressedBuf bytes.Buffer
+					w := NewWriterOptions(&compressedBuf, WriterOptions{Quality: level})
+					w.Write(tc.data)
+					if err := w.Close(); err != nil {
+						t.Fatalf("our encoder failed to close: %v", err)
+					}
+
+					// 2. Decompress with STANDARDIZED andybalholm decoder
+					r := andybrotli.NewReader(bytes.NewReader(compressedBuf.Bytes()))
+					decompressed, err := io.ReadAll(r)
+					if err != nil {
+						t.Fatalf("andybalholm failed to decompress our output: %v", err)
+					}
+					if !bytes.Equal(tc.data, decompressed) {
+						t.Fatalf("decompressed data mismatch")
+					}
+
+					// 3. Compress with STANDARDIZED andybalholm encoder
+					var stdCompressedBuf bytes.Buffer
+					stdW := andybrotli.NewWriterLevel(&stdCompressedBuf, level)
+					if _, err := stdW.Write(tc.data); err != nil {
+						t.Fatalf("andybalholm failed to write: %v", err)
+					}
+					if err := stdW.Close(); err != nil {
+						t.Fatalf("andybalholm failed to close: %v", err)
+					}
+
+					// 4. Decompress with OUR decoder
+					ourR := NewReader(bytes.NewReader(stdCompressedBuf.Bytes()))
+					ourDecompressed, err := io.ReadAll(ourR)
+					if err != nil {
+						t.Fatalf("our decoder failed to decompress andybalholm output: %v", err)
+					}
+					if !bytes.Equal(tc.data, ourDecompressed) {
+						t.Fatalf("our decompressed data mismatch")
+					}
+				})
+			}
+		})
 	}
 }
