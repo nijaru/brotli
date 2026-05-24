@@ -18,7 +18,7 @@ func Decode(encodedData []byte) ([]byte, error) {
 func testParity(t *testing.T, data []byte) {
 	// New implementation
 	e := &Encoder{}
-	encoded := e.Encode(nil, data, nil, true)
+	encoded := e.Encode(nil, data, true)
 
 	// Check if it decompresses correctly
 	newDec, err := Decode(encoded)
@@ -94,15 +94,15 @@ func TestStreamingParity(t *testing.T) {
 
 	// One-shot
 	e1 := &Encoder{}
-	oneShot := e1.Encode(nil, data, nil, true)
+	oneShot := e1.Encode(nil, data, true)
 
 	// Two-shot
 	e2 := &Encoder{}
 	half := len(data) / 2
-	part1Raw := e2.Encode(nil, data[:half], nil, false)
+	part1Raw := e2.Encode(nil, data[:half], false)
 	part1 := make([]byte, len(part1Raw))
 	copy(part1, part1Raw)
-	part2 := e2.Encode(nil, data[half:], nil, true)
+	part2 := e2.Encode(nil, data[half:], true)
 	twoShot := append(part1, part2...)
 
 	t.Logf(

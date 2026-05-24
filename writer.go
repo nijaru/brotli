@@ -7,7 +7,6 @@ import (
 	"github.com/nijaru/brotli/internal/encoder/generic"
 	"github.com/nijaru/brotli/internal/encoder/q0"
 	"github.com/nijaru/brotli/internal/quality"
-	match "github.com/nijaru/brotli/matchfinder"
 )
 
 const (
@@ -121,7 +120,7 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 			return 0, w.err
 		}
 
-		data := w.q0State.Encode(nil, p, nil, isLast)
+		data := w.q0State.Encode(nil, p, isLast)
 		if len(data) > 0 {
 			_, w.err = w.dst.Write(data)
 		}
@@ -175,67 +174,4 @@ type nopCloser struct {
 
 func (nopCloser) Close() error { return nil }
 
-func getMatchFinder(level int) match.MatchFinder {
-	switch level {
-	case 0, 1:
-		return &match.ZFast{MaxDistance: 1 << 20}
-	case 2:
-		return &match.ZDFast{MaxDistance: 1 << 20}
-	case 3:
-		return &match.ZM{MaxDistance: 1 << 20}
-	case 4:
-		return &match.Trio{MaxDistance: 1 << 20}
-	case 5, 6:
-		return &match.Bargain1{MaxDistance: 1 << 20}
-	case 7:
-		return &match.Bargain2{MaxDistance: 1 << 20, Skip: true}
-	case 8:
-		return &match.Bargain2{MaxDistance: 1 << 20}
-	case 9:
-		return &match.Bargain3{MaxDistance: 1 << 20}
-	}
-	return &match.Bargain3{MaxDistance: 1 << 20}
-}
 
-// NewParallelWriter is like NewWriterV2, but it uses multiple goroutines to
-// compress blocks in parallel.
-func NewParallelWriter(dst io.Writer, level int, concurrency int) *match.ParallelWriter {
-	if level < 0 {
-		level = 0
-	} else if level > 9 {
-		level = 9
-	}
-
-	w := &match.ParallelWriter{
-		Dest: dst,
-		MatchFinder: func() match.MatchFinder {
-			if level >= 5 && level <= 6 {
-				return match.GetBargain1()
-			}
-			return getMatchFinder(level)
-		},
-		Encoder: func() match.Encoder {
-			return match.GetEncoder(func() match.Encoder { return &generic.Encoder{} })
-		},
-		BlockSize:   1 << 16,
-		Concurrency: concurrency,
-	}
-	return w
-}
-
-// NewWriterV2 is like NewWriterLevel, but it uses the new implementation
-func NewWriterV2(dst io.Writer, level int) *match.Writer {
-	if level < 0 {
-		level = 0
-	} else if level > 9 {
-		level = 9
-	}
-
-	w := &match.Writer{
-		Dest:        dst,
-		MatchFinder: getMatchFinder(level),
-		Encoder:     &generic.Encoder{},
-		BlockSize:   1 << 16,
-	}
-	return w
-}

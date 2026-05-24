@@ -11,7 +11,6 @@ This library is an optimized, allocation-free fork of the `c2go` port (`github.c
 * **Zero-Allocation Resets**: Reusing a writer via `Reset()` or flushing via `Flush()` performs no heap allocations by using concrete structural routing inside `brotli.Writer`.
 * **Fast State Clearing**: Uses Go builtins like `clear()` in hot decoder paths for faster memory operations.
 * **Lower Memory Footprint**: Reduces memory allocation by ~9 KB per writer instance at levels Q1–Q11 by removing redundant tables from the generic compression state.
-* **Parallel Encoding**: Includes a multi-threaded block encoder (`NewParallelWriter`) and alternative matchfinders (`NewWriterV2`) for high-concurrency systems.
 
 ---
 
@@ -95,12 +94,6 @@ func main() {
 ```go
 // Discard the writer's state and re-use the underlying buffers for a new target
 writer.Reset(newDestination)
-```
-
-### 3. Multithreaded Parallel Compression
-```go
-// Create a writer that compresses blocks in parallel across 4 goroutines
-writer := brotli.NewParallelWriter(destination, brotli.DefaultCompression, 4)
 ```
 
 ---
