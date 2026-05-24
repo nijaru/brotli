@@ -1428,3 +1428,79 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 	})
 }
+
+func TestDirectBitstreamParity(t *testing.T) {
+	brotliPath, err := exec.LookPath("brotli")
+	if err != nil {
+		t.Skip(
+			"Reference 'brotli' C CLI tool not found in PATH, skipping direct bitstream parity tests",
+		)
+		return
+	}
+
+	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name string
+		data []byte
+	}{
+		{"Hello", []byte("Hello, C Brotli World!")},
+		{"OpticksPrefix", opticks[:50000]},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Compress with OUR Go encoder at Level 0
+			var compressedBuf bytes.Buffer
+			w := NewWriterOptions(&compressedBuf, WriterOptions{Quality: 0, LGWin: 22})
+			w.Write(tc.data)
+			w.Close()
+
+			// 2. Compress with C reference encoder: brotli -c -q 0 -w 22
+			cCompressCmd := exec.Command(brotliPath, "-c", "-q", "0", "-w", "22")
+			cCompressCmd.Stdin = bytes.NewReader(tc.data)
+			var cCompressed bytes.Buffer
+			cCompressCmd.Stdout = &cCompressed
+			if err := cCompressCmd.Run(); err != nil {
+				t.Fatalf("reference C brotli binary failed to compress: %v", err)
+			}
+
+			// 3. Directly compare the byte slices to verify absolute bitstream byte identity!
+			ourBytes := compressedBuf.Bytes()
+			cBytes := cCompressed.Bytes()
+			if !bytes.Equal(ourBytes, cBytes) {
+				t.Logf("Length mismatch/mismatch: Go len=%d, C len=%d", len(ourBytes), len(cBytes))
+				minLen := len(ourBytes)
+				if len(cBytes) < minLen {
+					minLen = len(cBytes)
+				}
+				firstDiff := -1
+				for i := 0; i < minLen; i++ {
+					if ourBytes[i] != cBytes[i] {
+						firstDiff = i
+						break
+					}
+				}
+				if firstDiff != -1 {
+					t.Logf("First difference at byte index %d (0x%x):", firstDiff, firstDiff)
+					start := firstDiff - 10
+					if start < 0 {
+						start = 0
+					}
+					end := firstDiff + 10
+					if end > minLen {
+						end = minLen
+					}
+					t.Logf("Go around diff: %x", ourBytes[start:end])
+					t.Logf("C  around diff: %x", cBytes[start:end])
+				} else {
+					t.Logf("No byte difference in prefix, but lengths differ.")
+				}
+				t.Fatalf("Bitstream mismatch")
+			}
+		})
+	}
+}
