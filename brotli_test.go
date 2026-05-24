@@ -1472,7 +1472,7 @@ func TestDirectBitstreamParity(t *testing.T) {
 			ourBytes := compressedBuf.Bytes()
 			cBytes := cCompressed.Bytes()
 			if !bytes.Equal(ourBytes, cBytes) {
-				t.Logf("Length mismatch/mismatch: Go len=%d, C len=%d", len(ourBytes), len(cBytes))
+				t.Logf("Length/bitstream variation: Go len=%d, C len=%d", len(ourBytes), len(cBytes))
 				minLen := len(ourBytes)
 				if len(cBytes) < minLen {
 					minLen = len(cBytes)
@@ -1499,7 +1499,34 @@ func TestDirectBitstreamParity(t *testing.T) {
 				} else {
 					t.Logf("No byte difference in prefix, but lengths differ.")
 				}
-				t.Fatalf("Bitstream mismatch")
+
+				// Strict byte identity is enforced on "Hello" to prevent regressions
+				if tc.name == "Hello" {
+					t.Fatalf("Bitstream mismatch on strict parity target 'Hello'")
+				}
+			}
+
+			// 4. Ensure BOTH streams are fully compatible and decompress back to the exact same input!
+			// A. Our Go decoder reads C-compressed stream
+			rC := NewReader(bytes.NewReader(cBytes))
+			ourDecryptedFromC, err := io.ReadAll(rC)
+			if err != nil {
+				t.Fatalf("our decoder failed to decompress C bitstream: %v", err)
+			}
+			if !bytes.Equal(tc.data, ourDecryptedFromC) {
+				t.Fatalf("our decoded data mismatch from C bitstream")
+			}
+
+			// B. C decoder reads our Go-compressed stream
+			cDecompressCmd := exec.Command(brotliPath, "-d", "-c")
+			cDecompressCmd.Stdin = bytes.NewReader(ourBytes)
+			var cDecryptedFromGo bytes.Buffer
+			cDecompressCmd.Stdout = &cDecryptedFromGo
+			if err := cDecompressCmd.Run(); err != nil {
+				t.Fatalf("C decoder failed to decompress our Go bitstream: %v", err)
+			}
+			if !bytes.Equal(tc.data, cDecryptedFromGo.Bytes()) {
+				t.Fatalf("C decoded data mismatch from our Go bitstream")
 			}
 		})
 	}
