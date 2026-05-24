@@ -8,12 +8,12 @@ A highly optimized, modernized, and idiomatic Go package for Brotli compression 
 
 ---
 
-## Features & Optimizations
+## Optimizations
 
-* **Zero-Allocation Stream Resets**: Concrete routing inside `brotli.Writer` (tier-based routing for Q0 vs. Generic engines) guarantees that reusing a writer via `Reset()` or invoking `Flush()` executes with **zero heap allocations**, making it ideal for high-throughput HTTP proxies and server runtimes.
-* **Surgical Decoder Modernization**: Leverages Go 1.26 primitives such as the builtin `clear()` for fast block-zeroing on hot paths, mapping directly to highly optimized CPU vector instructions.
-* **Reduced Memory Footprint**: Pruning obsolete table representations and fast-path duplicates from the generic compression engines reduces individual `brotli.Writer` memory allocations by **~9 KB per instance** at levels Q1–Q11.
-* **Parallel Compression & Custom Matchfinders**: Includes a robust multithreaded block-level encoder (`NewParallelWriter`) and customized matchfinders (`NewWriterV2`), letting you squeeze out maximum compression speeds and ratios across multi-core systems.
+* **Zero-Allocation Resets**: Uses concrete structural routing in `brotli.Writer` (separating Q0 and Generic paths) to ensure that writer reuse via `Reset()` and stream flushes via `Flush()` do not allocate heap memory.
+* **Go 1.26 Modernizations**: Replaces manual loops with Go 1.26 builtins (such as `clear()`) in hot paths of the decoder state machine.
+* **Reduced Memory Usage**: Prunes obsolete tables and duplicate structures from the generic compression state to reduce individual `brotli.Writer` memory allocations by approximately 9 KB per instance at levels Q1–Q11.
+* **Block-Level Parallelism & Alternative Matchfinders**: Adds a multi-threaded block encoder (`NewParallelWriter`) and optimized matchfinders (`NewWriterV2`) to support higher throughput on multi-core systems.
 
 ---
 
