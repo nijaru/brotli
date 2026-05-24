@@ -63,13 +63,30 @@ func TestGlobalPoolCorrectness(t *testing.T) {
 	}
 }
 
+func TestWriterPoolNormalizesReturnedWriterQuality(t *testing.T) {
+	p := NewWriterPool(DefaultCompression)
+	w := NewWriterLevel(io.Discard, BestCompression)
+
+	p.Put(w)
+	if w.options.Quality != DefaultCompression {
+		t.Fatalf("Put normalized quality to %d, want %d", w.options.Quality, DefaultCompression)
+	}
+
+	var buf bytes.Buffer
+	reused := p.Get(&buf)
+	if reused.options.Quality != DefaultCompression {
+		t.Fatalf("Get returned quality %d, want %d", reused.options.Quality, DefaultCompression)
+	}
+	p.Put(reused)
+}
+
 func BenchmarkPoolUsage(b *testing.B) {
 	input := []byte("Benchmark data for pool-based compression. Let's make it relatively short.")
 	wp := NewWriterPool(DefaultCompression)
 	rp := NewReaderPool()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var buf bytes.Buffer
 		w := wp.Get(&buf)
 		w.Write(input)
@@ -86,7 +103,7 @@ func BenchmarkGlobalPoolUsage(b *testing.B) {
 	input := []byte("Benchmark data for pool-based compression. Let's make it relatively short.")
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var buf bytes.Buffer
 		w := GetWriter(&buf)
 		w.Write(input)
@@ -103,7 +120,7 @@ func BenchmarkNoPoolUsage(b *testing.B) {
 	input := []byte("Benchmark data for pool-based compression. Let's make it relatively short.")
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var buf bytes.Buffer
 		w := NewWriterLevel(&buf, DefaultCompression)
 		w.Write(input)

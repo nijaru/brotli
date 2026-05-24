@@ -1,2 +1,8 @@
 cpu.out
 brotli.test
+*.orig
+*.rej
+/results.tsv
+/run.log
+/scratch/*
+!/scratch/go.mod

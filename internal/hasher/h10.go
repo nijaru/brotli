@@ -120,20 +120,19 @@ func storeAndFindMatchesH10(
 			break
 		}
 		{
-			var cur_len uint = min(best_len_left, best_len_right)
-			var len uint
-			len = cur_len + common.FindMatchLengthWithLimit(
-				data[cur_ix_masked+cur_len:],
-				data[prev_ix_masked+cur_len:],
-				max_length-cur_len,
+			curLen := min(best_len_left, best_len_right)
+			matchedLen := curLen + common.FindMatchLengthWithLimit(
+				data[cur_ix_masked+curLen:],
+				data[prev_ix_masked+curLen:],
+				max_length-curLen,
 			)
-			if matches != nil && len > *best_len {
-				*best_len = uint(len)
-				initBackwardMatch(&matches[0], backward, uint(len))
+			if matches != nil && matchedLen > *best_len {
+				*best_len = matchedLen
+				initBackwardMatch(&matches[0], backward, matchedLen)
 				matches = matches[1:]
 			}
 
-			if len >= max_comp_len {
+			if matchedLen >= max_comp_len {
 				if should_reroot_tree {
 					forest[node_left] = forest[leftChildIndexH10(self, prev_ix)]
 					forest[node_right] = forest[rightChildIndexH10(self, prev_ix)]
@@ -142,8 +141,8 @@ func storeAndFindMatchesH10(
 				break
 			}
 
-			if data[cur_ix_masked+len] > data[prev_ix_masked+len] {
-				best_len_left = uint(len)
+			if data[cur_ix_masked+matchedLen] > data[prev_ix_masked+matchedLen] {
+				best_len_left = matchedLen
 				if should_reroot_tree {
 					forest[node_left] = uint32(prev_ix)
 				}
@@ -151,7 +150,7 @@ func storeAndFindMatchesH10(
 				node_left = rightChildIndexH10(self, prev_ix)
 				prev_ix = uint(forest[node_left])
 			} else {
-				best_len_right = uint(len)
+				best_len_right = matchedLen
 				if should_reroot_tree {
 					forest[node_right] = uint32(prev_ix)
 				}
@@ -318,16 +317,16 @@ func (h *H10) StitchToPreviousBlock(
 			   Furthermore, we have to make sure that we don't look further back
 			   from the start of the next block than the window size, otherwise we
 			   could access already overwritten areas of the ring-buffer. */
-			max_back_val := common.WindowGap - 1
-			if position-i > uint(max_back_val) {
-				max_back_val = int(position - i)
+			maxBackVal := common.WindowGap - 1
+			if position-i > uint(maxBackVal) {
+				maxBackVal = int(position - i)
 			}
-			var max_backward uint = h.window_mask_ - uint(max_back_val)
+			maxBackward := h.window_mask_ - uint(maxBackVal)
 
 			/* We know that i + 128 <= position + num_bytes, i.e. the
 			   end of the current block and that we have at least
 			   128 tail in the ring-buffer. */
-			storeAndFindMatchesH10(h, ringbuffer, i, ringbuffer_mask, 128, max_backward, nil, nil)
+			storeAndFindMatchesH10(h, ringbuffer, i, ringbuffer_mask, 128, maxBackward, nil, nil)
 		}
 	}
 }

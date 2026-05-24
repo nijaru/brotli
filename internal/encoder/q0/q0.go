@@ -55,9 +55,6 @@ type Encoder struct {
 	table          []int
 	storage        []byte
 
-	litDepth [256]byte
-	litBits  [256]uint16
-
 	lastBytes     uint16
 	lastBytesBits byte
 	wroteHeader   bool

@@ -57,6 +57,24 @@ func TestNewPlan(t *testing.T) {
 	}
 }
 
+func TestNewPlanClampsQualityAndWindow(t *testing.T) {
+	pLow := NewPlan(-1, 9, 0, 0, false)
+	if pLow.Quality != MinQuality {
+		t.Errorf("quality=%d, want %d", pLow.Quality, MinQuality)
+	}
+	if pLow.Lgwin != MinWindowBits {
+		t.Errorf("lgwin=%d, want %d", pLow.Lgwin, MinWindowBits)
+	}
+
+	pHigh := NewPlan(99, 99, 0, 0, false)
+	if pHigh.Quality != MaxQuality {
+		t.Errorf("quality=%d, want %d", pHigh.Quality, MaxQuality)
+	}
+	if pHigh.Lgwin != MaxWindowBits {
+		t.Errorf("lgwin=%d, want %d", pHigh.Lgwin, MaxWindowBits)
+	}
+}
+
 func TestZopfliParams(t *testing.T) {
 	p10 := NewPlan(10, 22, 0, 0, false)
 	if p10.MaxZopfliLen != 150 {

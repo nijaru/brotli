@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
+	rand "math/rand/v2"
 	"os"
 	"os/exec"
 	"strconv"
@@ -21,6 +21,14 @@ import (
 	andybrotli "github.com/andybalholm/brotli"
 	"github.com/xyproto/randomstring"
 )
+
+func pseudoRandomBytes(n int) []byte {
+	var seed [32]byte
+	seed[0] = 1
+	data := make([]byte, n)
+	_, _ = rand.NewChaCha8(seed).Read(data)
+	return data
+}
 
 func checkCompressedData(compressedData, wantOriginalData []byte) error {
 	uncompressed, err := Decode(compressedData)
@@ -69,6 +77,27 @@ func TestEncoderEmptyWrite(t *testing.T) {
 	}
 	if err := e.Close(); err != nil {
 		t.Errorf("Close()=%v, want nil", err)
+	}
+}
+
+func TestWriterOptionsClampQ0LGWin(t *testing.T) {
+	input := []byte("hello hello hello hello")
+	for _, lgwin := range []int{0, 2, 9, 10, 24, 25, 30} {
+		out := bytes.Buffer{}
+		w := NewWriterOptions(&out, WriterOptions{Quality: BestSpeed, LGWin: lgwin})
+		n, err := w.Write(input)
+		if err != nil {
+			t.Fatalf("LGWin %d: Write() error: %v", lgwin, err)
+		}
+		if n != len(input) {
+			t.Fatalf("LGWin %d: Write() n=%d, want %d", lgwin, n, len(input))
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("LGWin %d: Close() error: %v", lgwin, err)
+		}
+		if err := checkCompressedData(out.Bytes(), input); err != nil {
+			t.Fatalf("LGWin %d: compressed data did not round trip: %v", lgwin, err)
+		}
 	}
 }
 
@@ -123,8 +152,7 @@ func TestEncoderStreams(t *testing.T) {
 	// to fill the window.
 	const lgWin = 16
 	windowSize := int(math.Pow(2, lgWin))
-	input := make([]byte, 8*windowSize)
-	rand.Read(input)
+	input := pseudoRandomBytes(8 * windowSize)
 	out := bytes.Buffer{}
 	e := NewWriterOptions(&out, WriterOptions{Quality: 11, LGWin: lgWin})
 	halfInput := input[:len(input)/2]
@@ -150,8 +178,7 @@ func TestEncoderStreams(t *testing.T) {
 
 func TestEncoderLargeInput(t *testing.T) {
 	for level := BestSpeed; level <= BestCompression; level++ {
-		input := make([]byte, 1000000)
-		rand.Read(input)
+		input := pseudoRandomBytes(1000000)
 		out := bytes.Buffer{}
 		e := NewWriterOptions(&out, WriterOptions{Quality: level})
 		in := bytes.NewReader(input)
@@ -189,8 +216,7 @@ func TestEncoderLargeInput(t *testing.T) {
 }
 
 func TestEncoderFlush(t *testing.T) {
-	input := make([]byte, 1000)
-	rand.Read(input)
+	input := pseudoRandomBytes(1000)
 	out := bytes.Buffer{}
 	e := NewWriterOptions(&out, WriterOptions{Quality: 5})
 	in := bytes.NewReader(input)
@@ -372,7 +398,7 @@ func TestQuality(t *testing.T) {
 func TestDecodeFuzz(t *testing.T) {
 	// Test that the decoder terminates with corrupted input.
 	content := bytes.Repeat([]byte("hello world!"), 100)
-	rnd := rand.New(rand.NewSource(0))
+	rnd := rand.New(rand.NewPCG(0, 0))
 	encoded, err := Encode(content, WriterOptions{Quality: 5})
 	if err != nil {
 		t.Fatalf("Encode(<%d bytes>, _) = _, %s", len(content), err)
@@ -383,7 +409,7 @@ func TestDecodeFuzz(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		enc := append([]byte{}, encoded...)
 		for j := 0; j < 5; j++ {
-			enc[rnd.Intn(len(enc))] = byte(rnd.Intn(256))
+			enc[rnd.IntN(len(enc))] = byte(rnd.IntN(256))
 		}
 		Decode(enc)
 	}

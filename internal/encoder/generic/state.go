@@ -92,35 +92,6 @@ func InitState(s *State) {
 	s.RemainingMetadataBytes = 0x7FFFFFFF // math.MaxUint32
 }
 
-// ResetForReuse resets per-compression state while preserving initialized buffers.
-// Call this on Writer.Reset when quality hasn't changed to avoid re-allocating.
-func ResetForReuse(s *State) {
-	s.InputPos = 0
-	s.Commands = s.Commands[:0]
-	s.NumLiterals = 0
-	s.LastInsertLen = 0
-	s.LastFlushPos = 0
-	s.LastProcessedPos = 0
-	s.PrevByte = 0
-	s.PrevByte2 = 0
-	if s.Hasher_ != nil {
-		s.Hasher_.Common().Is_prepared_ = false
-	}
-
-	s.StreamState = streamProcessing
-	s.IsLastBlockEmitted = false
-	s.RemainingMetadataBytes = 0x7FFFFFFF
-
-	ringbuffer.RingBufferInit(&s.Ringbuffer_)
-
-	/* Re-initialize distance cache. */
-	s.DistCache[0] = 4
-	s.DistCache[1] = 11
-	s.DistCache[2] = 15
-	s.DistCache[3] = 16
-	copy(s.SavedDistCache[:], s.DistCache[:])
-}
-
 func initParams(params *common.EncoderParams) {
 	params.Quality = 11
 	params.Lgwin = 22

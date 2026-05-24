@@ -283,27 +283,6 @@ func storeMetaBlockHeader(len uint, is_uncompressed bool, storage_ix *uint, stor
 	bitstream.WriteSingleBit(is_uncompressed, storage_ix, storage)
 }
 
-func storeMetaBlockHeaderBW(len uint, is_uncompressed bool, bw *bitstream.BitWriter) {
-	var nibbles uint = 6
-
-	/* ISLAST */
-	bw.WriteBits(1, 0)
-
-	if len <= 1<<16 {
-		nibbles = 4
-	} else if len <= 1<<20 {
-		nibbles = 5
-	} else if len > 1<<24 {
-		panic("metablock too long")
-	}
-
-	bw.WriteBits(2, uint64(nibbles)-4)
-	bw.WriteBits(nibbles*4, uint64(len)-1)
-
-	/* ISUNCOMPRESSED */
-	bw.WriteSingleBit(is_uncompressed)
-}
-
 func createCommands(
 	input []byte,
 	block_size uint,

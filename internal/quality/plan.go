@@ -43,6 +43,7 @@ const (
 
 // Plan carries all quality-derived parameters, computed once at writer creation.
 type Plan struct {
+	Quality           int
 	Tier              Tier
 	StaticEntropy     bool // quality <= 2: use precomputed Huffman codes
 	BlockSplit        bool // quality >= 4: use block splitting
@@ -107,6 +108,7 @@ func NewPlan(quality, lgwin, lgblock int, sizeHint uint64, largeWindow bool) Pla
 	}
 
 	return Plan{
+		Quality:           quality,
 		Tier:              tier,
 		StaticEntropy:     quality <= 2,
 		BlockSplit:        quality >= 4,

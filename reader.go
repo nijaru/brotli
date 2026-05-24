@@ -6,12 +6,6 @@ import (
 	"github.com/nijaru/brotli/internal/decoder"
 )
 
-type decodeError int
-
-func (err decodeError) Error() string {
-	return "brotli: decoder error"
-}
-
 // Reader wraps the internal decoder.Reader for API encapsulation,
 // allowing clients to use it as a standard io.Reader.
 type Reader struct {

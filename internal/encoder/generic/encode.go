@@ -21,20 +21,7 @@ import (
 /** Minimal value for ::BROTLI_PARAM_LGWIN parameter. */
 
 /** Options for ::BROTLI_PARAM_MODE parameter. */
-const (
-	modeGeneric = 0
-	modeText    = 1
-	modeFont    = 2
-)
-
-/** Default value for ::BROTLI_PARAM_QUALITY parameter. */
-const defaultQuality = 11
-
-/** Default value for ::BROTLI_PARAM_LGWIN parameter. */
-const defaultWindow = 22
-
-/** Default value for ::BROTLI_PARAM_MODE parameter. */
-const defaultMode = modeGeneric
+const modeFont = 2
 
 /** Operations that can be performed by streaming encoder. */
 const (
@@ -51,44 +38,6 @@ const (
 	streamMetadataHead   = 3
 	streamMetadataBody   = 4
 )
-
-type baselineEncoder struct {
-	params           common.EncoderParams
-	hasher_          hasher.Handle
-	inputPos         uint64
-	ringbuffer_      ringbuffer.RingBuffer
-	commands         []metablock.Command
-	numLiterals      uint
-	lastInsertLen    uint
-	lastFlushPos     uint64
-	lastProcessedPos uint64
-	distCache        [common.NumDistanceShortCodes]int
-	savedDistCache   [4]int
-	lastBytes        uint16
-	lastBytesBits    byte
-	prevByte         byte
-	prevByte2        byte
-	storage          []byte
-	smallTable       [1 << 10]int
-	largeTable       []int
-	largeTableSize   uint
-	cmdDepths        [128]byte
-	cmdBits          [128]uint16
-	cmdCode          [512]byte
-	cmdCodeNumbits   uint
-	commandBuf       []uint32
-	literalBuf       []byte
-	tinyBuf          struct {
-		u64 [2]uint64
-		u8  [16]byte
-	}
-	remainingMetadataBytes uint32
-	streamState            int
-	isLastBlockEmitted     bool
-	isMetadata             bool
-	metaBlockRemainingLen  int
-	isInitialized          bool
-}
 
 func inputBlockSize(s *State) uint {
 	return uint(1) << uint(s.Params.Lgblock)
@@ -164,50 +113,6 @@ func encodeWindowBits(lgwin int, largeWindow bool, lastBytes *uint16, lastBytesB
 		*lastBytes |= 1 << *lastBytesBits
 		*lastBytesBits++
 	}
-}
-
-func encoderInitParams(params *common.EncoderParams) {
-	params.Mode = defaultMode
-	params.Large_window = false
-	params.Quality = defaultQuality
-	params.Lgwin = defaultWindow
-	params.Lgblock = 0
-	params.Size_hint = 0
-	params.Disable_literal_context_modeling = false
-	initEncoderDictionary(&params.Dictionary)
-	params.Dist.Distance_postfix_bits = 0
-	params.Dist.Num_direct_distance_codes = 0
-	params.Dist.Alphabet_size = uint32(common.DistanceAlphabetSize(0, 0, common.MaxDistanceBits))
-	params.Dist.Max_distance = common.MaxDistance
-}
-
-func encoderInitState(s *State) {
-	encoderInitParams(&s.Params)
-	s.InputPos = 0
-	s.Commands = s.Commands[:0]
-	s.NumLiterals = 0
-	s.LastInsertLen = 0
-	s.LastFlushPos = 0
-	s.LastProcessedPos = 0
-	s.PrevByte = 0
-	s.PrevByte2 = 0
-	if s.Hasher_ != nil {
-		s.Hasher_.Common().Is_prepared_ = false
-	}
-	s.StreamState = streamProcessing
-	s.IsLastBlockEmitted = false
-	s.IsInitialized = false
-
-	ringbuffer.RingBufferInit(&s.Ringbuffer_)
-
-	/* Initialize distance cache. */
-	s.DistCache[0] = 4
-	s.DistCache[1] = 11
-	s.DistCache[2] = 15
-	s.DistCache[3] = 16
-	copy(s.SavedDistCache[:], s.DistCache[:])
-
-	s.RemainingMetadataBytes = math.MaxUint32
 }
 
 func injectBytePaddingBlock(s *State) {
@@ -576,7 +481,7 @@ func shouldUseComplexStaticContextMap(
 		var entropy [3]float64
 		var dummy uint
 		var i uint
-		utf8Lut := context.GetContextLUT(2) // contextUTF8
+		utf8Lut := context.GetContextLUT(context.ModeUTF8)
 		/* To make entropy calculations faster and to fit on the stack, we collect
 		   histograms over the 5 most significant bits of literals. One histogram
 		   without context and 13 additional histograms for each context value. */
@@ -810,10 +715,10 @@ func chooseContextMode(
 	   CONTEXT_UTF8 for the highest qualities */
 	if params.Quality >= 10 &&
 		!context.IsMostlyUTF8(data, pos, mask, length, context.KMinUTF8Ratio) {
-		return 1 // contextSigned
+		return context.ModeSigned
 	}
 
-	return 2 // contextUTF8
+	return context.ModeUTF8
 }
 
 func updateLastProcessedPos(s *State) bool {

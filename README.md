@@ -2,7 +2,7 @@
 
 Package `brotli` implements the Brotli compression format (RFC 7932) in pure Go.
 
-This library is an optimized, allocation-free fork of the `c2go` port (`github.com/andybalholm/brotli`). It requires Go 1.26 or later and maintains complete API compatibility with the `c2go` implementation, allowing it to be used as a direct, high-performance replacement.
+This library is an optimized, allocation-conscious fork of the `c2go` port (`github.com/andybalholm/brotli`). It requires Go 1.26 or later and keeps the standard reader, writer, and HTTP helper APIs compatible with the `c2go` implementation, allowing it to be used as a direct, high-performance replacement.
 
 ---
 
@@ -16,14 +16,14 @@ This library is an optimized, allocation-free fork of the `c2go` port (`github.c
 
 ## Correctness & Interoperability
 
-The test suite automatically verifies compliance and compatibility:
+The test suite verifies compliance and compatibility:
 
 | Test Target | Verification Type | Description |
 |:---|:---|:---|
-| **C Reference Library** | Differential Round-Trip | This package &rarr; C Reference Decoder and C Reference Encoder &rarr; This package across all quality levels ($Q0\text{–}Q11$) |
+| **C Reference Library** | Differential Round-Trip | When the `brotli` CLI is installed, this package &rarr; C Reference Decoder and C Reference Encoder &rarr; This package across all quality levels ($Q0\text{–}Q11$) |
 | **c2go Port** | Cross-Decoder Round-Trip | This package &rarr; `c2go` Decoder and `c2go` Encoder &rarr; This package across all quality levels ($Q0\text{–}Q11$) |
 | **Direct Bitstream Parity** | Byte-Identity Verification | $Q0$ compressed byte-identity of this package vs. official C encoder (`brotli -q 0 -w 22`) |
-| **Native Fuzzing** | Memory Safety & Fuzzing | Continuous random mutation testing with `go test -fuzz` |
+| **Mutation Coverage** | Decoder Robustness | Corrupted-stream tests verify decoder termination and error handling |
 
 ---
 

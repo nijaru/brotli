@@ -67,10 +67,21 @@ func NewWriterLevel(dst io.Writer, level int) *Writer {
 
 // NewWriterOptions is like NewWriter but specifies WriterOptions
 func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
-	w := &Writer{}
-	w.options = options
+	w := &Writer{options: options}
 	w.Reset(dst)
 	return w
+}
+
+func normalizeWriterOptions(options WriterOptions) (WriterOptions, quality.Plan) {
+	lgwin := 22
+	if options.LGWin > 0 {
+		lgwin = options.LGWin
+	}
+	plan := quality.NewPlan(options.Quality, lgwin, 0, 0, false)
+	return WriterOptions{
+		Quality: plan.Quality,
+		LGWin:   plan.Lgwin,
+	}, plan
 }
 
 // Reset discards the Writer's state and makes it equivalent to the result of
@@ -80,17 +91,14 @@ func (w *Writer) Reset(dst io.Writer) {
 	w.dst = dst
 	w.err = nil
 
-	var lgwin uint = 22
-	if w.options.LGWin > 0 {
-		lgwin = uint(w.options.LGWin)
-	}
-	w.plan = quality.NewPlan(w.options.Quality, int(lgwin), 0, 0, false)
+	w.options, w.plan = normalizeWriterOptions(w.options)
+	lgwin := uint(w.plan.Lgwin)
 
 	if w.plan.Tier == quality.TierQ0 {
 		w.q0State.Reset(lgwin)
 	} else {
 		generic.InitState(&w.genericState)
-		w.genericState.Params.Quality = w.options.Quality
+		w.genericState.Params.Quality = w.plan.Quality
 		w.genericState.Params.Lgwin = lgwin
 		w.genericState.Plan = w.plan
 		w.genericState.Dst = dst
@@ -173,5 +181,3 @@ type nopCloser struct {
 }
 
 func (nopCloser) Close() error { return nil }
-
-

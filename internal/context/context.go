@@ -82,10 +82,10 @@ context ids and the type of the next byte is summarized in the table below:
 */
 
 const (
-	contextLSB6   = 0
-	contextMSB6   = 1
-	contextUTF8   = 2
-	contextSigned = 3
+	ModeLSB6   = 0
+	ModeMSB6   = 1
+	ModeUTF8   = 2
+	ModeSigned = 3
 )
 
 /* Common context lookup table for all context modes. */

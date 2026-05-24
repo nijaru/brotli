@@ -40,13 +40,14 @@ func PutReader(r *Reader) {
 // quality level to ensure reused encoders match user-requested behavior.
 type WriterPool struct {
 	pool    sync.Pool
-	quality int
+	options WriterOptions
 }
 
 // NewWriterPool creates a new WriterPool for the given quality level.
 func NewWriterPool(quality int) *WriterPool {
+	options, _ := normalizeWriterOptions(WriterOptions{Quality: quality})
 	return &WriterPool{
-		quality: quality,
+		options: options,
 	}
 }
 
@@ -55,9 +56,10 @@ func NewWriterPool(quality int) *WriterPool {
 func (p *WriterPool) Get(dst io.Writer) *Writer {
 	v := p.pool.Get()
 	if v == nil {
-		return NewWriterLevel(dst, p.quality)
+		return NewWriterOptions(dst, p.options)
 	}
 	w := v.(*Writer)
+	w.options = p.options
 	w.Reset(dst)
 	return w
 }
@@ -66,6 +68,10 @@ func (p *WriterPool) Get(dst io.Writer) *Writer {
 // Before returning it, it resets the destination to nil to prevent memory leaks
 // (holding references to the original dst writer).
 func (p *WriterPool) Put(w *Writer) {
+	if w == nil {
+		return
+	}
+	w.options = p.options
 	w.Reset(nil)
 	p.pool.Put(w)
 }
@@ -96,6 +102,9 @@ func (p *ReaderPool) Get(src io.Reader) *Reader {
 // Put returns the Reader to the pool.
 // Before returning it, it resets the source to nil to prevent memory leaks.
 func (p *ReaderPool) Put(r *Reader) {
+	if r == nil {
+		return
+	}
 	r.Reset(nil)
 	p.pool.Put(r)
 }
