@@ -176,6 +176,19 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return w.writeChunk(p, operationProcess)
 }
 
+// WriteString implements io.StringWriter to write a string directly.
+func (w *Writer) WriteString(s string) (n int, err error) {
+	return w.Write([]byte(s))
+}
+
+// WriteByte implements io.ByteWriter to write a single byte.
+func (w *Writer) WriteByte(c byte) error {
+	var buf [1]byte
+	buf[0] = c
+	_, err := w.Write(buf[:])
+	return err
+}
+
 type nopCloser struct {
 	io.Writer
 }
