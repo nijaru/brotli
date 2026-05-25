@@ -2,8 +2,7 @@ package brotli
 
 import (
 	"io"
-	"sync"
-)
+	"sync")
 
 // Global default pools for standard compression and decompression
 var (

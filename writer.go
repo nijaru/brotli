@@ -4,10 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/nijaru/brotli/internal/encoder/generic"
-	"github.com/nijaru/brotli/internal/encoder/q0"
-	"github.com/nijaru/brotli/internal/quality"
-)
+	"github.com/nijaru/brotli/internal/encoder")
 
 const (
 	BestSpeed          = 0
@@ -42,10 +39,10 @@ type Writer struct {
 	dst     io.Writer
 	options WriterOptions
 	err     error
-	plan    quality.Plan
+	plan    encoder.Plan
 
-	q0State      q0.Encoder
-	genericState generic.State
+	q0State      encoder.Encoder
+	genericState encoder.State
 }
 
 // Writes to the returned writer are compressed and written to dst.
@@ -72,12 +69,12 @@ func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
 	return w
 }
 
-func normalizeWriterOptions(options WriterOptions) (WriterOptions, quality.Plan) {
+func normalizeWriterOptions(options WriterOptions) (WriterOptions, encoder.Plan) {
 	lgwin := 22
 	if options.LGWin > 0 {
 		lgwin = options.LGWin
 	}
-	plan := quality.NewPlan(options.Quality, lgwin, 0, 0, false)
+	plan := encoder.NewPlan(options.Quality, lgwin, 0, 0, false)
 	return WriterOptions{
 		Quality: plan.Quality,
 		LGWin:   plan.Lgwin,
@@ -94,10 +91,10 @@ func (w *Writer) Reset(dst io.Writer) {
 	w.options, w.plan = normalizeWriterOptions(w.options)
 	lgwin := uint(w.plan.Lgwin)
 
-	if w.plan.Tier == quality.TierQ0 {
+	if w.plan.Tier == encoder.TierQ0 {
 		w.q0State.Reset(lgwin)
 	} else {
-		generic.InitState(&w.genericState)
+		encoder.InitState(&w.genericState)
 		w.genericState.Params.Quality = w.plan.Quality
 		w.genericState.Params.Lgwin = lgwin
 		w.genericState.Plan = w.plan
@@ -114,7 +111,7 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 		return 0, w.err
 	}
 
-	if w.plan.Tier == quality.TierQ0 {
+	if w.plan.Tier == encoder.TierQ0 {
 		var isLast bool
 		if op == operationFinish {
 			isLast = true
@@ -138,7 +135,7 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 	for {
 		availableIn := uint(len(p))
 		nextIn := p
-		success := generic.CompressStream(&w.genericState, op, &availableIn, &nextIn)
+		success := encoder.CompressStream(&w.genericState, op, &availableIn, &nextIn)
 		bytesConsumed := len(p) - int(availableIn)
 		p = p[bytesConsumed:]
 		n += bytesConsumed

@@ -2,8 +2,7 @@ package common
 
 import (
 	"encoding/binary"
-	"math/bits"
-)
+	"math/bits")
 
 /* Copyright 2017 Google Inc. All Rights Reserved.
 

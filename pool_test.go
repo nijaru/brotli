@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"testing"
-)
+	"testing")
 
 func TestPoolCorrectness(t *testing.T) {
 	wp := NewWriterPool(DefaultCompression)

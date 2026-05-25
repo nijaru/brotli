@@ -2,7 +2,8 @@ package decoder
 
 import (
 	"errors"
-	"io")
+	"io"
+)
 
 type decodeError int
 

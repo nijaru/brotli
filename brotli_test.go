@@ -19,7 +19,8 @@ import (
 	"time"
 
 	andybrotli "github.com/andybalholm/brotli"
-	"github.com/xyproto/randomstring")
+	"github.com/xyproto/randomstring"
+)
 
 func pseudoRandomBytes(n int) []byte {
 	var seed [32]byte
@@ -887,7 +888,11 @@ func TestDirectBitstreamParity(t *testing.T) {
 			ourBytes := compressedBuf.Bytes()
 			cBytes := cCompressed.Bytes()
 			if !bytes.Equal(ourBytes, cBytes) {
-				t.Logf("Length/bitstream variation: Go len=%d, C len=%d", len(ourBytes), len(cBytes))
+				t.Logf(
+					"Length/bitstream variation: Go len=%d, C len=%d",
+					len(ourBytes),
+					len(cBytes),
+				)
 				minLen := len(ourBytes)
 				if len(cBytes) < minLen {
 					minLen = len(cBytes)

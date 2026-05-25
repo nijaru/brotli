@@ -3,8 +3,7 @@ package brotli
 import (
 	"io"
 
-	"github.com/nijaru/brotli/internal/decoder"
-)
+	"github.com/nijaru/brotli/internal/decoder")
 
 // Reader wraps the internal decoder.Reader for API encapsulation,
 // allowing clients to use it as a standard io.Reader.
