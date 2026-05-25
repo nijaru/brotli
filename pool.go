@@ -12,13 +12,14 @@ var (
 )
 
 // GetWriter retrieves a default-compression (*Writer) from a package-level pool
-// and resets it to write to dst, eliminating initial allocation overhead.
+// and resets it to write to dst. Use it for repeated one-shot compression where
+// the caller can return the writer with PutWriter after Close.
 func GetWriter(dst io.Writer) *Writer {
 	return defaultWriterPool.Get(dst)
 }
 
-// PutWriter returns a Writer to the package-level default pool.
-// Before returning it, the destination is cleared to prevent memory leaks.
+// PutWriter returns a Writer to the package-level default pool. Callers must
+// not use w after PutWriter returns.
 func PutWriter(w *Writer) {
 	defaultWriterPool.Put(w)
 }
@@ -38,6 +39,11 @@ func PutReader(r *Reader) {
 // WriterPool manages a thread-safe pool of Writer instances to reduce garbage
 // collection overhead and heap allocations. Each pool is specific to a compression
 // quality level to ensure reused encoders match user-requested behavior.
+//
+// Pooling is most useful when compressing many independent streams at the same
+// quality level. A checked-out Writer still has normal Writer ownership rules:
+// write to it from one goroutine at a time, call Close when the stream is
+// complete, then return it to the pool and stop using that pointer.
 type WriterPool struct {
 	pool    sync.Pool
 	options WriterOptions
@@ -64,9 +70,9 @@ func (p *WriterPool) Get(dst io.Writer) *Writer {
 	return w
 }
 
-// Put returns the Writer to the pool.
-// Before returning it, it resets the destination to nil to prevent memory leaks
-// (holding references to the original dst writer).
+// Put returns the Writer to the pool. Callers must not use w after Put returns.
+// Before returning it, Put clears the destination to avoid retaining the
+// original dst writer.
 func (p *WriterPool) Put(w *Writer) {
 	if w == nil {
 		return

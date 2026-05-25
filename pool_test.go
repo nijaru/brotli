@@ -2,7 +2,9 @@ package brotli
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -128,5 +130,92 @@ func BenchmarkNoPoolUsage(b *testing.B) {
 
 		r := NewReader(&buf)
 		io.Copy(io.Discard, r)
+	}
+}
+
+func BenchmarkWriterLifecycle(b *testing.B) {
+	payloads := []struct {
+		name string
+		size int
+	}{
+		{name: "small_512B", size: 512},
+		{name: "medium_8KiB", size: 8 << 10},
+		{name: "large_64KiB", size: 64 << 10},
+	}
+	levels := []int{BestSpeed, DefaultCompression, 9, BestCompression}
+
+	for _, payload := range payloads {
+		input := benchmarkPayload(b, payload.size)
+		for _, level := range levels {
+			b.Run(fmt.Sprintf("Q%d/%s/new", level, payload.name), func(b *testing.B) {
+				b.ReportAllocs()
+				b.SetBytes(int64(len(input)))
+				for b.Loop() {
+					w := NewWriterLevel(io.Discard, level)
+					benchmarkWriteClose(b, w, input)
+				}
+			})
+
+			b.Run(fmt.Sprintf("Q%d/%s/pool", level, payload.name), func(b *testing.B) {
+				wp := NewWriterPool(level)
+				w := wp.Get(io.Discard)
+				benchmarkWriteClose(b, w, input)
+				wp.Put(w)
+
+				b.ReportAllocs()
+				b.SetBytes(int64(len(input)))
+				b.ResetTimer()
+				for b.Loop() {
+					w := wp.Get(io.Discard)
+					benchmarkWriteClose(b, w, input)
+					wp.Put(w)
+				}
+			})
+
+			b.Run(fmt.Sprintf("Q%d/%s/reset", level, payload.name), func(b *testing.B) {
+				w := NewWriterLevel(io.Discard, level)
+				benchmarkWriteClose(b, w, input)
+
+				b.ReportAllocs()
+				b.SetBytes(int64(len(input)))
+				b.ResetTimer()
+				for b.Loop() {
+					w.Reset(io.Discard)
+					benchmarkWriteClose(b, w, input)
+				}
+			})
+		}
+	}
+}
+
+func benchmarkPayload(b *testing.B, size int) []byte {
+	b.Helper()
+
+	source, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		b.Fatal(err)
+	}
+	if len(source) == 0 {
+		b.Fatal("benchmark corpus is empty")
+	}
+	if len(source) >= size {
+		return source[:size]
+	}
+
+	input := make([]byte, size)
+	for n := 0; n < len(input); {
+		n += copy(input[n:], source)
+	}
+	return input
+}
+
+func benchmarkWriteClose(b *testing.B, w *Writer, input []byte) {
+	b.Helper()
+
+	if _, err := w.Write(input); err != nil {
+		b.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		b.Fatal(err)
 	}
 }

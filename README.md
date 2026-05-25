@@ -29,15 +29,27 @@ The test suite verifies compliance and compatibility:
 
 ## Performance
 
-This library focuses on minimizing memory allocations during reuse. Reusing a writer via `Reset()` completely eliminates heap allocations at standard compression levels:
+This library focuses on minimizing memory allocations during reuse. For repeated
+one-shot compression, prefer `GetWriter`/`PutWriter` or a `WriterPool` for the
+chosen quality level:
 
-* **Levels Q0–Q9**: `0 allocs/op` during buffer reuse.
-* **Throughput**: Up to 300 MB/s at level Q0 depending on hardware configuration.
+* **Pooled lifecycle:** Reuses encoder state across independent streams.
+* **Manual `Reset`:** Best when one goroutine owns a long-lived writer.
+* **Standard constructors:** Keep c2go-compatible drop-in behavior for simple
+  calls and one-off compression.
+
+Recent local benchmarks on an Apple M3 Max show pooled and manual-reset writer
+lifecycles at `0 allocs/op` for Q0, Q6, and Q9 across 512 B, 8 KiB, and 64 KiB
+payloads. Constructing a fresh writer each time still pays the setup cost, from
+small Q0 allocations to multi-megabyte setup at higher quality levels. Q10-Q11
+remain correctness-first dense modes with higher allocation cost, although
+pooling still avoids most construction overhead.
 
 To run the benchmark suite locally:
 
 ```bash
 go test -bench=BenchmarkEncodeLevelsReset -benchmem .
+go test -bench=BenchmarkWriterLifecycle -benchmem .
 ```
 
 ---
@@ -90,7 +102,24 @@ func main() {
 }
 ```
 
-### 2. High-Performance Zero-Allocation Re-use
+### 2. Pooled Reuse
+```go
+var compressed bytes.Buffer
+
+writer := brotli.GetWriter(&compressed)
+if _, err := writer.Write(original); err != nil {
+	log.Fatalf("Compression failed: %v", err)
+}
+if err := writer.Close(); err != nil {
+	log.Fatalf("Close failed: %v", err)
+}
+brotli.PutWriter(writer)
+```
+
+Call `PutWriter` only after `Close`, and do not use the writer after returning
+it to the pool.
+
+### 3. Manual Reset Reuse
 ```go
 // Discard the writer's state and re-use the underlying buffers for a new target
 writer.Reset(newDestination)
