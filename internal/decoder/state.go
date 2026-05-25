@@ -3,10 +3,7 @@ package decoder
 import (
 	"io"
 
-	"github.com/nijaru/brotli/internal/bitstream"
-	"github.com/nijaru/brotli/internal/common"
-	"github.com/nijaru/brotli/internal/dictionary"
-)
+	"github.com/nijaru/brotli/internal/common")
 
 /* Copyright 2015 Google Inc. All Rights Reserved.
 
@@ -99,7 +96,7 @@ type Reader struct {
 
 	state       int
 	loopCounter int
-	br          bitstream.BitReader
+	br          common.BitReader
 	buffer      struct {
 		u64 uint64
 		u8  [8]byte
@@ -116,15 +113,15 @@ type Reader struct {
 	sub_loopCounter           uint32
 	ringbuffer                []byte
 	ringbufferEnd             []byte
-	htreeCommand              []bitstream.HuffmanCode
+	htreeCommand              []common.HuffmanCode
 	contextLookup             []byte
 	contextMapSlice           []byte
 	dist_contextMapSlice      []byte
-	literalHGroup             bitstream.HuffmanTreeGroup
-	insertCopyHGroup          bitstream.HuffmanTreeGroup
-	distanceHGroup            bitstream.HuffmanTreeGroup
-	blockTypeTrees            []bitstream.HuffmanCode
-	blockLenTrees             []bitstream.HuffmanCode
+	literalHGroup             common.HuffmanTreeGroup
+	insertCopyHGroup          common.HuffmanTreeGroup
+	distanceHGroup            common.HuffmanTreeGroup
+	blockTypeTrees            []common.HuffmanCode
+	blockLenTrees             []common.HuffmanCode
 	trivialLiteralContext     int
 	distanceContext           int
 	metaBlockRemainingLen     int
@@ -137,7 +134,7 @@ type Reader struct {
 	distancePostfixMask       int
 	numDistHtrees             uint32
 	distContextMap            []byte
-	literalHtree              []bitstream.HuffmanCode
+	literalHtree              []common.HuffmanCode
 	distHtreeIndex            byte
 	repeatCodeLen             uint32
 	prevCodeLen               uint32
@@ -148,18 +145,18 @@ type Reader struct {
 	symbol                    uint32
 	repeat                    uint32
 	space                     uint32
-	table                     [32]bitstream.HuffmanCode
-	symbolLists               bitstream.SymbolList
-	symbolsListsArray         [bitstream.HuffmanMaxCodeLength + 1 + common.NumCommandSymbols]uint16
+	table                     [32]common.HuffmanCode
+	symbolLists               common.SymbolList
+	symbolsListsArray         [common.HuffmanMaxCodeLength + 1 + common.NumCommandSymbols]uint16
 	nextSymbol                [32]int
 	codeLengthCodeLengths     [common.CodeLengthCodes]byte
 	codeLengthHisto           [16]uint16
 	htreeIndex                int
-	next                      []bitstream.HuffmanCode
+	next                      []common.HuffmanCode
 	contextIndex              uint32
 	maxRunLengthPrefix        uint32
 	code                      uint32
-	contextMapTable           [bitstream.HuffmanMaxSize272]bitstream.HuffmanCode
+	contextMapTable           [common.HuffmanMaxSize272]common.HuffmanCode
 	substateMetablockHeader   int
 	substateTreeGroup         int
 	substateContextMap        int
@@ -179,8 +176,8 @@ type Reader struct {
 	num_literalHtrees         uint32
 	contextMap                []byte
 	contextModes              []byte
-	dictionary                *dictionary.Dictionary
-	transforms                *dictionary.Transforms
+	dictionary                *common.Dictionary
+	transforms                *common.Transforms
 	trivialLiteralContexts    [8]uint32
 }
 
@@ -204,26 +201,11 @@ func decoderStateInit(s *Reader) bool {
 	s.rbRoundtrips = 0
 	s.partialPosOut = 0
 
-	s.blockTypeTrees = nil
-	s.blockLenTrees = nil
 	s.ringbufferSize = 0
 	s.new_ringbufferSize = 0
 	s.ringbufferMask = 0
 
-	s.contextMap = nil
-	s.contextModes = nil
-	s.distContextMap = nil
-	s.contextMapSlice = nil
-	s.dist_contextMapSlice = nil
-
 	s.sub_loopCounter = 0
-
-	s.literalHGroup.Codes = nil
-	s.literalHGroup.HTrees = nil
-	s.insertCopyHGroup.Codes = nil
-	s.insertCopyHGroup.HTrees = nil
-	s.distanceHGroup.Codes = nil
-	s.distanceHGroup.HTrees = nil
 
 	s.isLastMetablock = 0
 	s.isUncompressed = 0
@@ -238,14 +220,12 @@ func decoderStateInit(s *Reader) bool {
 	s.distRb[2] = 11
 	s.distRb[3] = 4
 	s.distRbIdx = 0
-	s.blockTypeTrees = nil
-	s.blockLenTrees = nil
 
 	s.symbolLists.Storage = s.symbolsListsArray[:]
-	s.symbolLists.Offset = bitstream.HuffmanMaxCodeLength + 1
+	s.symbolLists.Offset = common.HuffmanMaxCodeLength + 1
 
-	s.dictionary = dictionary.GetDictionary()
-	s.transforms = dictionary.GetTransforms()
+	s.dictionary = common.GetDictionary()
+	s.transforms = common.GetTransforms()
 
 	return true
 }
@@ -264,43 +244,39 @@ func decoderStateMetablockBegin(s *Reader) {
 	s.blockTypeRb[3] = 0
 	s.blockTypeRb[4] = 1
 	s.blockTypeRb[5] = 0
-	s.contextMap = nil
-	s.contextModes = nil
-	s.distContextMap = nil
 	s.contextMapSlice = nil
 	s.literalHtree = nil
 	s.dist_contextMapSlice = nil
 	s.distHtreeIndex = 0
 	s.contextLookup = nil
-	s.literalHGroup.Codes = nil
-	s.literalHGroup.HTrees = nil
-	s.insertCopyHGroup.Codes = nil
-	s.insertCopyHGroup.HTrees = nil
-	s.distanceHGroup.Codes = nil
-	s.distanceHGroup.HTrees = nil
 }
 
 func decoderStateCleanupAfterMetablock(s *Reader) {
-	s.contextModes = nil
-	s.contextMap = nil
-	s.distContextMap = nil
-	s.literalHGroup.HTrees = nil
-	s.insertCopyHGroup.HTrees = nil
-	s.distanceHGroup.HTrees = nil
 }
 
 func decoderHuffmanTreeGroupInit(
 	s *Reader,
-	group *bitstream.HuffmanTreeGroup,
+	group *common.HuffmanTreeGroup,
 	alphabetSize uint32,
 	maxSymbol uint32,
 	nTrees uint32,
 ) bool {
-	var max_table_size uint = uint(bitstream.KMaxHuffmanTableSize[(alphabetSize+31)>>5])
+	var max_table_size uint = uint(common.KMaxHuffmanTableSize[(alphabetSize+31)>>5])
 	group.AlphabetSize = uint16(alphabetSize)
 	group.MaxSymbol = uint16(maxSymbol)
 	group.NumHTrees = uint16(nTrees)
-	group.HTrees = make([][]bitstream.HuffmanCode, nTrees)
-	group.Codes = make([]bitstream.HuffmanCode, (uint(nTrees) * max_table_size))
-	return !(group.Codes == nil)
+
+	neededCodes := uint(nTrees) * max_table_size
+	if cap(group.Codes) >= int(neededCodes) {
+		group.Codes = group.Codes[:neededCodes]
+	} else {
+		group.Codes = make([]common.HuffmanCode, neededCodes)
+	}
+
+	if cap(group.HTrees) >= int(nTrees) {
+		group.HTrees = group.HTrees[:nTrees]
+	} else {
+		group.HTrees = make([][]common.HuffmanCode, nTrees)
+	}
+	return true
 }

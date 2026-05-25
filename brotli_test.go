@@ -19,8 +19,7 @@ import (
 	"time"
 
 	andybrotli "github.com/andybalholm/brotli"
-	"github.com/xyproto/randomstring"
-)
+	"github.com/xyproto/randomstring")
 
 func pseudoRandomBytes(n int) []byte {
 	var seed [32]byte
@@ -31,7 +30,7 @@ func pseudoRandomBytes(n int) []byte {
 }
 
 func checkCompressedData(compressedData, wantOriginalData []byte) error {
-	uncompressed, err := Decode(compressedData)
+	uncompressed, err := Decode(nil, compressedData)
 	if err != nil {
 		return fmt.Errorf("brotli decompress failed: %v", err)
 	}
@@ -330,7 +329,7 @@ func TestDecoderStreaming(t *testing.T) {
 
 func TestReader(t *testing.T) {
 	content := bytes.Repeat([]byte("hello world!"), 10000)
-	encoded, _ := Encode(content, WriterOptions{Quality: 5})
+	encoded := Encode(nil, content, 5)
 	r := NewReader(bytes.NewReader(encoded))
 	var decodedOutput bytes.Buffer
 	n, err := io.Copy(&decodedOutput, r)
@@ -364,8 +363,8 @@ func TestReader(t *testing.T) {
 
 func TestDecode(t *testing.T) {
 	content := bytes.Repeat([]byte("hello world!"), 10000)
-	encoded, _ := Encode(content, WriterOptions{Quality: 5})
-	decoded, err := Decode(encoded)
+	encoded := Encode(nil, content, 5)
+	decoded, err := Decode(nil, encoded)
 	if err != nil {
 		t.Errorf("Decode: %v", err)
 	}
@@ -382,8 +381,8 @@ func TestDecode(t *testing.T) {
 func TestQuality(t *testing.T) {
 	content := bytes.Repeat([]byte("hello world!"), 10000)
 	for q := 0; q < 12; q++ {
-		encoded, _ := Encode(content, WriterOptions{Quality: q})
-		decoded, err := Decode(encoded)
+		encoded := Encode(nil, content, q)
+		decoded, err := Decode(nil, encoded)
 		if err != nil {
 			t.Errorf("Decode: %v", err)
 		}
@@ -402,10 +401,7 @@ func TestDecodeFuzz(t *testing.T) {
 	// Test that the decoder terminates with corrupted input.
 	content := bytes.Repeat([]byte("hello world!"), 100)
 	rnd := rand.New(rand.NewPCG(0, 0))
-	encoded, err := Encode(content, WriterOptions{Quality: 5})
-	if err != nil {
-		t.Fatalf("Encode(<%d bytes>, _) = _, %s", len(content), err)
-	}
+	encoded := Encode(nil, content, 5)
 	if len(encoded) == 0 {
 		t.Fatalf("Encode(<%d bytes>, _) produced empty output", len(content))
 	}
@@ -414,14 +410,14 @@ func TestDecodeFuzz(t *testing.T) {
 		for j := 0; j < 5; j++ {
 			enc[rnd.IntN(len(enc))] = byte(rnd.IntN(256))
 		}
-		Decode(enc)
+		_, _ = Decode(nil, enc)
 	}
 }
 
 func TestDecodeTrailingData(t *testing.T) {
 	content := bytes.Repeat([]byte("hello world!"), 100)
-	encoded, _ := Encode(content, WriterOptions{Quality: 5})
-	_, err := Decode(append(encoded, 0))
+	encoded := Encode(nil, content, 5)
+	_, err := Decode(nil, append(encoded, 0))
 	if err == nil {
 		t.Errorf("Expected 'excessive input' error")
 	}
@@ -439,10 +435,7 @@ func TestEncodeDecode(t *testing.T) {
 	} {
 		t.Logf("case %q x %d", test.data, test.repeats)
 		input := bytes.Repeat(test.data, test.repeats)
-		encoded, err := Encode(input, WriterOptions{Quality: 5})
-		if err != nil {
-			t.Errorf("Encode: %v", err)
-		}
+		encoded := Encode(nil, input, 5)
 		// Inputs are compressible, but may be too small to compress.
 		if maxSize := len(input)/2 + 20; len(encoded) >= maxSize {
 			t.Errorf(""+
@@ -450,7 +443,7 @@ func TestEncodeDecode(t *testing.T) {
 				"Encoded=%q",
 				len(encoded), maxSize, encoded)
 		}
-		decoded, err := Decode(encoded)
+		decoded, err := Decode(nil, encoded)
 		if err != nil {
 			t.Errorf("Decode: %v", err)
 		}
@@ -513,22 +506,7 @@ func TestErrorReset(t *testing.T) {
 	}
 }
 
-// Encode returns content encoded with Brotli.
-func Encode(content []byte, options WriterOptions) ([]byte, error) {
-	var buf bytes.Buffer
-	writer := NewWriterOptions(&buf, options)
-	_, err := writer.Write(content)
-	if closeErr := writer.Close(); err == nil {
-		err = closeErr
-	}
-	return buf.Bytes(), err
-}
-
-// Decode decodes Brotli encoded data.
-func Decode(encodedData []byte) ([]byte, error) {
-	r := NewReader(bytes.NewReader(encodedData))
-	return io.ReadAll(r)
-}
+// (Private Encode and Decode helpers removed; test suite now uses public root-package functions)
 
 func BenchmarkEncodeLevels(b *testing.B) {
 	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
@@ -591,6 +569,47 @@ func BenchmarkDecodeLevels(b *testing.B) {
 			b.SetBytes(int64(len(opticks)))
 			for b.Loop() {
 				io.Copy(io.Discard, NewReader(bytes.NewReader(compressed)))
+			}
+		})
+	}
+}
+
+func BenchmarkBlockEncode(b *testing.B) {
+	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for level := BestSpeed; level <= BestCompression; level++ {
+		b.Run(fmt.Sprintf("%d", level), func(b *testing.B) {
+			var dst []byte
+			b.ReportAllocs()
+			b.SetBytes(int64(len(opticks)))
+			for b.Loop() {
+				dst = Encode(dst, opticks, level)
+			}
+		})
+	}
+}
+
+func BenchmarkBlockDecode(b *testing.B) {
+	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for level := BestSpeed; level <= BestCompression; level++ {
+		compressed := Encode(nil, opticks, level)
+		b.Run(fmt.Sprintf("%d", level), func(b *testing.B) {
+			var dst []byte
+			b.ReportAllocs()
+			b.SetBytes(int64(len(opticks)))
+			var err error
+			for b.Loop() {
+				dst, err = Decode(dst, compressed)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}

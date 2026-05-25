@@ -2,8 +2,7 @@ package decoder
 
 import (
 	"errors"
-	"io"
-)
+	"io")
 
 type decodeError int
 
@@ -33,11 +32,32 @@ func NewReader(src io.Reader) *Reader {
 // This permits reusing a Reader rather than allocating a new one.
 // Error is always nil
 func (r *Reader) Reset(src io.Reader) error {
-	if r.errorCode < 0 {
-		// There was an unrecoverable error, leaving the Reader's state
-		// undefined. Clear out everything but the buffer.
-		*r = Reader{buf: r.buf}
-	}
+	// Save the pre-allocated slices/buffers so we can reuse their capacity!
+	buf := r.buf
+	ringbuffer := r.ringbuffer
+	contextMap := r.contextMap
+	distContextMap := r.distContextMap
+	contextModes := r.contextModes
+	blockTypeTrees := r.blockTypeTrees
+	blockLenTrees := r.blockLenTrees
+	literalHGroup := r.literalHGroup
+	insertCopyHGroup := r.insertCopyHGroup
+	distanceHGroup := r.distanceHGroup
+
+	// Zero the struct to clear state machine fields
+	*r = Reader{}
+
+	// Restore slices (preserving their capacity!)
+	r.buf = buf
+	r.ringbuffer = ringbuffer
+	r.contextMap = contextMap
+	r.distContextMap = distContextMap
+	r.contextModes = contextModes
+	r.blockTypeTrees = blockTypeTrees
+	r.blockLenTrees = blockLenTrees
+	r.literalHGroup = literalHGroup
+	r.insertCopyHGroup = insertCopyHGroup
+	r.distanceHGroup = distanceHGroup
 
 	decoderStateInit(r)
 	r.src = src
