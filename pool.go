@@ -3,6 +3,7 @@ package brotli
 import (
 	"io"
 	"sync"
+	"sync/atomic"
 )
 
 // Global default pools for standard compression and decompression
@@ -10,19 +11,48 @@ var (
 	defaultWriterPool = NewWriterPool(DefaultCompression)
 	defaultReaderPool = NewReaderPool()
 
-	writerPools [12]*WriterPool
+	writerPools      [12]*WriterPool
+	writerStatePools [12]*sync.Pool
+
+	globalSessionID uint64
 )
 
 func init() {
 	for i := 0; i < 12; i++ {
 		writerPools[i] = NewWriterPool(i)
+		writerStatePools[i] = &sync.Pool{}
 	}
+}
+
+func nextSessionID() uint64 {
+	return atomic.AddUint64(&globalSessionID, 1)
 }
 
 // getWriterPool returns the thread-safe WriterPool matching the normalized quality level.
 func getWriterPool(quality int) *WriterPool {
 	opts, _ := normalizeWriterOptions(WriterOptions{Quality: quality})
 	return writerPools[opts.Quality]
+}
+
+func getWriterStatePool(quality int) *sync.Pool {
+	opts, _ := normalizeWriterOptions(WriterOptions{Quality: quality})
+	return writerStatePools[opts.Quality]
+}
+
+func releaseWriterState(pool *sync.Pool, s *writerState, sessionID uint64) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	if s.released || s.sessionID != sessionID {
+		s.mu.Unlock()
+		return
+	}
+	s.released = true
+	s.mu.Unlock()
+
+	s.genericState.Dst = nil
+	pool.Put(s)
 }
 
 // GetWriter retrieves a default-compression (*Writer) from a package-level pool
@@ -59,7 +89,6 @@ func PutReader(r *Reader) {
 // write to it from one goroutine at a time, call Close when the stream is
 // complete, then return it to the pool and stop using that pointer.
 type WriterPool struct {
-	pool    sync.Pool
 	options WriterOptions
 }
 
@@ -74,14 +103,7 @@ func NewWriterPool(quality int) *WriterPool {
 // Get retrieves a Writer from the pool and resets it to write to dst.
 // If the pool is empty, a new Writer is allocated.
 func (p *WriterPool) Get(dst io.Writer) *Writer {
-	v := p.pool.Get()
-	if v == nil {
-		return NewWriterOptions(dst, p.options)
-	}
-	w := v.(*Writer)
-	w.options = p.options
-	w.Reset(dst)
-	return w
+	return NewWriterOptions(dst, p.options)
 }
 
 // Put returns the Writer to the pool. Callers must not use w after Put returns.
@@ -92,8 +114,9 @@ func (p *WriterPool) Put(w *Writer) {
 		return
 	}
 	w.options = p.options
-	w.Reset(nil)
-	p.pool.Put(w)
+	w.options, w.plan = normalizeWriterOptions(w.options)
+	pool := getWriterStatePool(w.plan.Quality)
+	releaseWriterState(pool, w.state, w.sessionID)
 }
 
 // ReaderPool manages a thread-safe pool of Reader instances to eliminate heap
