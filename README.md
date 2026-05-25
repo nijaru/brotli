@@ -6,11 +6,13 @@ This library is an optimized, allocation-conscious fork of the `c2go` port (`git
 
 ---
 
-## Optimizations
+## Features & Optimizations
 
-* **Zero-Allocation Resets**: Reusing a writer via `Reset()` or flushing via `Flush()` performs no heap allocations by using concrete structural routing inside `brotli.Writer`.
+* **Zero-Allocation Block API**: Provides Snappy-style block `Encode` and `Decode` functions with automatic pool recycling. Reusing destination slices delivers absolute zero heap allocations in the steady state (including a direct-to-slice decompression path that bypasses double-buffering).
+* **Go 1.23+ Range Iterators**: First-in-class native decompressor iterators (`Lines()` and `Chunks()`) for clean, modern `for...range` loops.
+* **Zero-Allocation Resets**: Reusing a writer via `Reset()` or decompressor via `Reset()` performs no heap allocations in the steady state.
 * **Fast State Clearing**: Uses Go builtins like `clear()` in hot decoder paths for faster memory operations.
-* **Lower Memory Footprint**: Reduces memory allocation by ~9 KB per writer instance at levels Q1–Q11 by removing redundant tables from the generic compression state.
+* **Lower Memory Footprint**: Reduces memory allocation by ~9 KB per writer instance at levels Q1–Q11 by removing redundant tables from the generic compression state, and leverages a 45x memory reduction for Q10-Q11 inside the splitters.
 
 ---
 
@@ -102,7 +104,60 @@ func main() {
 }
 ```
 
-### 2. Pooled Reuse
+### 2. Zero-Allocation Block API (Snappy-Style)
+For in-memory block operations, use the `Encode` and `Decode` facade. Reusing a slice capacity in `dst` delivers absolute zero heap allocations in the steady state:
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/nijaru/brotli"
+)
+
+func main() {
+	original := []byte("high-performance block data")
+
+	// 1. Compress block (quality level ranges from 0 to 11)
+	compressed := brotli.Encode(nil, original, brotli.DefaultCompression)
+
+	// 2. Decompress block (reusing a destination slice to prevent allocation)
+	var dst []byte
+	var err error
+	dst, err = brotli.Decode(dst, compressed)
+	if err != nil {
+		log.Fatalf("Decode failed: %v", err)
+	}
+
+	fmt.Println(string(dst))
+}
+```
+
+### 3. Modern Go 1.23+ Range Iterators
+Decompress streams line-by-line or chunk-by-chunk using standard `for...range` loops:
+
+```go
+// Line iterator
+for line, err := range reader.Lines() {
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(line)
+}
+
+// Zero-allocation chunk iterator (yielding chunks up to 8KB)
+for chunk, err := range reader.Chunks(8192) {
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Process chunk (valid only for the current iteration)
+	process(chunk)
+}
+```
+
+### 4. Pooled Streaming Reuse
 ```go
 var compressed bytes.Buffer
 
@@ -119,7 +174,7 @@ brotli.PutWriter(writer)
 Call `PutWriter` only after `Close`, and do not use the writer after returning
 it to the pool.
 
-### 3. Manual Reset Reuse
+### 5. Manual Reset Reuse
 ```go
 // Discard the writer's state and re-use the underlying buffers for a new target
 writer.Reset(newDestination)
