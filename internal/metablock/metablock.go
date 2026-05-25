@@ -29,6 +29,17 @@ type MetaBlockSplit struct {
 	Command_histograms_size   uint
 	Distance_histograms       []common.HistogramDistance
 	Distance_histograms_size  uint
+
+	// Reusable buffers for BuildMetaBlock context modeling (Q10/Q11)
+	Literal_context_modes           []int
+	Literal_histograms_temp         []common.HistogramLiteral
+	Distance_histograms_temp        []common.HistogramDistance
+	Cluster_size_buf                []uint32
+	Clusters_buf                    []uint32
+	Pairs_buf                       []HistogramPair
+	New_index_buf                   []uint32
+	Literal_histograms_reindex_buf  []common.HistogramLiteral
+	Distance_histograms_reindex_buf []common.HistogramDistance
 }
 
 var metaBlockPool sync.Pool

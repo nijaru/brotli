@@ -274,16 +274,11 @@ func TestDecoderStreaming(t *testing.T) {
 	pr, pw := io.Pipe()
 	writer := NewWriterOptions(pw, WriterOptions{Quality: 5, LGWin: 20})
 	reader := readerWithTimeout{NewReader(pr)}
-	defer func() {
-		go io.ReadAll(pr) // swallow the "EOF" token from writer.Close
-		if err := writer.Close(); err != nil {
-			t.Errorf("writer.Close: %v", err)
-		}
-	}()
-
 	ch := make(chan []byte)
 	errch := make(chan error)
+	donech := make(chan struct{})
 	go func() {
+		defer close(donech)
 		for {
 			segment, ok := <-ch
 			if !ok {
@@ -299,7 +294,15 @@ func TestDecoderStreaming(t *testing.T) {
 			}
 		}
 	}()
-	defer close(ch)
+
+	defer func() {
+		close(ch)
+		<-donech
+		go io.ReadAll(pr) // swallow the "EOF" token from writer.Close
+		if err := writer.Close(); err != nil {
+			t.Errorf("writer.Close: %v", err)
+		}
+	}()
 
 	segments := [...][]byte{
 		[]byte("first"),

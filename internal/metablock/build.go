@@ -503,18 +503,27 @@ func BuildMetaBlock(
 
 	if !params.Disable_literal_context_modeling {
 		literal_context_multiplier = 1 << common.LiteralContextBits
-		literal_context_modes = make([]int, mb.Literal_split.Num_types)
+		if cap(mb.Literal_context_modes) < int(mb.Literal_split.Num_types) {
+			mb.Literal_context_modes = make([]int, mb.Literal_split.Num_types)
+		}
+		literal_context_modes = mb.Literal_context_modes[:mb.Literal_split.Num_types]
 		for i = 0; i < mb.Literal_split.Num_types; i++ {
 			literal_context_modes[i] = literal_context_mode
 		}
 	}
 
 	literal_histograms_size = mb.Literal_split.Num_types * literal_context_multiplier
-	literal_histograms = make([]common.HistogramLiteral, literal_histograms_size)
+	if cap(mb.Literal_histograms_temp) < int(literal_histograms_size) {
+		mb.Literal_histograms_temp = make([]common.HistogramLiteral, literal_histograms_size)
+	}
+	literal_histograms = mb.Literal_histograms_temp[:literal_histograms_size]
 	common.ClearHistogramsLiteral(literal_histograms, literal_histograms_size)
 
 	distance_histograms_size = mb.Distance_split.Num_types << common.DistanceContextBits
-	distance_histograms = make([]common.HistogramDistance, distance_histograms_size)
+	if cap(mb.Distance_histograms_temp) < int(distance_histograms_size) {
+		mb.Distance_histograms_temp = make([]common.HistogramDistance, distance_histograms_size)
+	}
+	distance_histograms = mb.Distance_histograms_temp[:distance_histograms_size]
 	common.ClearHistogramsDistance(distance_histograms, distance_histograms_size)
 
 	mb.Command_histograms_size = mb.Command_split.Num_types
@@ -563,6 +572,11 @@ func BuildMetaBlock(
 		mb.Literal_histograms,
 		&mb.Literal_histograms_size,
 		mb.Literal_context_map,
+		&mb.Cluster_size_buf,
+		&mb.Clusters_buf,
+		&mb.Pairs_buf,
+		&mb.New_index_buf,
+		&mb.Literal_histograms_reindex_buf,
 	)
 	literal_histograms = nil
 
@@ -597,6 +611,11 @@ func BuildMetaBlock(
 		mb.Distance_histograms,
 		&mb.Distance_histograms_size,
 		mb.Distance_context_map,
+		&mb.Cluster_size_buf,
+		&mb.Clusters_buf,
+		&mb.Pairs_buf,
+		&mb.New_index_buf,
+		&mb.Distance_histograms_reindex_buf,
 	)
 	distance_histograms = nil
 }

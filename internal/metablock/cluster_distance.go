@@ -269,8 +269,18 @@ func histogramRemapDistance(
 
 var histogramReindexDistance_kInvalidIndex uint32 = math.MaxUint32
 
-func histogramReindexDistance(out []common.HistogramDistance, symbols []uint32, length uint) uint {
-	var new_index []uint32 = make([]uint32, length)
+func histogramReindexDistance(
+	out []common.HistogramDistance,
+	symbols []uint32,
+	length uint,
+	new_index_buf *[]uint32,
+	reindex_tmp *[]common.HistogramDistance,
+) uint {
+	if cap(*new_index_buf) < int(length) {
+		*new_index_buf = make([]uint32, length)
+	}
+	new_index := (*new_index_buf)[:length]
+
 	var next_index uint32
 	var tmp []common.HistogramDistance
 	var i uint
@@ -286,9 +296,10 @@ func histogramReindexDistance(out []common.HistogramDistance, symbols []uint32, 
 		}
 	}
 
-	/* TODO: by using idea of "cycle-sort" we can avoid allocation of
-	   tmp and reduce the number of copying by the factor of 2. */
-	tmp = make([]common.HistogramDistance, next_index)
+	if cap(*reindex_tmp) < int(next_index) {
+		*reindex_tmp = make([]common.HistogramDistance, next_index)
+	}
+	tmp = (*reindex_tmp)[:next_index]
 
 	next_index = 0
 	for i = 0; i < length; i++ {
@@ -300,12 +311,10 @@ func histogramReindexDistance(out []common.HistogramDistance, symbols []uint32, 
 		symbols[i] = new_index[symbols[i]]
 	}
 
-	new_index = nil
 	for i = 0; uint32(i) < next_index; i++ {
 		out[i] = tmp[i]
 	}
 
-	tmp = nil
 	return uint(next_index)
 }
 
@@ -316,13 +325,31 @@ func ClusterHistogramsDistance(
 	out []common.HistogramDistance,
 	out_size *uint,
 	histogram_symbols []uint32,
+	cluster_size_buf *[]uint32,
+	clusters_buf *[]uint32,
+	pairs_buf *[]HistogramPair,
+	new_index_buf *[]uint32,
+	reindex_tmp *[]common.HistogramDistance,
 ) {
-	var cluster_size []uint32 = make([]uint32, in_size)
-	var clusters []uint32 = make([]uint32, in_size)
+	if cap(*cluster_size_buf) < int(in_size) {
+		*cluster_size_buf = make([]uint32, in_size)
+	}
+	cluster_size := (*cluster_size_buf)[:in_size]
+
+	if cap(*clusters_buf) < int(in_size) {
+		*clusters_buf = make([]uint32, in_size)
+	}
+	clusters := (*clusters_buf)[:in_size]
+
 	var num_clusters uint = 0
 	var max_input_histograms uint = 64
 	var pairs_capacity uint = max_input_histograms * max_input_histograms / 2
-	var pairs []HistogramPair = make([]HistogramPair, (pairs_capacity + 1))
+
+	if cap(*pairs_buf) < int(pairs_capacity+1) {
+		*pairs_buf = make([]HistogramPair, pairs_capacity+1)
+	}
+	pairs := (*pairs_buf)[:pairs_capacity+1]
+
 	var i uint
 
 	/* For the first pass of clustering, we allow all pairs. */
@@ -377,6 +404,7 @@ func ClusterHistogramsDistance(
 				copy(new_array, pairs[:pairs_capacity])
 			}
 
+			*pairs_buf = new_array
 			pairs = new_array
 			pairs_capacity = _new_size
 		}
@@ -395,14 +423,9 @@ func ClusterHistogramsDistance(
 		)
 	}
 
-	pairs = nil
-	cluster_size = nil
-
 	/* Find the optimal map from original histograms to the final ones. */
 	histogramRemapDistance(in, in_size, clusters, num_clusters, out, histogram_symbols)
 
-	clusters = nil
-
 	/* Convert the context map to a canonical form. */
-	*out_size = histogramReindexDistance(out, histogram_symbols, in_size)
+	*out_size = histogramReindexDistance(out, histogram_symbols, in_size, new_index_buf, reindex_tmp)
 }

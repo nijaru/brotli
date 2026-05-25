@@ -3,8 +3,6 @@ package brotli
 import (
 	"errors"
 	"io"
-	"runtime"
-	"sync"
 
 	"github.com/nijaru/brotli/internal/encoder/generic"
 	"github.com/nijaru/brotli/internal/encoder/q0"
@@ -40,21 +38,14 @@ var (
 	errWriterClosed = errors.New("brotli: Writer is closed")
 )
 
-type writerState struct {
+type Writer struct {
+	dst     io.Writer
+	options WriterOptions
+	err     error
+	plan    quality.Plan
+
 	q0State      q0.Encoder
 	genericState generic.State
-	mu           sync.Mutex
-	released     bool
-	sessionID    uint64
-}
-
-type Writer struct {
-	dst       io.Writer
-	options   WriterOptions
-	err       error
-	plan      quality.Plan
-	state     *writerState
-	sessionID uint64
 }
 
 // Writes to the returned writer are compressed and written to dst.
@@ -72,11 +63,6 @@ func NewWriterLevel(dst io.Writer, level int) *Writer {
 	return NewWriterOptions(dst, WriterOptions{
 		Quality: level,
 	})
-}
-
-type cleanupArg struct {
-	state     *writerState
-	sessionID uint64
 }
 
 // NewWriterOptions is like NewWriter but specifies WriterOptions
@@ -108,38 +94,16 @@ func (w *Writer) Reset(dst io.Writer) {
 	w.options, w.plan = normalizeWriterOptions(w.options)
 	lgwin := uint(w.plan.Lgwin)
 
-	if w.state == nil {
-		w.sessionID = nextSessionID()
-
-		pool := getWriterStatePool(w.plan.Quality)
-		v := pool.Get()
-		if v == nil {
-			w.state = &writerState{}
-		} else {
-			w.state = v.(*writerState)
-		}
-
-		w.state.mu.Lock()
-		w.state.sessionID = w.sessionID
-		w.state.released = false
-		w.state.mu.Unlock()
-
-		runtime.AddCleanup(w, func(arg cleanupArg) {
-			releaseWriterState(pool, arg.state, arg.sessionID)
-		}, cleanupArg{state: w.state, sessionID: w.sessionID})
-	}
-
 	if w.plan.Tier == quality.TierQ0 {
-		w.state.q0State.Reset(lgwin)
+		w.q0State.Reset(lgwin)
 	} else {
-		generic.InitState(&w.state.genericState)
-		w.state.genericState.Params.Quality = w.plan.Quality
-		w.state.genericState.Params.Lgwin = lgwin
-		w.state.genericState.Plan = w.plan
-		w.state.genericState.Dst = dst
-		w.state.genericState.Err = nil
+		generic.InitState(&w.genericState)
+		w.genericState.Params.Quality = w.plan.Quality
+		w.genericState.Params.Lgwin = lgwin
+		w.genericState.Plan = w.plan
+		w.genericState.Dst = dst
+		w.genericState.Err = nil
 	}
-	runtime.KeepAlive(w)
 }
 
 func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
@@ -157,14 +121,14 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 		}
 
 		if op == operationFlush {
-			data := w.state.q0State.Flush()
+			data := w.q0State.Flush()
 			if len(data) > 0 {
 				_, w.err = w.dst.Write(data)
 			}
 			return 0, w.err
 		}
 
-		data := w.state.q0State.Encode(nil, p, isLast)
+		data := w.q0State.Encode(nil, p, isLast)
 		if len(data) > 0 {
 			_, w.err = w.dst.Write(data)
 		}
@@ -174,7 +138,7 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 	for {
 		availableIn := uint(len(p))
 		nextIn := p
-		success := generic.CompressStream(&w.state.genericState, op, &availableIn, &nextIn)
+		success := generic.CompressStream(&w.genericState, op, &availableIn, &nextIn)
 		bytesConsumed := len(p) - int(availableIn)
 		p = p[bytesConsumed:]
 		n += bytesConsumed
@@ -182,8 +146,8 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 			return n, errEncode
 		}
 
-		if len(p) == 0 || w.state.genericState.Err != nil {
-			w.err = w.state.genericState.Err
+		if len(p) == 0 || w.genericState.Err != nil {
+			w.err = w.genericState.Err
 			return n, w.err
 		}
 	}
@@ -195,7 +159,6 @@ func (w *Writer) writeChunk(p []byte, op int) (n int, err error) {
 // Flush has a negative impact on compression.
 func (w *Writer) Flush() error {
 	_, err := w.writeChunk(nil, operationFlush)
-	runtime.KeepAlive(w)
 	return err
 }
 
@@ -204,16 +167,13 @@ func (w *Writer) Close() error {
 	// If stream is already closed, it is reported by `writeChunk`.
 	_, err := w.writeChunk(nil, operationFinish)
 	w.dst = nil
-	runtime.KeepAlive(w)
 	return err
 }
 
 // Write implements io.Writer. Flush or Close must be called to ensure that the
 // encoded bytes are actually flushed to the underlying Writer.
 func (w *Writer) Write(p []byte) (n int, err error) {
-	n, err = w.writeChunk(p, operationProcess)
-	runtime.KeepAlive(w)
-	return n, err
+	return w.writeChunk(p, operationProcess)
 }
 
 type nopCloser struct {
