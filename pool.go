@@ -9,7 +9,21 @@ import (
 var (
 	defaultWriterPool = NewWriterPool(DefaultCompression)
 	defaultReaderPool = NewReaderPool()
+
+	writerPools [12]*WriterPool
 )
+
+func init() {
+	for i := 0; i < 12; i++ {
+		writerPools[i] = NewWriterPool(i)
+	}
+}
+
+// getWriterPool returns the thread-safe WriterPool matching the normalized quality level.
+func getWriterPool(quality int) *WriterPool {
+	opts, _ := normalizeWriterOptions(WriterOptions{Quality: quality})
+	return writerPools[opts.Quality]
+}
 
 // GetWriter retrieves a default-compression (*Writer) from a package-level pool
 // and resets it to write to dst. Use it for repeated one-shot compression where

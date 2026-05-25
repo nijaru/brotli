@@ -15,6 +15,17 @@ func HTTPCompressor(w http.ResponseWriter, r *http.Request) io.WriteCloser {
 	return HTTPCompressorWithLevel(w, r, 4)
 }
 
+type pooledWriterWrapper struct {
+	*Writer
+	pool *WriterPool
+}
+
+func (pw *pooledWriterWrapper) Close() error {
+	err := pw.Writer.Close()
+	pw.pool.Put(pw.Writer)
+	return err
+}
+
 func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) io.WriteCloser {
 	if w.Header().Get("Vary") == "" {
 		w.Header().Set("Vary", "Accept-Encoding")
@@ -24,7 +35,11 @@ func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) 
 	switch encoding {
 	case "br":
 		w.Header().Set("Content-Encoding", "br")
-		return NewWriterLevel(w, level)
+		pool := getWriterPool(level)
+		return &pooledWriterWrapper{
+			Writer: pool.Get(w),
+			pool:   pool,
+		}
 	case "gzip":
 		w.Header().Set("Content-Encoding", "gzip")
 		gw, err := gzip.NewWriterLevel(w, gzipLevelForBrotliLevel(level))
