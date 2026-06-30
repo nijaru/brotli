@@ -427,5 +427,11 @@ func ClusterHistogramsDistance(
 	histogramRemapDistance(in, in_size, clusters, num_clusters, out, histogram_symbols)
 
 	/* Convert the context map to a canonical form. */
-	*out_size = histogramReindexDistance(out, histogram_symbols, in_size, new_index_buf, reindex_tmp)
+	*out_size = histogramReindexDistance(
+		out,
+		histogram_symbols,
+		in_size,
+		new_index_buf,
+		reindex_tmp,
+	)
 }

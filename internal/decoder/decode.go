@@ -1802,7 +1802,8 @@ func processCommandsInternal(safe int, s *Reader) int {
 	mask := s.ringbufferMask
 
 	if rSize > 0 {
-		if len(ringbuffer) < rSize || mask >= rSize || pos < 0 || pos > rSize || uint(mask) >= uint(len(ringbuffer)) {
+		if len(ringbuffer) < rSize || mask >= rSize || pos < 0 || pos > rSize ||
+			uint(mask) >= uint(len(ringbuffer)) {
 			return decoderErrorUnreachable
 		}
 	} else {

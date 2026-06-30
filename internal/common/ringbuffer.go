@@ -6,8 +6,6 @@ package common
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-import ()
-
 type RingBuffer struct {
 	Size_       uint32
 	Mask_       uint32

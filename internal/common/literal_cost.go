@@ -1,7 +1,5 @@
 package common
 
-import ()
-
 /* Copyright 2013 Google Inc. All Rights Reserved.
 
    Distributed under MIT license.

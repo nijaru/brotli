@@ -780,7 +780,14 @@ emit_commands:
 				ip += int(matched)
 
 				if insertlen < 6210 {
-					q0EmitInsertLen(insertlen, cmd_depth, cmd_bits, cmd_histo[:], storage_ix, storage)
+					q0EmitInsertLen(
+						insertlen,
+						cmd_depth,
+						cmd_bits,
+						cmd_histo[:],
+						storage_ix,
+						storage,
+					)
 				} else if shouldUseUncompressedMode(uint(next_emit-metablockStart), insertlen, literal_ratio) {
 					emitUncompressedMetaBlock1(in[metablockStart:], in[base:], mlen_storage_ix-3, storage_ix, storage)
 					input_size -= uint(base - input)
