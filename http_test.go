@@ -7,7 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
-	"testing")
+	"testing"
+)
 
 func TestGzipLevelForBrotliLevel(t *testing.T) {
 	tests := []struct {

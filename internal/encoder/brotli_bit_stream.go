@@ -4,7 +4,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/nijaru/brotli/internal/common")
+	"github.com/nijaru/brotli/internal/common"
+)
 
 const maxHuffmanTreeSize = (2*common.NumCommandSymbols + 1)
 

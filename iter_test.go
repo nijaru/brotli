@@ -3,7 +3,8 @@ package brotli
 import (
 	"bytes"
 	"slices"
-	"testing")
+	"testing"
+)
 
 func TestReaderLines(t *testing.T) {
 	linesInput := "line 1\nline 2\r\nline 3\nline 4"

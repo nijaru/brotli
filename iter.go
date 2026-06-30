@@ -4,7 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"iter")
+	"iter"
+)
 
 // Lines returns an iterator that yields decompressed text line-by-line from the Reader.
 // It returns a sequence of (line, error), ensuring that any decompression or scanning

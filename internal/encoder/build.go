@@ -1,7 +1,8 @@
 package encoder
 
 import (
-	"github.com/nijaru/brotli/internal/common")
+	"github.com/nijaru/brotli/internal/common"
+)
 
 const maxStaticContexts = 13
 

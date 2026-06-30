@@ -8,7 +8,8 @@ import (
 	"bytes"
 	"io"
 	"log"
-	"os")
+	"os"
+)
 
 func ExampleWriter_Reset() {
 	proverbs := []string{

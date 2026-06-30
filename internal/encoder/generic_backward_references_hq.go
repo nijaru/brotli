@@ -3,7 +3,8 @@ package encoder
 import (
 	"math"
 
-	"github.com/nijaru/brotli/internal/common")
+	"github.com/nijaru/brotli/internal/common"
+)
 
 type zopfliNode struct {
 	length              uint32

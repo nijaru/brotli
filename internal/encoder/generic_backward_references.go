@@ -3,7 +3,8 @@ package encoder
 import (
 	"sync"
 
-	"github.com/nijaru/brotli/internal/common")
+	"github.com/nijaru/brotli/internal/common"
+)
 
 /* Copyright 2013 Google Inc. All Rights Reserved.
 

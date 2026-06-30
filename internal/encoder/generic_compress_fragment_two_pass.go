@@ -3,7 +3,8 @@ package encoder
 import (
 	"encoding/binary"
 
-	"github.com/nijaru/brotli/internal/common")
+	"github.com/nijaru/brotli/internal/common"
+)
 
 /* Copyright 2015 Google Inc. All Rights Reserved.
 

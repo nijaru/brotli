@@ -1,7 +1,8 @@
 package encoder
 
 import (
-	"testing")
+	"testing"
+)
 
 func TestNewPlan(t *testing.T) {
 	tests := []struct {

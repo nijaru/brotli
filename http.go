@@ -4,7 +4,8 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-	"strings")
+	"strings"
+)
 
 // HTTPCompressor chooses a compression method (brotli, gzip, or none) based on
 // the Accept-Encoding header, sets the Content-Encoding header, and returns a

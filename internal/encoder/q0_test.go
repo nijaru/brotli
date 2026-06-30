@@ -7,7 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nijaru/brotli/internal/decoder")
+	"github.com/nijaru/brotli/internal/decoder"
+)
 
 func Decode(encodedData []byte) ([]byte, error) {
 	r := decoder.NewReader(bytes.NewReader(encodedData))
