@@ -15,13 +15,24 @@ func HTTPCompressor(w http.ResponseWriter, r *http.Request) io.WriteCloser {
 }
 
 type pooledWriterWrapper struct {
-	*Writer
+	w    *Writer
 	pool *WriterPool
 }
 
+func (pw *pooledWriterWrapper) Write(p []byte) (n int, err error) {
+	if pw.w == nil {
+		return 0, errWriterClosed
+	}
+	return pw.w.Write(p)
+}
+
 func (pw *pooledWriterWrapper) Close() error {
-	err := pw.Writer.Close()
-	pw.pool.Put(pw.Writer)
+	if pw.w == nil {
+		return nil
+	}
+	err := pw.w.Close()
+	pw.pool.Put(pw.w)
+	pw.w = nil
 	return err
 }
 
@@ -36,8 +47,8 @@ func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) 
 		w.Header().Set("Content-Encoding", "br")
 		pool := getWriterPool(level)
 		return &pooledWriterWrapper{
-			Writer: pool.Get(w),
-			pool:   pool,
+			w:    pool.Get(w),
+			pool: pool,
 		}
 	case "gzip":
 		w.Header().Set("Content-Encoding", "gzip")

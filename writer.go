@@ -3,8 +3,10 @@ package brotli
 import (
 	"errors"
 	"io"
+	"unsafe"
 
-	"github.com/nijaru/brotli/internal/encoder")
+	"github.com/nijaru/brotli/internal/encoder"
+)
 
 const (
 	BestSpeed          = 0
@@ -175,7 +177,10 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 
 // WriteString implements io.StringWriter to write a string directly.
 func (w *Writer) WriteString(s string) (n int, err error) {
-	return w.Write([]byte(s))
+	if len(s) == 0 {
+		return 0, nil
+	}
+	return w.Write(unsafe.Slice(unsafe.StringData(s), len(s)))
 }
 
 // WriteByte implements io.ByteWriter to write a single byte.

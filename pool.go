@@ -1,13 +1,20 @@
 package brotli
 
 import (
+	"bytes"
 	"io"
-	"sync")
+	"sync"
+)
 
 // Global default pools for standard compression and decompression
 var (
 	defaultWriterPool = NewWriterPool(DefaultCompression)
 	defaultReaderPool = NewReaderPool()
+	bufferPool        = sync.Pool{
+		New: func() any {
+			return new(bytes.Buffer)
+		},
+	}
 
 	writerPools [12]*WriterPool
 )
@@ -41,6 +48,12 @@ func PutWriter(w *Writer) {
 // to read from src, eliminating initial allocation overhead.
 func GetReader(src io.Reader) *Reader {
 	return defaultReaderPool.Get(src)
+}
+
+// GetReaderBytes retrieves a (*Reader) from a package-level pool and resets it
+// to read from the provided slice, eliminating all allocation overhead.
+func GetReaderBytes(src []byte) *Reader {
+	return defaultReaderPool.GetBytes(src)
 }
 
 // PutReader returns a Reader to the package-level default pool.
@@ -115,6 +128,20 @@ func (p *ReaderPool) Get(src io.Reader) *Reader {
 	}
 	r := v.(*Reader)
 	r.Reset(src)
+	return r
+}
+
+// GetBytes retrieves a Reader from the pool and resets it to read from the provided slice.
+// If the pool is empty, a new Reader is allocated.
+func (p *ReaderPool) GetBytes(src []byte) *Reader {
+	v := p.pool.Get()
+	if v == nil {
+		r := &Reader{}
+		r.ResetBytes(src)
+		return r
+	}
+	r := v.(*Reader)
+	r.ResetBytes(src)
 	return r
 }
 

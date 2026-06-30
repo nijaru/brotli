@@ -8,12 +8,14 @@ import "bytes"
 // The compressed data is overwritten starting at index 0 of dst.
 func Encode(dst, src []byte, quality int) []byte {
 	pool := getWriterPool(quality)
-	var buf bytes.Buffer
-	w := pool.Get(&buf)
+	buf := bufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+
+	w := pool.Get(buf)
 
 	// Override quality and reset to write to buf
 	w.options.Quality = quality
-	w.Reset(&buf)
+	w.Reset(buf)
 
 	_, _ = w.Write(src)
 	_ = w.Close()
@@ -27,5 +29,6 @@ func Encode(dst, src []byte, quality int) []byte {
 	copy(dst, buf.Bytes())
 
 	pool.Put(w)
+	bufferPool.Put(buf)
 	return dst
 }

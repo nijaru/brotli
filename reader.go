@@ -23,6 +23,13 @@ func (r *Reader) Reset(src io.Reader) error {
 	return r.dec.Reset(src)
 }
 
+// ResetBytes discards the Reader's state and makes it equivalent to the result of
+// its original state from NewReader, but reading from the provided slice instead.
+// This permits reusing a Reader without allocating a bytes.Reader or copying input data.
+func (r *Reader) ResetBytes(src []byte) {
+	r.dec.ResetBytes(src)
+}
+
 // NewReader creates a new Reader reading the given reader.
 func NewReader(src io.Reader) *Reader {
 	r := &Reader{}

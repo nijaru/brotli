@@ -1,7 +1,6 @@
 package brotli
 
 import (
-	"bytes"
 	"io"
 )
 
@@ -10,7 +9,7 @@ import (
 // If dst is nil or too small, a new slice is allocated automatically.
 // The uncompressed data is overwritten starting at index 0 of dst.
 func Decode(dst, src []byte) ([]byte, error) {
-	r := GetReader(bytes.NewReader(src))
+	r := GetReaderBytes(src)
 	defer PutReader(r)
 
 	if dst != nil {

@@ -1797,6 +1797,20 @@ func processCommandsInternal(safe int, s *Reader) int {
 	var br *common.BitReader = &s.br
 	var hc []common.HuffmanCode
 
+	ringbuffer := s.ringbuffer
+	rSize := s.ringbufferSize
+	mask := s.ringbufferMask
+
+	if rSize > 0 {
+		if len(ringbuffer) < rSize || mask >= rSize || pos < 0 || pos > rSize || uint(mask) >= uint(len(ringbuffer)) {
+			return decoderErrorUnreachable
+		}
+	} else {
+		if pos != 0 {
+			return decoderErrorUnreachable
+		}
+	}
+
 	if !checkInputAmountMaybeSafe(safe, br, 28) {
 		result = decoderNeedsMoreInput
 		goto saveStateAndReturn
@@ -1893,7 +1907,7 @@ CommandInner:
 			}
 
 			if safe == 0 {
-				s.ringbuffer[pos] = byte(readPreloadedSymbol(s.literalHtree, br, &bits, &value))
+				ringbuffer[pos] = byte(readPreloadedSymbol(s.literalHtree, br, &bits, &value))
 			} else {
 				var literal uint32
 				if !safeReadSymbol(s.literalHtree, br, &literal) {
@@ -1901,12 +1915,12 @@ CommandInner:
 					goto saveStateAndReturn
 				}
 
-				s.ringbuffer[pos] = byte(literal)
+				ringbuffer[pos] = byte(literal)
 			}
 
 			s.blockLength[0]--
 			pos++
-			if pos == s.ringbufferSize {
+			if pos == rSize {
 				s.state = stateCommandInnerWrite
 				i--
 				goto saveStateAndReturn
@@ -1917,8 +1931,8 @@ CommandInner:
 			}
 		}
 	} else {
-		var p1 byte = s.ringbuffer[(pos-1)&s.ringbufferMask]
-		var p2 byte = s.ringbuffer[(pos-2)&s.ringbufferMask]
+		var p1 byte = ringbuffer[(pos-1)&mask]
+		var p2 byte = ringbuffer[(pos-2)&mask]
 		for {
 			var ctx byte
 			if !checkInputAmountMaybeSafe(safe, br, 28) { /* 162 bits + 7 bytes */
@@ -1957,10 +1971,10 @@ CommandInner:
 				p1 = byte(literal)
 			}
 
-			s.ringbuffer[pos] = p1
+			ringbuffer[pos] = p1
 			s.blockLength[0]--
 			pos++
-			if pos == s.ringbufferSize {
+			if pos == rSize {
 				s.state = stateCommandInnerWrite
 				i--
 				goto saveStateAndReturn
@@ -2041,8 +2055,8 @@ CommandPostDecodeLiterals:
 			var trans *common.Transforms = s.transforms
 			var offset int = int(s.dictionary.Offsets_by_length[i])
 			var shift uint32 = uint32(s.dictionary.Size_bits_by_length[i])
-			var mask int = int(common.BitMask(shift))
-			var word_idx int = address & mask
+			var mask_val int = int(common.BitMask(shift))
+			var word_idx int = address & mask_val
 			var transform_idx int = address >> shift
 
 			/* Compensate double distance-ring-buffer roll. */
@@ -2057,14 +2071,14 @@ CommandPostDecodeLiterals:
 				word := words.Data[offset:]
 				var len int = i
 				if transform_idx == int(trans.CutOffTransforms[0]) {
-					copy(s.ringbuffer[pos:], word[:uint(len)])
+					copy(ringbuffer[pos:], word[:uint(len)])
 				} else {
-					len = common.TransformDictionaryWord(s.ringbuffer[pos:], word, int(len), trans, transform_idx)
+					len = common.TransformDictionaryWord(ringbuffer[pos:], word, int(len), trans, transform_idx)
 				}
 
 				pos += int(len)
 				s.metaBlockRemainingLen -= int(len)
-				if pos >= s.ringbufferSize {
+				if pos >= rSize {
 					s.state = stateCommandPostWrite1
 					goto saveStateAndReturn
 				}
@@ -2076,9 +2090,9 @@ CommandPostDecodeLiterals:
 			return decoderErrorFormatDictionary
 		}
 	} else {
-		var src_start int = (pos - s.distanceCode) & s.ringbufferMask
-		copy_dst := s.ringbuffer[pos:]
-		copy_src := s.ringbuffer[src_start:]
+		var src_start int = (pos - s.distanceCode) & mask
+		copy_dst := ringbuffer[pos:]
+		copy_src := ringbuffer[src_start:]
 		var dst_end int = pos + i
 		var src_end int = src_start + i
 
@@ -2098,7 +2112,7 @@ CommandPostDecodeLiterals:
 			goto CommandPostWrapCopy
 		}
 
-		if dst_end >= s.ringbufferSize || src_end >= s.ringbufferSize {
+		if dst_end >= rSize || src_end >= rSize {
 			/* At least one region wraps. */
 			goto CommandPostWrapCopy
 		}
@@ -2125,13 +2139,13 @@ CommandPostDecodeLiterals:
 	}
 CommandPostWrapCopy:
 	{
-		var wrap_guard int = s.ringbufferSize - pos
+		var wrap_guard int = rSize - pos
 		for {
 			i--
 			if i < 0 {
 				break
 			}
-			s.ringbuffer[pos] = s.ringbuffer[(pos-s.distanceCode)&s.ringbufferMask]
+			ringbuffer[pos] = ringbuffer[(pos-s.distanceCode)&mask]
 			pos++
 			wrap_guard--
 			if wrap_guard == 0 {

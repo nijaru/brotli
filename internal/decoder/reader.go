@@ -68,8 +68,44 @@ func (r *Reader) Reset(src io.Reader) error {
 	return nil
 }
 
+func (r *Reader) ResetBytes(src []byte) {
+	// Save the pre-allocated slices/buffers so we can reuse their capacity!
+	buf := r.buf
+	ringbuffer := r.ringbuffer
+	contextMap := r.contextMap
+	distContextMap := r.distContextMap
+	contextModes := r.contextModes
+	blockTypeTrees := r.blockTypeTrees
+	blockLenTrees := r.blockLenTrees
+	literalHGroup := r.literalHGroup
+	insertCopyHGroup := r.insertCopyHGroup
+	distanceHGroup := r.distanceHGroup
+
+	// Zero the struct to clear state machine fields
+	*r = Reader{}
+
+	// Restore slices (preserving their capacity!)
+	r.buf = buf
+	r.ringbuffer = ringbuffer
+	r.contextMap = contextMap
+	r.distContextMap = distContextMap
+	r.contextModes = contextModes
+	r.blockTypeTrees = blockTypeTrees
+	r.blockLenTrees = blockLenTrees
+	r.literalHGroup = literalHGroup
+	r.insertCopyHGroup = insertCopyHGroup
+	r.distanceHGroup = distanceHGroup
+
+	decoderStateInit(r)
+	r.src = nil
+	r.in = src
+}
+
 func (r *Reader) Read(p []byte) (n int, err error) {
 	if !decoderHasMoreOutput(r) && len(r.in) == 0 {
+		if r.src == nil {
+			return 0, io.EOF
+		}
 		m, readErr := r.src.Read(r.buf)
 		if m == 0 {
 			if readErr == io.EOF && r.state != stateDone {
@@ -118,6 +154,10 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 		// Calling r.src.Read may block. Don't block if we have data to return.
 		if n > 0 {
 			return n, nil
+		}
+
+		if r.src == nil {
+			return 0, io.ErrUnexpectedEOF
 		}
 
 		// Top off the buffer.
