@@ -997,4 +997,37 @@ func FuzzDecode(f *testing.F) {
 	})
 }
 
+func BenchmarkCompareUpstreamBrotli(b *testing.B) {
+	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	levels := []int{0, 6, 9}
+	for _, lvl := range levels {
+		b.Run(fmt.Sprintf("Nijaru/Q%d", lvl), func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(len(opticks)))
+			w := NewWriterLevel(io.Discard, lvl)
+			for b.Loop() {
+				w.Reset(io.Discard)
+				w.Write(opticks)
+				w.Close()
+			}
+		})
+
+		b.Run(fmt.Sprintf("Upstream/Q%d", lvl), func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(len(opticks)))
+			w := andybrotli.NewWriterLevel(io.Discard, lvl)
+			for b.Loop() {
+				w.Reset(io.Discard)
+				w.Write(opticks)
+				w.Close()
+			}
+		})
+	}
+}
+
+
 
