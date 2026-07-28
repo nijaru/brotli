@@ -182,7 +182,7 @@ func hashAtOffset(v uint64, offset int, shift uint) uint32 {
 	assert(offset >= 0)
 	assert(offset <= 3)
 	{
-		var h uint64 = ((v >> uint(8*offset)) << 24) * uint64(KHashMul32)
+		var h uint64 = ((v >> uint(offset<<3)) << 24) * uint64(KHashMul32)
 		return uint32(h >> shift)
 	}
 }
@@ -325,9 +325,7 @@ func (e *Encoder) buildAndStoreCommandPrefixCode(
 	copy(bits[56:], cmd_bits[56:64])
 	ConvertBitDepthsToSymbols(depth[64:], 64, bits[64:])
 
-	for i = 0; i < 64; i++ {
-		cmd_depth[i] = 0
-	}
+	clear(cmd_depth[:64])
 	copy(cmd_depth[:], depth[:8])
 	copy(cmd_depth[64:], depth[8:16])
 	copy(cmd_depth[128:], depth[16:24])
@@ -374,9 +372,7 @@ func (e *Encoder) buildAndStoreCommandPrefixCodeToBuffer(
 	copy(bits[56:], cmd_bits[56:64])
 	ConvertBitDepthsToSymbols(depth[64:], 64, bits[64:])
 
-	for i = 0; i < 64; i++ {
-		cmd_depth[i] = 0
-	}
+	clear(cmd_depth[:64])
 	copy(cmd_depth[:], depth[:8])
 	copy(cmd_depth[64:], depth[8:16])
 	copy(cmd_depth[128:], depth[16:24])
