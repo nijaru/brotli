@@ -38,8 +38,11 @@ func (pw *pooledWriterWrapper) Close() error {
 }
 
 func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) io.WriteCloser {
-	if w.Header().Get("Vary") == "" {
+	vary := w.Header().Get("Vary")
+	if vary == "" {
 		w.Header().Set("Vary", "Accept-Encoding")
+	} else if !strings.Contains(strings.ToLower(vary), "accept-encoding") {
+		w.Header().Add("Vary", "Accept-Encoding")
 	}
 
 	encoding := negotiateContentEncoding(r, []string{"br", "gzip"})

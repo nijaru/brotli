@@ -13,10 +13,6 @@ func Encode(dst, src []byte, quality int) []byte {
 
 	w := pool.Get(buf)
 
-	// Override quality and reset to write to buf
-	w.options.Quality = quality
-	w.Reset(buf)
-
 	_, _ = w.Write(src)
 	_ = w.Close()
 

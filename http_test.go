@@ -66,6 +66,28 @@ func TestHTTPCompressorGzipFallback(t *testing.T) {
 	}
 }
 
+func TestHTTPCompressorVaryExistingHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	rec.Header().Set("Vary", "Accept-Language")
+
+	w := HTTPCompressorWithLevel(rec, req, DefaultCompression)
+	w.Write([]byte("hello"))
+	w.Close()
+
+	varValues := rec.Header().Values("Vary")
+	foundAcceptEncoding := false
+	for _, v := range varValues {
+		if v == "Accept-Encoding" {
+			foundAcceptEncoding = true
+		}
+	}
+	if !foundAcceptEncoding {
+		t.Errorf("Vary values %v did not contain Accept-Encoding", varValues)
+	}
+}
+
 func TestHTTPPoolSafety(t *testing.T) {
 	input := []byte("http pool safety payload http pool safety payload http pool safety payload")
 

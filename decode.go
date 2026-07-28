@@ -22,6 +22,9 @@ func Decode(dst, src []byte) ([]byte, error) {
 			grow := cap(dst)
 			if grow < 8192 {
 				grow = 8192
+				if hint := len(src) * 2; hint > grow {
+					grow = hint
+				}
 			}
 			newDst := make([]byte, len(dst), len(dst)+grow)
 			copy(newDst, dst)
