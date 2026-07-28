@@ -31,6 +31,8 @@ type WriterOptions struct {
 	// LGWin is the base 2 logarithm of the sliding window size.
 	// Range is 10 to 24. 0 indicates automatic configuration based on Quality.
 	LGWin int
+	// CustomDict is an optional pre-shared dictionary slice used to seed the sliding window.
+	CustomDict []byte
 }
 
 var (

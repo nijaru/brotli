@@ -69,6 +69,11 @@ func (r *Reader) ResetBytes(src []byte) {
 	r.dec.ResetBytes(src)
 }
 
+// SetCustomDictionary configures a pre-shared dictionary on the Reader.
+func (r *Reader) SetCustomDictionary(dict []byte) {
+	r.dec.SetCustomDictionary(dict)
+}
+
 // NewReader creates a new Reader reading the given reader.
 func NewReader(src io.Reader) *Reader {
 	r := &Reader{}

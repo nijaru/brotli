@@ -101,6 +101,10 @@ func (r *Reader) ResetBytes(src []byte) {
 	r.in = src
 }
 
+func (r *Reader) SetCustomDictionary(dict []byte) {
+	r.customDict = append([]byte(nil), dict...)
+}
+
 func (r *Reader) Read(p []byte) (n int, err error) {
 	if !decoderHasMoreOutput(r) && len(r.in) == 0 {
 		if r.src == nil {

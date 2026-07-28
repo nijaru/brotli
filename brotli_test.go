@@ -983,3 +983,18 @@ func TestWriterReadFromAndReaderWriteTo(t *testing.T) {
 		t.Fatal("decompressed output did not match input")
 	}
 }
+
+func FuzzDecode(f *testing.F) {
+	// Seed with valid compressed streams
+	for _, text := range []string{"", "hello world", "the quick brown fox jumps over the lazy dog"} {
+		f.Add(Encode(nil, []byte(text), 0))
+		f.Add(Encode(nil, []byte(text), 6))
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		// Ensure decoder never panics on arbitrary/corrupted input
+		_, _ = Decode(nil, data)
+	})
+}
+
+

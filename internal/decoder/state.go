@@ -180,6 +180,7 @@ type Reader struct {
 	dictionary                *common.Dictionary
 	transforms                *common.Transforms
 	trivialLiteralContexts    [8]uint32
+	customDict                []byte
 }
 
 func decoderStateInit(s *Reader) bool {

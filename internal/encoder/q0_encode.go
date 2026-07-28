@@ -188,8 +188,7 @@ func hashAtOffset(v uint64, offset int, shift uint) uint32 {
 }
 
 func isMatch5(p1 []byte, p2 []byte) bool {
-	return binary.LittleEndian.Uint32(p1) == binary.LittleEndian.Uint32(p2) &&
-		p1[4] == p2[4]
+	return ((binary.LittleEndian.Uint64(p1) ^ binary.LittleEndian.Uint64(p2)) & 0xFFFFFFFFFF) == 0
 }
 
 func q0BuildAndStoreHuffmanTreeFast(
