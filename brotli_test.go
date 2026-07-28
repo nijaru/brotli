@@ -951,3 +951,35 @@ func TestDirectBitstreamParity(t *testing.T) {
 		})
 	}
 }
+
+func TestWriterReadFromAndReaderWriteTo(t *testing.T) {
+	input := pseudoRandomBytes(65536)
+
+	// Test Writer.ReadFrom (io.Copy into Writer)
+	var compressed bytes.Buffer
+	w := NewWriter(&compressed)
+	nWritten, err := io.Copy(w, bytes.NewReader(input))
+	if err != nil {
+		t.Fatalf("io.Copy to Writer failed: %v", err)
+	}
+	if nWritten != int64(len(input)) {
+		t.Fatalf("ReadFrom wrote %d bytes, want %d", nWritten, len(input))
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Writer.Close failed: %v", err)
+	}
+
+	// Test Reader.WriteTo (io.Copy from Reader)
+	r := NewReader(&compressed)
+	var decompressed bytes.Buffer
+	nRead, err := io.Copy(&decompressed, r)
+	if err != nil {
+		t.Fatalf("io.Copy from Reader failed: %v", err)
+	}
+	if nRead != int64(len(input)) {
+		t.Fatalf("WriteTo read %d bytes, want %d", nRead, len(input))
+	}
+	if !bytes.Equal(decompressed.Bytes(), input) {
+		t.Fatal("decompressed output did not match input")
+	}
+}

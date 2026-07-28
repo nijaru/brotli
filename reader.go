@@ -1,6 +1,7 @@
 package brotli
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/nijaru/brotli/internal/decoder"
@@ -15,6 +16,43 @@ type Reader struct {
 // Read implements io.Reader to read uncompressed bytes from the wrapped decompressor.
 func (r *Reader) Read(p []byte) (n int, err error) {
 	return r.dec.Read(p)
+}
+
+// WriteTo implements io.WriterTo to stream decompressed bytes directly into w.
+// This allows io.Copy(w, r) to achieve zero heap allocations in steady state.
+func (r *Reader) WriteTo(w io.Writer) (n int64, err error) {
+	buf := bufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufferPool.Put(buf)
+
+	b := buf.AvailableBuffer()
+	if cap(b) < 32768 {
+		b = make([]byte, 32768)
+	} else {
+		b = b[:32768]
+	}
+
+	for {
+		nr, rErr := r.Read(b)
+		if nr > 0 {
+			nw, wErr := w.Write(b[:nr])
+			if nw > 0 {
+				n += int64(nw)
+			}
+			if wErr != nil {
+				return n, wErr
+			}
+			if nw != nr {
+				return n, io.ErrShortWrite
+			}
+		}
+		if rErr != nil {
+			if rErr == io.EOF {
+				return n, nil
+			}
+			return n, rErr
+		}
+	}
 }
 
 // Reset discards the Reader's state and makes it equivalent to the result of

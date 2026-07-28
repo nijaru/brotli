@@ -136,10 +136,7 @@ func BenchmarkHTTPResponseCompression(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "br")
 
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		rec := httptest.NewRecorder()
 		w := HTTPCompressorWithLevel(rec, req, DefaultCompression)
 		w.Write(input)
@@ -152,10 +149,7 @@ func BenchmarkHTTPResponseCompressionNoPool(b *testing.B) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "br")
 
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		rec := httptest.NewRecorder()
 		rec.Header().Set("Content-Encoding", "br")
 		w := NewWriterLevel(rec, DefaultCompression)

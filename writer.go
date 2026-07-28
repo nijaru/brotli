@@ -1,6 +1,7 @@
 package brotli
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"unsafe"
@@ -189,6 +190,44 @@ func (w *Writer) WriteByte(c byte) error {
 	buf[0] = c
 	_, err := w.Write(buf[:])
 	return err
+}
+
+// ReadFrom implements io.ReaderFrom to stream uncompressed bytes directly from r
+// and write compressed bytes to the underlying destination.
+// This allows io.Copy(w, r) to achieve zero heap allocations in steady state.
+func (w *Writer) ReadFrom(r io.Reader) (n int64, err error) {
+	buf := bufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufferPool.Put(buf)
+
+	b := buf.AvailableBuffer()
+	if cap(b) < 32768 {
+		b = make([]byte, 32768)
+	} else {
+		b = b[:32768]
+	}
+
+	for {
+		nr, rErr := r.Read(b)
+		if nr > 0 {
+			nw, wErr := w.Write(b[:nr])
+			if nw > 0 {
+				n += int64(nw)
+			}
+			if wErr != nil {
+				return n, wErr
+			}
+			if nw != nr {
+				return n, io.ErrShortWrite
+			}
+		}
+		if rErr != nil {
+			if rErr == io.EOF {
+				return n, nil
+			}
+			return n, rErr
+		}
+	}
 }
 
 type nopCloser struct {
