@@ -1,5 +1,7 @@
 package encoder
 
+import "encoding/binary"
+
 /* Copyright 2010 Google Inc. All Rights Reserved.
 
    Distributed under MIT license.
@@ -54,4 +56,28 @@ func (w *BitWriter) JumpToByteBoundary() {
 	}
 	w.Bits = 0
 	w.Dst = dst
+}
+
+/*
+WriteBits writes bits into bytes in increasing addresses, and within
+a byte least-significant-bit first. Can write up to 56 bits in one go.
+*/
+func WriteBits(n_bits uint, bits uint64, pos *uint, array []byte) {
+	p := array[*pos>>3:]
+	v := uint64(p[0])
+	v |= bits << (*pos & 7)
+	binary.LittleEndian.PutUint64(p, v)
+	*pos += n_bits
+}
+
+func WriteSingleBit(bit bool, pos *uint, array []byte) {
+	if bit {
+		WriteBits(1, 1, pos, array)
+	} else {
+		WriteBits(1, 0, pos, array)
+	}
+}
+
+func WriteBitsPrepareStorage(pos uint, array []byte) {
+	array[pos>>3] = 0
 }
