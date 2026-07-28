@@ -1,4 +1,4 @@
-package encoder
+package hash
 
 import (
 	"encoding/binary"
@@ -21,35 +21,37 @@ A (forgetful) hash table to the data seen by the compressor, to
 	fixed size (block_size_). The ring buffer contains the last block_size_
 	index positions of the given hash key in the compressed data.
 */
-func (*h5) HashTypeLength() uint {
-	return 4
+func (*h6) HashTypeLength() uint {
+	return 8
 }
 
-func (*h5) StoreLookahead() uint {
-	return 4
+func (*h6) StoreLookahead() uint {
+	return 8
 }
 
 /* HashBytes is the function that chooses the bucket to place the address in. */
-func hashBytesH5(data []byte, shift int) uint32 {
-	var h uint32 = binary.LittleEndian.Uint32(data) * KHashMul32
+func hashBytesH6(data []byte, mask uint64, shift int) uint32 {
+	var h uint64 = (binary.LittleEndian.Uint64(data) & mask) * kHashMul64Long
 
 	/* The higher bits contain more mixture from the multiplication,
 	   so we take our results from there. */
 	return uint32(h >> uint(shift))
 }
 
-type h5 struct {
+type h6 struct {
 	hasherCommon
 	bucket_size_ uint
 	block_size_  uint
 	hash_shift_  int
+	hash_mask_   uint64
 	block_mask_  uint32
 	num          []uint16
 	buckets      []uint32
 }
 
-func (h *h5) Initialize(params *common.EncoderParams) {
-	h.hash_shift_ = 32 - h.params.Bucket_bits
+func (h *h6) Initialize(params *common.EncoderParams) {
+	h.hash_shift_ = 64 - h.params.Bucket_bits
+	h.hash_mask_ = (^uint64(0)) >> uint(64-8*h.params.Hash_len)
 	h.bucket_size_ = uint(1) << uint(h.params.Bucket_bits)
 	h.block_size_ = uint(1) << uint(h.params.Block_bits)
 	h.block_mask_ = uint32(h.block_size_ - 1)
@@ -57,14 +59,14 @@ func (h *h5) Initialize(params *common.EncoderParams) {
 	h.buckets = make([]uint32, h.block_size_*h.bucket_size_)
 }
 
-func (h *h5) Prepare(one_shot bool, input_size uint, data []byte) {
+func (h *h6) Prepare(one_shot bool, input_size uint, data []byte) {
 	var num []uint16 = h.num
 	var partial_prepare_threshold uint = h.bucket_size_ >> 6
 	/* Partial preparation is 100 times slower (per socket). */
 	if one_shot && input_size <= partial_prepare_threshold {
 		var i uint
 		for i = 0; i < input_size; i++ {
-			var key uint32 = hashBytesH5(data[i:], h.hash_shift_)
+			var key uint32 = hashBytesH6(data[i:], h.hash_mask_, h.hash_shift_)
 			num[key] = 0
 		}
 	} else {
@@ -79,23 +81,23 @@ Look at 4 bytes at &data[ix & mask].
 
 	Compute a hash from these, and store the value of ix at that position.
 */
-func (h *h5) Store(data []byte, mask uint, ix uint) {
+func (h *h6) Store(data []byte, mask uint, ix uint) {
 	var num []uint16 = h.num
-	var key uint32 = hashBytesH5(data[ix&mask:], h.hash_shift_)
+	var key uint32 = hashBytesH6(data[ix&mask:], h.hash_mask_, h.hash_shift_)
 	var minor_ix uint = uint(num[key]) & uint(h.block_mask_)
 	var offset uint = minor_ix + uint(key<<uint(h.params.Block_bits))
 	h.buckets[offset] = uint32(ix)
 	num[key]++
 }
 
-func (h *h5) StoreRange(data []byte, mask uint, ix_start uint, ix_end uint) {
+func (h *h6) StoreRange(data []byte, mask uint, ix_start uint, ix_end uint) {
 	var i uint
 	for i = ix_start; i < ix_end; i++ {
 		h.Store(data, mask, i)
 	}
 }
 
-func (h *h5) StitchToPreviousBlock(
+func (h *h6) StitchToPreviousBlock(
 	num_bytes uint,
 	position uint,
 	ringbuffer []byte,
@@ -111,7 +113,7 @@ func (h *h5) StitchToPreviousBlock(
 	}
 }
 
-func (h *h5) PrepareDistanceCache(distance_cache []int) {
+func (h *h6) PrepareDistanceCache(distance_cache []int) {
 	prepareDistanceCache(distance_cache, h.params.Num_last_distances_to_check)
 }
 
@@ -120,16 +122,16 @@ Find a longest backward match of &data[cur_ix] up to the length of
 
 	max_length and stores the position cur_ix in the hash table.
 
-	REQUIRES: PrepareDistanceCacheH5 must be invoked for current distance cache
+	REQUIRES: PrepareDistanceCacheH6 must be invoked for current distance cache
 	          values; if this method is invoked repeatedly with the same distance
-	          cache values, it is enough to invoke PrepareDistanceCacheH5 once.
+	          cache values, it is enough to invoke PrepareDistanceCacheH6 once.
 
 	Does not look for matches longer than max_length.
 	Does not look for matches further away than max_backward.
 	Writes the best match into |out|.
 	|out|->score is updated only if a better match is found.
 */
-func (h *h5) FindLongestMatch(
+func (h *h6) FindLongestMatch(
 	dictionary *common.EncoderDictionary,
 	data []byte,
 	ring_buffer_mask uint,
@@ -195,7 +197,7 @@ func (h *h5) FindLongestMatch(
 		}
 	}
 	{
-		var key uint32 = hashBytesH5(data[cur_ix_masked:], h.hash_shift_)
+		var key uint32 = hashBytesH6(data[cur_ix_masked:], h.hash_mask_, h.hash_shift_)
 		bucket = buckets[key<<uint(h.params.Block_bits):]
 		var down uint
 		if uint(num[key]) > h.block_size_ {

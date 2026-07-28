@@ -3,7 +3,30 @@ package common
 import (
 	"encoding/binary"
 	"math/bits"
+
+	"github.com/nijaru/brotli/internal/common/tables"
 )
+
+type (
+	Dictionary = tables.Dictionary
+	DictWord   = tables.DictWord
+)
+
+var (
+	StaticDictionaryHash    = tables.StaticDictionaryHash
+	StaticDictionaryBuckets = tables.StaticDictionaryBuckets
+	StaticDictionaryWords   = tables.StaticDictionaryWords
+)
+
+const (
+	MinDictionaryWordLength = tables.MinDictionaryWordLength
+	MaxDictionaryWordLength = tables.MaxDictionaryWordLength
+)
+
+func GetDictionary() *tables.Dictionary {
+	return tables.GetDictionary()
+}
+
 
 /* Copyright 2017 Google Inc. All Rights Reserved.
 
