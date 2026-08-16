@@ -70,6 +70,30 @@ func pseudoRandom(n int) []byte {
 	return data
 }
 
+func BenchmarkStoreRangeForgetful(b *testing.B) {
+	// Q7/Q8 configuration: 1 bank, 16-bit slot index, 15-bit buckets.
+	h := &hashForgetfulChain{
+		bucketBits: 15,
+		numBanks:   1,
+		bankBits:   16,
+	}
+	params := &common.EncoderParams{Quality: 7}
+	h.Initialize(params)
+
+	data := pseudoRandom(1 << 20)
+	mask := uint(len(data) - 1)
+
+	h.Prepare(false, uint(len(data)), data)
+
+	b.ReportAllocs()
+	b.SetBytes(int64(len(data) - 64))
+	b.ResetTimer()
+
+	for b.Loop() {
+		h.StoreRange(data, mask, 0, uint(len(data)-64))
+	}
+}
+
 // TestStoreRangeParity verifies the unrolled StoreRange produces identical
 // table state (num[] and buckets[]) to sequential Store calls.
 func TestStoreRangeParity(t *testing.T) {
@@ -123,6 +147,72 @@ func TestStoreRangeParity(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestForgetfulChainStoreRangeParity verifies the unrolled StoreRange
+// produces identical table state to sequential Store calls, including the
+// 512-bank Q9 configuration where lanes can share a bank.
+func TestForgetfulChainStoreRangeParity(t *testing.T) {
+	for _, cfg := range []struct {
+		name     string
+		numBanks uint
+		bankBits uint
+	}{
+		{"Q7-oneBank", 1, 16},
+		{"Q9-fiftyOneTwoBanks", 512, 9},
+	} {
+		cfg := cfg
+		t.Run(cfg.name, func(t *testing.T) {
+			for _, data := range [][]byte{
+				pseudoRandom(1 << 16),
+				bytes.Repeat([]byte{0x41}, 1<<10),
+				bytes.Repeat([]byte("abcdefghij"), 128),
+			} {
+				ref := &hashForgetfulChain{bucketBits: 15, numBanks: cfg.numBanks, bankBits: cfg.bankBits}
+				got := &hashForgetfulChain{bucketBits: 15, numBanks: cfg.numBanks, bankBits: cfg.bankBits}
+				params := &common.EncoderParams{Quality: 7}
+				ref.Initialize(params)
+				got.Initialize(params)
+				ref.Prepare(false, uint(len(data)), data)
+				got.Prepare(false, uint(len(data)), data)
+
+				mask := (uint(1) << uint(bits.Len(uint(len(data)-1)))) - 1
+				end := uint(len(data) - 64)
+				var i uint
+				for i = 0; i < end; i++ {
+					ref.Store(data, mask, i)
+				}
+				got.StoreRange(data, mask, 0, end)
+				if !sameForgetfulChain(ref, got) {
+					t.Fatalf("table state differs after StoreRange (numBanks=%d)", cfg.numBanks)
+				}
+			}
+		})
+	}
+}
+
+func sameForgetfulChain(a, b *hashForgetfulChain) bool {
+	if !bytes.Equal(a.tiny_hash[:], b.tiny_hash[:]) {
+		return false
+	}
+	for i := range a.addr {
+		if a.addr[i] != b.addr[i] || a.head[i] != b.head[i] {
+			return false
+		}
+	}
+	for i := range a.free_slot_idx {
+		if a.free_slot_idx[i] != b.free_slot_idx[i] {
+			return false
+		}
+	}
+	for bank := range a.banks {
+		for i := range a.banks[bank] {
+			if a.banks[bank][i] != b.banks[bank][i] {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func newH5ForTest() Handle { return &h5{} }

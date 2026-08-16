@@ -131,10 +131,101 @@ func (h *hashForgetfulChain) Store(data []byte, mask uint, ix uint) {
 }
 
 func (h *hashForgetfulChain) StoreRange(data []byte, mask uint, ix_start uint, ix_end uint) {
-	var i uint
-	for i = ix_start; i < ix_end; i++ {
+	var i uint = ix_start
+	bankSel := h.numBanks - 1
+	slotMask := (uint(1) << h.bankBits) - 1
+	shift := uint(32 - h.bucketBits)
+	freeSlotIdx := h.free_slot_idx
+	addr := h.addr
+	head := h.head
+	banks := h.banks
+
+	for i+4 <= ix_end {
+		k0 := uint(uint32(binary.LittleEndian.Uint32(data[(i+0)&mask:])*KHashMul32) >> shift)
+		k1 := uint(uint32(binary.LittleEndian.Uint32(data[(i+1)&mask:])*KHashMul32) >> shift)
+		k2 := uint(uint32(binary.LittleEndian.Uint32(data[(i+2)&mask:])*KHashMul32) >> shift)
+		k3 := uint(uint32(binary.LittleEndian.Uint32(data[(i+3)&mask:])*KHashMul32) >> shift)
+
+		b0 := k0 & bankSel
+		b1 := k1 & bankSel
+		b2 := k2 & bankSel
+		b3 := k3 & bankSel
+
+		// Slot indices: each lane takes the next slot in its bank after the
+		// earlier lanes that share that bank.
+		idx0 := uint(freeSlotIdx[b0]) & slotMask
+		idx1 := (uint(freeSlotIdx[b1]) + eqU(b1, b0)) & slotMask
+		idx2 := (uint(freeSlotIdx[b2]) + eqU(b2, b0) + eqU(b2, b1)) & slotMask
+		idx3 := (uint(freeSlotIdx[b3]) + eqU(b3, b0) + eqU(b3, b1) + eqU(b3, b2)) & slotMask
+
+		// Lanes are written in order so same-key chains (addr, head) see the
+		// previous lane's update, matching sequential Store semantics.
+		{
+			delta := i - uint(addr[k0])
+			if delta > 0xFFFF {
+				delta = 0xFFFF
+			}
+			h.tiny_hash[uint16(i)] = byte(k0)
+			banks[b0][idx0].delta = uint16(delta)
+			banks[b0][idx0].next = head[k0]
+			addr[k0] = uint32(i)
+			head[k0] = uint16(idx0)
+			freeSlotIdx[b0]++
+		}
+		{
+			j := i + 1
+			delta := j - uint(addr[k1])
+			if delta > 0xFFFF {
+				delta = 0xFFFF
+			}
+			h.tiny_hash[uint16(j)] = byte(k1)
+			banks[b1][idx1].delta = uint16(delta)
+			banks[b1][idx1].next = head[k1]
+			addr[k1] = uint32(j)
+			head[k1] = uint16(idx1)
+			freeSlotIdx[b1]++
+		}
+		{
+			j := i + 2
+			delta := j - uint(addr[k2])
+			if delta > 0xFFFF {
+				delta = 0xFFFF
+			}
+			h.tiny_hash[uint16(j)] = byte(k2)
+			banks[b2][idx2].delta = uint16(delta)
+			banks[b2][idx2].next = head[k2]
+			addr[k2] = uint32(j)
+			head[k2] = uint16(idx2)
+			freeSlotIdx[b2]++
+		}
+		{
+			j := i + 3
+			delta := j - uint(addr[k3])
+			if delta > 0xFFFF {
+				delta = 0xFFFF
+			}
+			h.tiny_hash[uint16(j)] = byte(k3)
+			banks[b3][idx3].delta = uint16(delta)
+			banks[b3][idx3].next = head[k3]
+			addr[k3] = uint32(j)
+			head[k3] = uint16(idx3)
+			freeSlotIdx[b3]++
+		}
+
+		i += 4
+	}
+
+	for ; i < ix_end; i++ {
 		h.Store(data, mask, i)
 	}
+}
+
+// eqU is a branchless 0/1 equality test for bank indices.
+func eqU(a, b uint) uint {
+	if a == b {
+		return 1
+	}
+	return 0
 }
 
 func (h *hashForgetfulChain) StitchToPreviousBlock(
