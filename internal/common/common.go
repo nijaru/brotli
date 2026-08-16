@@ -1,9 +1,6 @@
 package common
 
 import (
-	"encoding/binary"
-	"math/bits"
-
 	"github.com/nijaru/brotli/internal/common/tables"
 )
 
@@ -190,24 +187,6 @@ func ComputeRbBits(params *EncoderParams) int {
 }
 
 const HqZopflificationQuality = 10
-
-func FindMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
-	matched := uint(0)
-	if limit >= 8 {
-		for matched+8 <= limit {
-			w1 := binary.LittleEndian.Uint64(s1[matched:])
-			w2 := binary.LittleEndian.Uint64(s2[matched:])
-			if w1 != w2 {
-				return matched + uint(bits.TrailingZeros64(w1^w2)>>3)
-			}
-			matched += 8
-		}
-	}
-	for matched < limit && s1[matched] == s2[matched] {
-		matched++
-	}
-	return matched
-}
 
 func EnsureCapacity[T any](s *[]T, offset *uint, capacity uint) {
 	if *offset+capacity > uint(cap(*s)) {
