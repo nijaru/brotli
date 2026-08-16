@@ -70,9 +70,7 @@ func (h *h6) Prepare(one_shot bool, input_size uint, data []byte) {
 			num[key] = 0
 		}
 	} else {
-		for i := 0; i < int(h.bucket_size_); i++ {
-			num[i] = 0
-		}
+		clear(num)
 	}
 }
 

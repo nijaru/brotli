@@ -102,15 +102,11 @@ func (h *hashForgetfulChain) Prepare(one_shot bool, input_size uint, data []byte
 			h.addr[i] = 0xCCCCCCCC
 		}
 
-		for i := range h.head {
-			h.head[i] = 0
-		}
+		clear(h.head)
 	}
 
 	h.tiny_hash = [65536]byte{}
-	for i := range h.free_slot_idx {
-		h.free_slot_idx[i] = 0
-	}
+	clear(h.free_slot_idx)
 }
 
 /*

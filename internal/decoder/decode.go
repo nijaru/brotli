@@ -364,7 +364,7 @@ func decodeSymbol(bits uint32, table []common.HuffmanCode, br *common.BitReader)
 	if table[0].Bits > huffmanTableBits {
 		var nbits uint32 = uint32(table[0].Bits) - huffmanTableBits
 		br.DropBits(huffmanTableBits)
-		table = table[uint32(table[0].Value)+((bits>>huffmanTableBits)&common.BitMask(nbits)):]
+		table = table[uint32(table[0].Value)+((bits>>huffmanTableBits)&((uint32(1)<<nbits)-1)):]
 	}
 
 	br.DropBits(uint32(table[0].Bits))
@@ -414,7 +414,7 @@ func safeDecodeSymbol(table []common.HuffmanCode, br *common.BitReader, result *
 	}
 
 	/* Speculatively drop HUFFMAN_TABLE_BITS. */
-	val = (val & common.BitMask(uint32(table[0].Bits))) >> huffmanTableBits
+	val = (val & ((uint32(1) << table[0].Bits) - 1)) >> huffmanTableBits
 
 	available_bits -= huffmanTableBits
 	table = table[uint32(table[0].Value)+val:]
@@ -2084,7 +2084,6 @@ CommandPostDecodeLiterals:
 					goto saveStateAndReturn
 				}
 			} else {
-				println("DECODER DEBUG: transform_idx:", transform_idx, "Num_transforms:", trans.Num_transforms, "distanceCode:", s.distanceCode, "maxDistance:", s.maxDistance, "maxBackwardDistance:", s.maxBackwardDistance, "pos:", pos, "copyLength:", i)
 				return decoderErrorFormatTransform
 			}
 		} else {

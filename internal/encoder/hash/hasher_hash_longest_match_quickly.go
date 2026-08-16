@@ -31,11 +31,11 @@ HashBytes is the function that chooses the bucket to place
 	classes have separate, different implementations of hashing.
 */
 func (h *hashLongestMatchQuickly) HashBytes(data []byte) uint32 {
-	var hash uint64 = ((binary.LittleEndian.Uint64(data) << (64 - 8*h.hashLen)) * kHashMul64)
+	var hash uint64 = ((binary.LittleEndian.Uint64(data) << h.hashShift) * kHashMul64)
 
 	/* The higher bits contain more mixture from the multiplication,
 	   so we take our results from there. */
-	return uint32(hash >> (64 - h.bucketBits))
+	return uint32(hash >> h.bucketShift)
 }
 
 /*
@@ -54,10 +54,15 @@ type hashLongestMatchQuickly struct {
 	hashLen       uint
 	useDictionary bool
 
+	hashShift   uint
+	bucketShift uint
+
 	buckets []uint32
 }
 
 func (h *hashLongestMatchQuickly) Initialize(params *common.EncoderParams) {
+	h.hashShift = 64 - 8*h.hashLen
+	h.bucketShift = 64 - h.bucketBits
 	h.buckets = make([]uint32, 1<<h.bucketBits+h.bucketSweep)
 }
 
@@ -73,13 +78,7 @@ func (h *hashLongestMatchQuickly) Prepare(one_shot bool, input_size uint, data [
 			}
 		}
 	} else {
-		/* It is not strictly necessary to fill this buffer here, but
-		   not filling will make the results of the compression stochastic
-		   (but correct). This is because random data would cause the
-		   system to find accidentally good backward references here and there. */
-		for i := range h.buckets {
-			h.buckets[i] = 0
-		}
+		clear(h.buckets)
 	}
 }
 
