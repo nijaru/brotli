@@ -89,8 +89,40 @@ func (h *h6) Store(data []byte, mask uint, ix uint) {
 }
 
 func (h *h6) StoreRange(data []byte, mask uint, ix_start uint, ix_end uint) {
-	var i uint
-	for i = ix_start; i < ix_end; i++ {
+	var i uint = ix_start
+	num := h.num
+	buckets := h.buckets
+	blockMask := uint(h.block_mask_)
+	blockBits := uint(h.params.Block_bits)
+	hashMask := h.hash_mask_
+	shift := uint(h.hash_shift_)
+
+	for i+4 <= ix_end {
+		k0 := uint32(((binary.LittleEndian.Uint64(data[(i+0)&mask:]) & hashMask) * kHashMul64Long) >> shift)
+		k1 := uint32(((binary.LittleEndian.Uint64(data[(i+1)&mask:]) & hashMask) * kHashMul64Long) >> shift)
+		k2 := uint32(((binary.LittleEndian.Uint64(data[(i+2)&mask:]) & hashMask) * kHashMul64Long) >> shift)
+		k3 := uint32(((binary.LittleEndian.Uint64(data[(i+3)&mask:]) & hashMask) * kHashMul64Long) >> shift)
+
+		off0 := (uint(num[k0]) & blockMask) + (uint(k0) << blockBits)
+		buckets[off0] = uint32(i + 0)
+		num[k0]++
+
+		off1 := (uint(num[k1]) & blockMask) + (uint(k1) << blockBits)
+		buckets[off1] = uint32(i + 1)
+		num[k1]++
+
+		off2 := (uint(num[k2]) & blockMask) + (uint(k2) << blockBits)
+		buckets[off2] = uint32(i + 2)
+		num[k2]++
+
+		off3 := (uint(num[k3]) & blockMask) + (uint(k3) << blockBits)
+		buckets[off3] = uint32(i + 3)
+		num[k3]++
+
+		i += 4
+	}
+
+	for ; i < ix_end; i++ {
 		h.Store(data, mask, i)
 	}
 }
