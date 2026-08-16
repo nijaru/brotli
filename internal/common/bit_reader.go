@@ -12,16 +12,11 @@ import "encoding/binary"
 
 const ShortFillBitWindowRead = (8 >> 1)
 
-var bitMask = [33]uint32{
-	0x00000000, 0x00000001, 0x00000003, 0x00000007, 0x0000000F, 0x0000001F, 0x0000003F, 0x0000007F,
-	0x000000FF, 0x000001FF, 0x000003FF, 0x000007FF, 0x00000FFF, 0x00001FFF, 0x00003FFF, 0x00007FFF,
-	0x0000FFFF, 0x0001FFFF, 0x0003FFFF, 0x0007FFFF, 0x000FFFFF, 0x001FFFFF, 0x003FFFFF, 0x007FFFFF,
-	0x00FFFFFF, 0x01FFFFFF, 0x03FFFFFF, 0x07FFFFFF, 0x0FFFFFFF, 0x1FFFFFFF, 0x3FFFFFFF, 0x7FFFFFFF,
-	0xFFFFFFFF,
-}
-
 func BitMask(n uint32) uint32 {
-	return bitMask[n]
+	if n >= 32 {
+		return 0xFFFFFFFF
+	}
+	return (uint32(1) << n) - 1
 }
 
 type BitReader struct {
@@ -106,7 +101,7 @@ func (br *BitReader) Get16BitsUnmasked() uint32 {
 
 func (br *BitReader) GetBits(nBits uint32) uint32 {
 	br.FillBitWindow(nBits)
-	return uint32(br.GetBitsUnmasked()) & bitMask[nBits]
+	return uint32(br.GetBitsUnmasked()) & BitMask(nBits)
 }
 
 func (br *BitReader) SafeGetBits(nBits uint32, val *uint32) bool {
@@ -116,7 +111,7 @@ func (br *BitReader) SafeGetBits(nBits uint32, val *uint32) bool {
 		}
 	}
 
-	*val = uint32(br.GetBitsUnmasked()) & bitMask[nBits]
+	*val = uint32(br.GetBitsUnmasked()) & BitMask(nBits)
 	return true
 }
 
@@ -138,7 +133,7 @@ func (br *BitReader) Unload() {
 }
 
 func (br *BitReader) TakeBits(nBits uint32, val *uint32) {
-	*val = uint32(br.GetBitsUnmasked()) & bitMask[nBits]
+	*val = uint32(br.GetBitsUnmasked()) & BitMask(nBits)
 	br.DropBits(nBits)
 }
 
