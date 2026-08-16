@@ -608,7 +608,7 @@ func updateNodes(
 				/* Try all copy lengths up until the maximum copy length corresponding
 				   to this distance. If the distance refers to the static dictionary, or
 				   the maximum length is long enough, try only one maximum length. */
-				max_match_len = BackwardMatchLength(&match)
+				max_match_len = BackwardMatchLength(match)
 
 				/* For dictionary matches, skip if the output length would exceed
 				   the remaining metablock space. The decoder uses the output length
@@ -624,7 +624,7 @@ func updateNodes(
 				for ; len <= max_match_len; len++ {
 					var len_code uint
 					if is_dictionary_match {
-						len_code = BackwardMatchLengthCode(&match)
+						len_code = BackwardMatchLengthCode(match)
 					} else {
 						len_code = len
 					}
@@ -748,8 +748,8 @@ func zopfliIterate(
 		}
 		cur_match_pos += uint(num_matches[i])
 		if num_matches[i] == 1 &&
-			BackwardMatchLength(&matches[cur_match_pos-1]) > max_zopfli_len {
-			skip = max(BackwardMatchLength(&matches[cur_match_pos-1]), skip)
+			BackwardMatchLength(matches[cur_match_pos-1]) > max_zopfli_len {
+			skip = max(BackwardMatchLength(matches[cur_match_pos-1]), skip)
 		}
 
 		if skip > 1 {
@@ -835,7 +835,7 @@ func zopfliComputeShortestPath(
 			params,
 			matches[lz_matches_offset:],
 		)
-		if num_matches > 0 && BackwardMatchLength(&matches[num_matches-1]) > max_zopfli_len {
+		if num_matches > 0 && BackwardMatchLength(matches[num_matches-1]) > max_zopfli_len {
 			matches[0] = matches[num_matches-1]
 			num_matches = 1
 		}
@@ -858,8 +858,8 @@ func zopfliComputeShortestPath(
 		if skip < LongCopyQuickStep {
 			skip = 0
 		}
-		if num_matches == 1 && BackwardMatchLength(&matches[0]) > max_zopfli_len {
-			skip = max(BackwardMatchLength(&matches[0]), skip)
+		if num_matches == 1 && BackwardMatchLength(matches[0]) > max_zopfli_len {
+			skip = max(BackwardMatchLength(matches[0]), skip)
 		}
 
 		if skip > 1 {
@@ -1028,16 +1028,16 @@ func createHqZopfliBackwardReferences(
 		for j = cur_match_pos; j+1 < cur_match_end; j++ {
 			common.Assert(
 				BackwardMatchLength(
-					&matches[j],
+					matches[j],
 				) <= BackwardMatchLength(
-					&matches[j+1],
+					matches[j+1],
 				),
 			)
 		}
 
 		num_matches[i] = uint32(num_found_matches)
 		if num_found_matches > 0 {
-			var match_len uint = BackwardMatchLength(&matches[cur_match_end-1])
+			var match_len uint = BackwardMatchLength(matches[cur_match_end-1])
 			if match_len > MaxZopfliLenQuality11 {
 				var skip uint = match_len - 1
 				matches[cur_match_pos] = matches[cur_match_end-1]

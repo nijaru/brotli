@@ -199,42 +199,36 @@ func searchInStaticDictionary(
 }
 
 type BackwardMatch struct {
-	Distance        uint32
-	Length          uint32
-	distance        uint32
-	length_and_code uint32
+	Distance      uint32
+	LengthAndCode uint32
 }
 
 func initBackwardMatch(self *BackwardMatch, dist uint, len uint) {
 	self.Distance = uint32(dist)
-	self.Length = uint32(len)
-	self.distance = uint32(dist)
-	self.length_and_code = uint32(len << 5)
+	self.LengthAndCode = uint32(len << 5)
 }
 
 func initDictionaryBackwardMatch(self *BackwardMatch, dist uint, len uint, len_code uint) {
 	self.Distance = uint32(dist)
-	self.Length = uint32(len)
-	self.distance = uint32(dist)
 	var tmp uint
 	if len == len_code {
 		tmp = 0
 	} else {
 		tmp = len_code
 	}
-	self.length_and_code = uint32(len<<5 | tmp)
+	self.LengthAndCode = uint32(len<<5 | tmp)
 }
 
-func BackwardMatchLength(self *BackwardMatch) uint {
-	return uint(self.length_and_code >> 5)
+func BackwardMatchLength(m BackwardMatch) uint {
+	return uint(m.LengthAndCode >> 5)
 }
 
-func BackwardMatchLengthCode(self *BackwardMatch) uint {
-	var code uint = uint(self.length_and_code) & 31
+func BackwardMatchLengthCode(m BackwardMatch) uint {
+	var code uint = uint(m.LengthAndCode) & 31
 	if code != 0 {
 		return code
 	} else {
-		return BackwardMatchLength(self)
+		return BackwardMatchLength(m)
 	}
 }
 
