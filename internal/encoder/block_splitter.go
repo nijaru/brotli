@@ -104,13 +104,18 @@ func SplitBlock(
 	pos uint,
 	mask uint,
 	params *common.EncoderParams,
-	literal_split *BlockSplit,
-	insert_and_copy_split *BlockSplit,
-	dist_split *BlockSplit,
+	mb *MetaBlockSplit,
 ) {
+	literal_split := &mb.Literal_split
+	insert_and_copy_split := &mb.Command_split
+	dist_split := &mb.Distance_split
+
 	{
 		var literals_count uint = countLiterals(cmds)
-		var literals []byte = make([]byte, literals_count)
+		if cap(mb.Literals_buf) < int(literals_count) {
+			mb.Literals_buf = make([]byte, literals_count)
+		}
+		var literals []byte = mb.Literals_buf[:literals_count]
 
 		/* Create a continuous array of literals. */
 		copyLiteralsToByteArray(cmds, data, pos, mask, literals)
@@ -127,11 +132,13 @@ func SplitBlock(
 			params,
 			literal_split,
 		)
-
-		literals = nil
 	}
 	{
-		var insert_and_copy_codes []uint16 = make([]uint16, len(cmds))
+		cmd_count := len(cmds)
+		if cap(mb.Insert_and_copy_codes_buf) < cmd_count {
+			mb.Insert_and_copy_codes_buf = make([]uint16, cmd_count)
+		}
+		var insert_and_copy_codes []uint16 = mb.Insert_and_copy_codes_buf[:cmd_count]
 		/* Compute prefix codes for commands. */
 
 		for i := range cmds {
@@ -148,13 +155,13 @@ func SplitBlock(
 			params,
 			insert_and_copy_split,
 		)
-
-		/* TODO: reuse for distances? */
-
-		insert_and_copy_codes = nil
 	}
 	{
-		var distance_prefixes []uint16 = make([]uint16, len(cmds))
+		cmd_count := len(cmds)
+		if cap(mb.Distance_prefixes_buf) < cmd_count {
+			mb.Distance_prefixes_buf = make([]uint16, cmd_count)
+		}
+		var distance_prefixes []uint16 = mb.Distance_prefixes_buf[:cmd_count]
 		var j uint = 0
 		/* Create a continuous array of distance prefixes. */
 
@@ -177,7 +184,5 @@ func SplitBlock(
 			params,
 			dist_split,
 		)
-
-		distance_prefixes = nil
 	}
 }

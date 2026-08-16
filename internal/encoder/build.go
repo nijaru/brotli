@@ -495,9 +495,7 @@ func BuildMetaBlock(
 		pos,
 		mask,
 		params,
-		&mb.Literal_split,
-		&mb.Command_split,
-		&mb.Distance_split,
+		mb,
 	)
 
 	if !params.Disable_literal_context_modeling {
