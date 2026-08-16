@@ -1028,6 +1028,3 @@ func BenchmarkCompareUpstreamBrotli(b *testing.B) {
 		})
 	}
 }
-
-
-

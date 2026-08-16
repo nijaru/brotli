@@ -219,3 +219,22 @@ func benchmarkWriteClose(b *testing.B, w *Writer, input []byte) {
 		b.Fatal(err)
 	}
 }
+
+func BenchmarkWriterPoolParallel(b *testing.B) {
+	payload := benchmarkPayload(b, 8192)
+	wp := NewWriterPool(DefaultCompression)
+
+	b.ReportAllocs()
+	b.SetBytes(int64(len(payload)))
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			w := wp.Get(io.Discard)
+			w.Write(payload)
+			w.Close()
+			wp.Put(w)
+		}
+	})
+}
+
