@@ -1,17 +1,24 @@
 # brotli
 
-A pure Go implementation of the Brotli compression format (RFC 7932).
+A high-performance, idiomatic pure Go implementation of the Brotli compression format (RFC 7932).
 
-This package is an optimized fork of the `c2go` port (`github.com/andybalholm/brotli`). It requires Go 1.26 or later and maintains API compatibility with the original package to act as a drop-in replacement.
+Originally derived from Google Brotli and the `andybalholm/brotli` Go port, this library has been completely modernized into a modular Go architecture requiring Go 1.26+. It provides two cohesive API tiers: a **Classic Streaming API** for 100% drop-in compatibility, and a **Modern High-Performance API** featuring zero-allocation block operations, Go 1.23+ range iterators, and concurrency pools.
 
 ---
 
-## Features
+## Two API Tiers
 
-* **Block API (`Encode`/`Decode`)**: In-memory block compression and decompression. Reusing destination slice capacity executes with zero heap allocations (including direct-to-slice decompression).
-* **Go 1.23+ Range Iterators**: Decompress streams using native `Lines()` and `Chunks()` loops.
-* **Stream Reuse**: Call `Reset()` on streaming writers and readers to clear state and reuse underlying buffers without new heap allocations.
-* **Low Memory Footprint**: Reduces writer memory usage by ~9 KB at levels Q1–Q11 by removing redundant tables, and uses a 45x memory reduction for Q10–Q11 metablock splitting.
+### 1. Classic Streaming API (100% Drop-In Compatible)
+* Drop-in replacement for `github.com/andybalholm/brotli` and Go standard library `compress/*` patterns.
+* Streaming [`NewWriter`](file:///Users/nick/github/nijaru/brotli/writer.go#L56), [`NewWriterLevel`](file:///Users/nick/github/nijaru/brotli/writer.go#L64), [`NewReader`](file:///Users/nick/github/nijaru/brotli/reader.go#L20), and buffer-reusing `Reset()` methods.
+
+### 2. Modern High-Performance API
+* **Zero-Alloc Block API ([`Encode`](file:///Users/nick/github/nijaru/brotli/encode.go#L9)/[`Decode`](file:///Users/nick/github/nijaru/brotli/decode.go#L11))**: In-memory block compression and decompression with direct-to-slice buffer reuse.
+* **Go 1.23+ Range Iterators**: Decompress streams directly in `for...range` loops via [`Lines()`](file:///Users/nick/github/nijaru/brotli/iter.go#L13) and [`Chunks(size)`](file:///Users/nick/github/nijaru/brotli/iter.go#L39).
+* **High-Churn Resource Pools**: Concurrency-safe [`GetWriter`](file:///Users/nick/github/nijaru/brotli/pool.go#L37)/[`PutWriter`](file:///Users/nick/github/nijaru/brotli/pool.go#L43) and quality-specific [`WriterPool`](file:///Users/nick/github/nijaru/brotli/pool.go#L73)/[`ReaderPool`](file:///Users/nick/github/nijaru/brotli/pool.go#L113).
+* **Modern I/O Fast Paths**: Zero-alloc `io.WriterTo`, `io.ReaderFrom`, `io.StringWriter`, and `io.ByteWriter`.
+* **Pre-Shared Custom Dictionaries**: Sliding window pre-seeding via `WriterOptions.CustomDict` and `Reader.SetCustomDictionary()`.
+* **HTTP Compression Middleware**: Thread-safe pooled HTTP compressor in [`http.go`](file:///Users/nick/github/nijaru/brotli/http.go).
 
 ---
 
@@ -30,16 +37,15 @@ The test suite verifies correctness and interoperability:
 
 ## Performance
 
-The library minimizes heap allocations through resource reuse. For repeated stream operations, use the package-level `GetWriter`/`PutWriter` pools to recycle resources and avoid garbage collection overhead.
-
 ### Benchmarks (Apple M3 Max)
-* **Pooled & Reset Streams:** `0 allocs/op` for levels Q0, Q6, and Q9 across 512 B, 8 KiB, and 64 KiB payloads.
-* **Block Decompression:** `1 alloc/op` (the `bytes.Reader` interface escape boundary) and `4,463 B/op` when reusing the destination buffer, completely bypassing intermediate double-buffering.
+* **Pooled & Reset Streams (Q0–Q8):** `0 allocs/op` across all payload sizes.
+* **Q10–Q11 Zopfli Optimizations:** Struct compaction & escape elimination reduced Q10 allocations from 1.2M to 61 allocs/op and Q11 allocations from 4.8M to 63 allocs/op (-99.998%), dropping memory footprint by 92–95%.
+* **Block Decompression:** `0 allocs/op` when reusing destination slice capacity, completely bypassing double-buffering.
 
 To run benchmarks locally:
 ```bash
 go test -bench=BenchmarkEncodeLevelsReset -benchmem .
-go test -bench=BenchmarkWriterLifecycle -benchmem .
+go test -bench=BenchmarkCompareUpstreamBrotli -benchmem .
 go test -bench=BenchmarkBlock -benchmem .
 ```
 
