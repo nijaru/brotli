@@ -28,10 +28,13 @@ type WriterOptions struct {
 	// The higher the quality, the slower the compression. Range is 0 to 11.
 	Quality int
 	// LGWin is the base 2 logarithm of the sliding window size.
-	// Range is 10 to 24. 0 indicates automatic configuration based on Quality.
+	// Range is 10 to 24 (or up to 30 when LargeWindow is true). 0 indicates automatic configuration.
 	LGWin int
 	// CustomDict is an optional pre-shared dictionary slice used to seed the sliding window.
 	CustomDict []byte
+	// LargeWindow enables RFC 9841 large sliding windows (LGWin up to 30, ~1 GB).
+	// Large-window streams require RFC 9841 compatible decoders.
+	LargeWindow bool
 }
 
 var (
@@ -78,10 +81,12 @@ func normalizeWriterOptions(options WriterOptions) (WriterOptions, encoder.Plan)
 	if options.LGWin > 0 {
 		lgwin = options.LGWin
 	}
-	plan := encoder.NewPlan(options.Quality, lgwin, 0, 0, false)
+	plan := encoder.NewPlan(options.Quality, lgwin, 0, 0, options.LargeWindow)
 	return WriterOptions{
-		Quality: plan.Quality,
-		LGWin:   plan.Lgwin,
+		Quality:     plan.Quality,
+		LGWin:       plan.Lgwin,
+		CustomDict:  options.CustomDict,
+		LargeWindow: plan.LargeWindow,
 	}, plan
 }
 
@@ -101,6 +106,7 @@ func (w *Writer) Reset(dst io.Writer) {
 		encoder.InitState(&w.genericState)
 		w.genericState.Params.Quality = w.plan.Quality
 		w.genericState.Params.Lgwin = lgwin
+		w.genericState.Params.Large_window = w.plan.LargeWindow
 		w.genericState.Plan = w.plan
 		w.genericState.Dst = dst
 		w.genericState.Err = nil

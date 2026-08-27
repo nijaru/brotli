@@ -92,20 +92,24 @@ func getHashTable(s *State, qLevel int, inputSize uint, tableSize *uint) []int {
 }
 
 func encodeWindowBits(lgwin int, largeWindow bool, lastBytes *uint16, lastBytesBits *byte) {
+	if largeWindow {
+		*lastBytes = uint16(((lgwin & 0x3F) << 8) | 0x11)
+		*lastBytesBits = 14
+		return
+	}
+
 	if lgwin == 16 {
 		*lastBytes = 0
 		*lastBytesBits = 1
+	} else if lgwin == 17 {
+		*lastBytes = 1
+		*lastBytesBits = 7
 	} else if lgwin > 17 {
 		*lastBytes = uint16(uint32(lgwin-17)<<1 | 0x01)
 		*lastBytesBits = 4
 	} else {
 		*lastBytes = uint16(uint32(lgwin-8)<<4 | 0x01)
 		*lastBytesBits = 7
-	}
-
-	if largeWindow {
-		*lastBytes |= 1 << *lastBytesBits
-		*lastBytesBits++
 	}
 }
 

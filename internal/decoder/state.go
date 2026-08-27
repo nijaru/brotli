@@ -188,7 +188,7 @@ func decoderStateInit(s *Reader) bool {
 
 	s.br.Init()
 	s.state = stateUninited
-	s.largeWindow = false
+	s.largeWindow = true
 	s.substateMetablockHeader = stateMetablockHeaderNone
 	s.substateTreeGroup = stateTreeGroupNone
 	s.substateContextMap = stateContextMapNone

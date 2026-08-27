@@ -105,6 +105,40 @@ func (r *Reader) SetCustomDictionary(dict []byte) {
 	r.customDict = append([]byte(nil), dict...)
 }
 
+func (r *Reader) resetForNextMember() {
+	buf := r.buf
+	ringbuffer := r.ringbuffer
+	contextMap := r.contextMap
+	distContextMap := r.distContextMap
+	contextModes := r.contextModes
+	blockTypeTrees := r.blockTypeTrees
+	blockLenTrees := r.blockLenTrees
+	literalHGroup := r.literalHGroup
+	insertCopyHGroup := r.insertCopyHGroup
+	distanceHGroup := r.distanceHGroup
+	src := r.src
+	in := r.in
+	customDict := r.customDict
+
+	*r = Reader{}
+
+	r.buf = buf
+	r.ringbuffer = ringbuffer
+	r.contextMap = contextMap
+	r.distContextMap = distContextMap
+	r.contextModes = contextModes
+	r.blockTypeTrees = blockTypeTrees
+	r.blockLenTrees = blockLenTrees
+	r.literalHGroup = literalHGroup
+	r.insertCopyHGroup = insertCopyHGroup
+	r.distanceHGroup = distanceHGroup
+	r.customDict = customDict
+
+	decoderStateInit(r)
+	r.src = src
+	r.in = in
+}
+
 func (r *Reader) Read(p []byte) (n int, err error) {
 	if !decoderHasMoreOutput(r) && len(r.in) == 0 {
 		if r.src == nil {
@@ -119,6 +153,23 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 			return 0, readErr
 		}
 		r.in = r.buf[:m]
+	}
+
+	if r.state == stateDone && !decoderHasMoreOutput(r) && (len(r.in) > 0 || r.src != nil) {
+		if len(r.in) == 0 {
+			m, readErr := r.src.Read(r.buf)
+			if m > 0 {
+				r.in = r.buf[:m]
+				r.resetForNextMember()
+			} else {
+				if readErr == io.EOF {
+					return 0, io.EOF
+				}
+				return 0, readErr
+			}
+		} else {
+			r.resetForNextMember()
+		}
 	}
 
 	if len(p) == 0 {
@@ -137,8 +188,28 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 
 		switch result {
 		case decoderResultSuccess:
-			if len(r.in) > 0 {
-				return n, errExcessiveInput
+			if !decoderHasMoreOutput(r) {
+				if len(r.in) > 0 {
+					r.resetForNextMember()
+					if n > 0 {
+						return n, nil
+					}
+					continue
+				}
+				if r.src != nil {
+					encN, err := r.src.Read(r.buf)
+					if encN > 0 {
+						r.in = r.buf[:encN]
+						r.resetForNextMember()
+						if n > 0 {
+							return n, nil
+						}
+						continue
+					}
+					if err != nil && err != io.EOF {
+						return n, err
+					}
+				}
 			}
 			return n, nil
 		case decoderResultError:

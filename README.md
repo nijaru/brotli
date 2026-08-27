@@ -1,6 +1,6 @@
 # brotli
 
-A high-performance, pure Go implementation of the Brotli compression format (RFC 7932).
+A high-performance, pure Go implementation of the Brotli compression format (RFC 7932 & RFC 9841).
 
 `nijaru/brotli` is a drop-in replacement for `andybalholm/brotli` and standard library `compress/*` packages. It provides faster throughput, up to 95% lower memory footprint, zero-allocation in-memory block compression, and native Go 1.23+ range iterators.
 
@@ -12,6 +12,8 @@ A high-performance, pure Go implementation of the Brotli compression format (RFC
   - Swap existing `andybalholm/brotli` imports with zero code changes.
 - **Zero-Allocation Block API**
   - In-memory `Encode` and `Decode` operate directly on reusable slices without stream wrapping overhead.
+- **RFC 9841 Large Window & Multi-Stream Framing**
+  - Supports sliding windows up to 30 bits (~1 GB) and transparent multi-member concatenated stream decoding.
 - **95% Lower Memory Footprint**
   - Reduces peak heap memory in archival Zopfli modes from 84 MB down to 3.8 MB.
 - **Go 1.27 SIMD Vector Acceleration**

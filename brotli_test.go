@@ -1028,3 +1028,72 @@ func BenchmarkCompareUpstreamBrotli(b *testing.B) {
 		})
 	}
 }
+
+func TestLargeWindowEncodingAndDecoding(t *testing.T) {
+	data := []byte("Large window Brotli RFC 9841 test string. Repeating to verify large window sliding distance.")
+	data = bytes.Repeat(data, 500)
+
+	// Test windows from 20 up to 28 bits
+	for _, lgwin := range []int{22, 24, 26, 28} {
+		var compressed bytes.Buffer
+		w := NewWriterOptions(&compressed, WriterOptions{
+			Quality:     6,
+			LGWin:       lgwin,
+			LargeWindow: lgwin > 24,
+		})
+		if _, err := w.Write(data); err != nil {
+			t.Fatalf("lgwin %d write failed: %v", lgwin, err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("lgwin %d close failed: %v", lgwin, err)
+		}
+
+		// Decompress
+		r := NewReader(&compressed)
+		decompressed, err := io.ReadAll(r)
+		if err != nil {
+			t.Fatalf("lgwin %d decompress failed: %v", lgwin, err)
+		}
+		if !bytes.Equal(decompressed, data) {
+			t.Fatalf("lgwin %d decompressed content mismatch: got %d bytes, want %d bytes (compressed %d bytes)",
+				lgwin, len(decompressed), len(data), compressed.Len())
+		}
+	}
+}
+
+func TestConcatenatedStreamDecoding(t *testing.T) {
+	chunks := []string{
+		"First independent Brotli member.\n",
+		"Second member with different data.\n",
+		"Third member finalizing the stream.\n",
+	}
+
+	var combined bytes.Buffer
+	var expectedText string
+
+	for _, chunk := range chunks {
+		expectedText += chunk
+		comp := Encode(nil, []byte(chunk), DefaultCompression)
+		combined.Write(comp)
+	}
+
+	// 1. Test streaming Reader on concatenated members
+	r := NewReader(bytes.NewReader(combined.Bytes()))
+	decompressed, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("Concatenated stream read failed: %v", err)
+	}
+	if string(decompressed) != expectedText {
+		t.Fatalf("Concatenated stream mismatch:\nGot:  %q\nWant: %q", string(decompressed), expectedText)
+	}
+
+	// 2. Test block Decode on concatenated members
+	blockDecomp, err := Decode(nil, combined.Bytes())
+	if err != nil {
+		t.Fatalf("Concatenated block Decode failed: %v", err)
+	}
+	if string(blockDecomp) != expectedText {
+		t.Fatalf("Concatenated block Decode mismatch:\nGot:  %q\nWant: %q", string(blockDecomp), expectedText)
+	}
+}
+
