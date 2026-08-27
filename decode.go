@@ -2,6 +2,7 @@ package brotli
 
 import (
 	"io"
+	"slices"
 )
 
 // Decode decompresses src and writes to dst, returning the uncompressed slice.
@@ -18,7 +19,6 @@ func Decode(dst, src []byte) ([]byte, error) {
 
 	for {
 		if len(dst) == cap(dst) {
-			// Ensure we have some capacity to read into
 			grow := cap(dst)
 			if grow < 8192 {
 				grow = 8192
@@ -26,9 +26,7 @@ func Decode(dst, src []byte) ([]byte, error) {
 					grow = hint
 				}
 			}
-			newDst := make([]byte, len(dst), len(dst)+grow)
-			copy(newDst, dst)
-			dst = newDst
+			dst = slices.Grow(dst, grow)
 		}
 
 		freeSlice := dst[len(dst):cap(dst)]

@@ -2,13 +2,17 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package brotli
+package brotli_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"strings"
+
+	"github.com/nijaru/brotli"
 )
 
 func ExampleWriter_Reset() {
@@ -21,8 +25,8 @@ func ExampleWriter_Reset() {
 
 	var b bytes.Buffer
 
-	bw := NewWriter(nil)
-	br := NewReader(nil)
+	bw := brotli.NewWriter(nil)
+	br := brotli.NewReader(nil)
 
 	for _, s := range proverbs {
 		b.Reset()
@@ -50,4 +54,88 @@ func ExampleWriter_Reset() {
 	// Concurrency is not parallelism.
 	// The bigger the interface, the weaker the abstraction.
 	// Documentation is for users.
+}
+
+func ExampleEncode() {
+	src := []byte("Hello, Brotli block compression!")
+
+	// Compress using in-memory block API
+	compressed := brotli.Encode(nil, src, brotli.DefaultCompression)
+
+	// Decompress into pre-allocated slice
+	decompressed, err := brotli.Decode(nil, compressed)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(decompressed))
+
+	// Output:
+	// Hello, Brotli block compression!
+}
+
+func ExampleReader_Lines() {
+	text := "first line\nsecond line\nthird line"
+	compressed := brotli.Encode(nil, []byte(text), brotli.DefaultCompression)
+
+	r := brotli.NewReader(bytes.NewReader(compressed))
+
+	// Stream line by line using Go 1.23+ range iterators
+	for line, err := range r.Lines() {
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(line)
+	}
+
+	// Output:
+	// first line
+	// second line
+	// third line
+}
+
+func ExampleReader_Chunks() {
+	text := strings.Repeat("A", 16)
+	compressed := brotli.Encode(nil, []byte(text), brotli.DefaultCompression)
+
+	r := brotli.NewReader(bytes.NewReader(compressed))
+
+	// Yield decompressed chunks up to 8 bytes each
+	var totalBytes int
+	for chunk, err := range r.Chunks(8) {
+		if err != nil {
+			log.Fatal(err)
+		}
+		totalBytes += len(chunk)
+	}
+
+	fmt.Println("Total bytes decompressed:", totalBytes)
+
+	// Output:
+	// Total bytes decompressed: 16
+}
+
+func ExampleWriterPool() {
+	pool := brotli.NewWriterPool(brotli.BestSpeed)
+
+	var buf bytes.Buffer
+	w := pool.Get(&buf)
+
+	if _, err := w.Write([]byte("Pooled compression")); err != nil {
+		log.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		log.Fatal(err)
+	}
+	pool.Put(w)
+
+	decompressed, err := brotli.Decode(nil, buf.Bytes())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(decompressed))
+
+	// Output:
+	// Pooled compression
 }
