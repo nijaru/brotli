@@ -1,7 +1,6 @@
 package brotli
 
 import (
-	"bytes"
 	"io"
 	"sync"
 )
@@ -10,9 +9,9 @@ import (
 var (
 	defaultWriterPool = NewWriterPool(DefaultCompression)
 	defaultReaderPool = NewReaderPool()
-	bufferPool        = sync.Pool{
+	copyBufPool       = sync.Pool{
 		New: func() any {
-			return new(bytes.Buffer)
+			return new([32768]byte)
 		},
 	}
 

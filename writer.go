@@ -1,7 +1,6 @@
 package brotli
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"unsafe"
@@ -198,16 +197,9 @@ func (w *Writer) WriteByte(c byte) error {
 // and write compressed bytes to the underlying destination.
 // This allows io.Copy(w, r) to achieve zero heap allocations in steady state.
 func (w *Writer) ReadFrom(r io.Reader) (n int64, err error) {
-	buf := bufferPool.Get().(*bytes.Buffer)
-	buf.Reset()
-	defer bufferPool.Put(buf)
-
-	b := buf.AvailableBuffer()
-	if cap(b) < 32768 {
-		b = make([]byte, 32768)
-	} else {
-		b = b[:32768]
-	}
+	buf := copyBufPool.Get().(*[32768]byte)
+	defer copyBufPool.Put(buf)
+	b := buf[:]
 
 	for {
 		nr, rErr := r.Read(b)
