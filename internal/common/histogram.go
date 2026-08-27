@@ -37,22 +37,25 @@ func HistogramAddLiteral(self *HistogramLiteral, val uint) {
 
 func HistogramAddVectorLiteral(self *HistogramLiteral, p []byte, n uint) {
 	self.Total_count_ += n
-	n += 1
-	for {
-		n--
-		if n == 0 {
-			break
-		}
-		self.Data_[p[0]]++
-		p = p[1:]
+	if uint(len(p)) < n {
+		n = uint(len(p))
+	}
+	for i := uint(0); i < n; i++ {
+		self.Data_[p[i]]++
 	}
 }
 
 func HistogramAddHistogramLiteral(self *HistogramLiteral, v *HistogramLiteral) {
-	var i uint
 	self.Total_count_ += v.Total_count_
-	for i = 0; i < NumLiteralSymbols; i++ {
-		self.Data_[i] += v.Data_[i]
+	for i := 0; i < NumLiteralSymbols; i += 8 {
+		self.Data_[i+0] += v.Data_[i+0]
+		self.Data_[i+1] += v.Data_[i+1]
+		self.Data_[i+2] += v.Data_[i+2]
+		self.Data_[i+3] += v.Data_[i+3]
+		self.Data_[i+4] += v.Data_[i+4]
+		self.Data_[i+5] += v.Data_[i+5]
+		self.Data_[i+6] += v.Data_[i+6]
+		self.Data_[i+7] += v.Data_[i+7]
 	}
 }
 
@@ -85,23 +88,26 @@ func HistogramAddCommand(self *HistogramCommand, val uint) {
 }
 
 func HistogramAddHistogramCommand(self *HistogramCommand, v *HistogramCommand) {
-	var i uint
 	self.Total_count_ += v.Total_count_
-	for i = 0; i < NumCommandSymbols; i++ {
-		self.Data_[i] += v.Data_[i]
+	for i := 0; i < NumCommandSymbols; i += 8 {
+		self.Data_[i+0] += v.Data_[i+0]
+		self.Data_[i+1] += v.Data_[i+1]
+		self.Data_[i+2] += v.Data_[i+2]
+		self.Data_[i+3] += v.Data_[i+3]
+		self.Data_[i+4] += v.Data_[i+4]
+		self.Data_[i+5] += v.Data_[i+5]
+		self.Data_[i+6] += v.Data_[i+6]
+		self.Data_[i+7] += v.Data_[i+7]
 	}
 }
 
 func HistogramAddVectorCommand(self *HistogramCommand, p []uint16, n uint) {
 	self.Total_count_ += n
-	n += 1
-	for {
-		n--
-		if n == 0 {
-			break
-		}
-		self.Data_[p[0]]++
-		p = p[1:]
+	if uint(len(p)) < n {
+		n = uint(len(p))
+	}
+	for i := uint(0); i < n; i++ {
+		self.Data_[p[i]]++
 	}
 }
 
@@ -134,23 +140,26 @@ func HistogramAddDistance(self *HistogramDistance, val uint) {
 }
 
 func HistogramAddHistogramDistance(self *HistogramDistance, v *HistogramDistance) {
-	var i uint
 	self.Total_count_ += v.Total_count_
-	for i = 0; i < NumDistanceSymbols; i++ {
-		self.Data_[i] += v.Data_[i]
+	for i := 0; i < NumDistanceSymbols; i += 8 {
+		self.Data_[i+0] += v.Data_[i+0]
+		self.Data_[i+1] += v.Data_[i+1]
+		self.Data_[i+2] += v.Data_[i+2]
+		self.Data_[i+3] += v.Data_[i+3]
+		self.Data_[i+4] += v.Data_[i+4]
+		self.Data_[i+5] += v.Data_[i+5]
+		self.Data_[i+6] += v.Data_[i+6]
+		self.Data_[i+7] += v.Data_[i+7]
 	}
 }
 
 func HistogramAddVectorDistance(self *HistogramDistance, p []uint16, n uint) {
 	self.Total_count_ += n
-	n += 1
-	for {
-		n--
-		if n == 0 {
-			break
-		}
-		self.Data_[p[0]]++
-		p = p[1:]
+	if uint(len(p)) < n {
+		n = uint(len(p))
+	}
+	for i := uint(0); i < n; i++ {
+		self.Data_[p[i]]++
 	}
 }
 

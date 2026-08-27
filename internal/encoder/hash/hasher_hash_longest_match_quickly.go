@@ -96,8 +96,48 @@ func (h *hashLongestMatchQuickly) Store(data []byte, mask uint, ix uint) {
 }
 
 func (h *hashLongestMatchQuickly) StoreRange(data []byte, mask uint, ix_start uint, ix_end uint) {
-	var i uint
-	for i = ix_start; i < ix_end; i++ {
+	var i uint = ix_start
+	buckets := h.buckets
+	hashShift := h.hashShift
+	bucketShift := h.bucketShift
+	sweep := uint32(h.bucketSweep)
+
+	if sweep == 1 {
+		for i+4 <= ix_end {
+			k0 := uint32(((binary.LittleEndian.Uint64(data[(i+0)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+			k1 := uint32(((binary.LittleEndian.Uint64(data[(i+1)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+			k2 := uint32(((binary.LittleEndian.Uint64(data[(i+2)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+			k3 := uint32(((binary.LittleEndian.Uint64(data[(i+3)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+
+			buckets[k0] = uint32(i + 0)
+			buckets[k1] = uint32(i + 1)
+			buckets[k2] = uint32(i + 2)
+			buckets[k3] = uint32(i + 3)
+
+			i += 4
+		}
+	} else {
+		for i+4 <= ix_end {
+			k0 := uint32(((binary.LittleEndian.Uint64(data[(i+0)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+			k1 := uint32(((binary.LittleEndian.Uint64(data[(i+1)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+			k2 := uint32(((binary.LittleEndian.Uint64(data[(i+2)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+			k3 := uint32(((binary.LittleEndian.Uint64(data[(i+3)&mask:]) << hashShift) * kHashMul64) >> bucketShift)
+
+			off0 := uint32((i+0)>>3) % sweep
+			off1 := uint32((i+1)>>3) % sweep
+			off2 := uint32((i+2)>>3) % sweep
+			off3 := uint32((i+3)>>3) % sweep
+
+			buckets[k0+off0] = uint32(i + 0)
+			buckets[k1+off1] = uint32(i + 1)
+			buckets[k2+off2] = uint32(i + 2)
+			buckets[k3+off3] = uint32(i + 3)
+
+			i += 4
+		}
+	}
+
+	for ; i < ix_end; i++ {
 		h.Store(data, mask, i)
 	}
 }
