@@ -8,13 +8,20 @@ A high-performance, pure Go implementation of the Brotli compression format (RFC
 
 ## Features
 
-- **100% Drop-In Replacement:** Upgrade existing Go web servers, gRPC services, and middleware by simply changing your import path.
-- **Zero-Allocation Block API:** Compress and decompress byte slices in-memory with zero heap allocations and no stream wrapping overhead.
-- **95% Lower Memory:** Eliminates millions of temporary heap allocations in high-compression modes (Q10/Q11 memory reduced from 84 MB to 3.8 MB).
-- **Go 1.27 SIMD Vector Acceleration:** Portable vector matching delivers up to 3x faster match finding on Go 1.27+ with transparent scalar fallback on Go 1.26.
-- **Go 1.23+ Range Iterators:** Stream decompression directly in `for...range` loops with `Lines()` and `Chunks()`.
-- **Pre-Shared Custom Dictionaries:** Seed compression with pre-shared dictionaries for small payloads (JSON, API responses).
-- **HTTP Compression Middleware:** Thread-safe pooled HTTP compressor for web services and APIs.
+- **100% Drop-In Replacement**
+  - Swap existing `andybalholm/brotli` imports with zero code changes.
+- **Zero-Allocation Block API**
+  - In-memory `Encode` and `Decode` operate directly on reusable slices without stream wrapping overhead.
+- **95% Lower Memory Footprint**
+  - Reduces peak heap memory in archival Zopfli modes from 84 MB down to 3.8 MB.
+- **Go 1.27 SIMD Vector Acceleration**
+  - Up to 3x faster vector match finding on Go 1.27+ with transparent fallback on Go 1.26.
+- **Go 1.23+ Range Iterators**
+  - Stream decompression directly inside `for...range` loops using `Lines()` and `Chunks()`.
+- **Pre-Shared Custom Dictionaries**
+  - Seed compression with pre-shared dictionaries for small payloads (JSON, RPCs).
+- **HTTP Compression Middleware**
+  - Thread-safe pooled middleware for web services and reverse proxies.
 
 ---
 
