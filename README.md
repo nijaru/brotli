@@ -109,6 +109,13 @@ for chunk, err := range reader.Chunks(8192) {
 
 ---
 
+## Acknowledgements
+
+- [Google Brotli](https://github.com/google/brotli) for the original Brotli compression specification and canonical C reference implementation (RFC 7932).
+- [Andy Balholm](https://github.com/andybalholm/brotli) for the foundational pure Go implementation.
+
+---
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
