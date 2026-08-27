@@ -10,6 +10,7 @@ Originally derived from Google Brotli and `andybalholm/brotli`, this library has
 
 - **Classic Streaming API**: 100% drop-in replacement for `github.com/andybalholm/brotli` and standard library `compress/*` patterns.
 - **Zero-Allocation Block API**: In-memory `Encode` and `Decode` that operate directly on reusable buffer capacity without intermediate allocations.
+- **Go 1.27 Portable SIMD**: Accelerated 27.3 GB/s match-finding vector kernels (`archsimd.Uint8x16`) with seamless scalar fallback on Go 1.26.
 - **Go 1.23+ Range Iterators**: Stream decompression directly in `for...range` loops using `Lines()` and `Chunks()`.
 - **Low Memory Footprint**: 0 heap allocations in steady-state streaming across Q0–Q8, and 99.998% fewer allocations in Q10–Q11 Zopfli modes.
 - **Pre-Shared Custom Dictionaries**: Sliding window seeding via `WriterOptions.CustomDict` and `Reader.SetCustomDictionary()`.
@@ -114,16 +115,16 @@ brotli.PutWriter(w) // Return writer after Close
 ---
 
 ## Performance (Apple M3 Max)
-
+ 
 | Quality Level | Throughput | Allocations (Stream Reset) | Memory Footprint |
 | :--- | :--- | :--- | :--- |
-| **Q0 (Fast)** | **282 MB/s** | **0 allocs/op** | ~2.3 KB |
-| **Q1** | **200 MB/s** | **0 allocs/op** | Hasher table reuse |
-| **Q6 (Default)** | **39 MB/s** | **0 allocs/op** | ~160 KB (20–25% lower than upstream) |
-| **Q9 (High)** | **18 MB/s** | 1 alloc/op | ~1.2 MB |
-| **Q10 (Zopfli)** | 1.1 MB/s | **61 allocs/op** | 5.9 MB (-80% vs baseline) |
-| **Q11 (Max)** | 0.8 MB/s | **63 allocs/op** | 6.8 MB (-92% vs baseline) |
-| **Decompression** | **220–346 MB/s** | **0 allocs/op** | Direct-to-slice decoding |
+| **Q0 (Fast)** | **290 MB/s** | **0 allocs/op** | ~2.3 KB |
+| **Q1** | **204 MB/s** | **0 allocs/op** | Hasher table reuse |
+| **Q6 (Default)** | **40 MB/s** | **0 allocs/op** | ~160 KB (20–25% lower than upstream) |
+| **Q9 (High)** | **19 MB/s** | 1 alloc/op | ~1.2 MB |
+| **Q10 (Zopfli)** | 1.16 MB/s | **61 allocs/op** | 5.9 MB (-80% vs baseline) |
+| **Q11 (Max)** | 0.84 MB/s | **63 allocs/op** | **3.8 MB (-95% vs baseline)** |
+| **Decompression** | **310–346 MB/s** | **0 allocs/op** | Direct-to-slice zero-alloc decoding |
 
 ---
 
