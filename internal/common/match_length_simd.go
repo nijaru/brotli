@@ -12,46 +12,50 @@ import (
 
 // FindMatchLengthWithLimit computes the number of matching bytes between s1 and s2 up to limit.
 //
-// Invariant: callers ensure len(s1) >= limit and len(s2) >= limit; the limit clamp below
-// keeps the function safe if a caller ever violates it.
-// Gating: Empirical profiling shows 96.6%-99.1% of candidate matches terminate within 16 bytes,
-// so the first 16 bytes are compared with a scalar 64-bit gate. Longer spans use dual 128-bit
-// vector registers (32 bytes per iteration) with direct register extraction (GetElem).
-// The slices are re-anchored to exact lengths before the vector loop so every in-loop bounds
-// check folds into the loop condition.
+// Invariant: callers ensure len(s1) >= limit and len(s2) >= limit — the same contract as the
+// scalar build, which is why the gate carries no clamp: it must stay small enough to inline
+// at every call site, because a call per candidate costs more in register spill/reload than
+// the code bloat. Empirical profiling shows 96.6%-99.1% of candidate matches terminate within
+// 16 bytes, so the gate compares the first 8 bytes with one 64-bit word load; longer matches
+// continue in findMatchLengthVector, which clamps limit, finishes the 8-15 byte range with a
+// second word load, and compares 32 bytes per iteration with dual 128-bit vector registers
+// and direct register extraction (GetElem).
 func FindMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
-	if limit == 0 {
-		return 0
-	}
-	if uint(len(s1)) < limit {
-		limit = uint(len(s1))
-	}
-	if uint(len(s2)) < limit {
-		limit = uint(len(s2))
-	}
-	if limit == 0 {
-		return 0
-	}
-
-	matched := uint(0)
-
-	// Step 1: Scalar fast-rejection check for the first 16 bytes (handles ~98% of candidate matches)
 	if limit >= 8 {
 		w1 := binary.LittleEndian.Uint64(s1)
 		w2 := binary.LittleEndian.Uint64(s2)
 		if w1 != w2 {
 			return uint(bits.TrailingZeros64(w1^w2) >> 3)
 		}
-		matched = 8
+		return findMatchLengthVector(s1, s2, 8, limit)
+	}
+	matched := uint(0)
+	for matched < limit && s1[matched] == s2[matched] {
+		matched++
+	}
+	return matched
+}
 
-		if limit >= 16 {
-			w1 = binary.LittleEndian.Uint64(s1[8:])
-			w2 = binary.LittleEndian.Uint64(s2[8:])
-			if w1 != w2 {
-				return 8 + uint(bits.TrailingZeros64(w1^w2)>>3)
-			}
-			matched = 16
+// findMatchLengthVector extends a match verified over its first `matched` bytes
+// (the gate passes with matched = 8).
+//
+// It clamps limit to the slice lengths, verifies the next 8 bytes with a word load,
+// then re-anchors the slices to exact-length views of the unverified suffix so every
+// in-loop bounds check folds into the loop condition.
+func findMatchLengthVector(s1, s2 []byte, matched, limit uint) uint {
+	if uint(len(s1)) < limit {
+		limit = uint(len(s1))
+	}
+	if uint(len(s2)) < limit {
+		limit = uint(len(s2))
+	}
+	if matched+8 <= limit {
+		w1 := binary.LittleEndian.Uint64(s1[matched:])
+		w2 := binary.LittleEndian.Uint64(s2[matched:])
+		if w1 != w2 {
+			return matched + uint(bits.TrailingZeros64(w1^w2)>>3)
 		}
+		matched += 8
 	}
 
 	// Re-anchor to exact-length views: len(s1) == len(s2) == limit-matched.
@@ -60,7 +64,7 @@ func FindMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
 	s1 = unsafe.Slice((*byte)(unsafe.Add(p1, matched)), limit-matched)
 	s2 = unsafe.Slice((*byte)(unsafe.Add(p2, matched)), limit-matched)
 
-	// Step 2: 32-byte dual-vector loop with direct register extraction
+	// 32-byte dual-vector loop with direct register extraction.
 	for len(s1) >= 32 {
 		v1a := archsimd.LoadUint8x16(s1[:16])
 		v2a := archsimd.LoadUint8x16(s2[:16])
@@ -91,7 +95,7 @@ func FindMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
 		matched += 32
 	}
 
-	// Step 3: Single 16-byte vector step if 16 bytes remain
+	// Single 16-byte vector step if 16 bytes remain.
 	if len(s1) >= 16 {
 		v1 := archsimd.LoadUint8x16(s1[:16])
 		v2 := archsimd.LoadUint8x16(s2[:16])
@@ -110,7 +114,7 @@ func FindMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
 		matched += 16
 	}
 
-	// Step 4: Scalar tail for remainder (< 16 bytes)
+	// Scalar tail for remainder (< 16 bytes).
 	for i := 0; i < len(s1) && s1[i] == s2[i]; i++ {
 		matched++
 	}

@@ -172,6 +172,8 @@ func (h *h5) FindLongestMatch(
 ) {
 	var num []uint16 = h.num
 	var buckets []uint32 = h.buckets
+	var blockMask uint32 = h.block_mask_
+	var numLast uint = uint(h.params.Num_last_distances_to_check)
 	var cur_ix_masked uint = cur_ix & ring_buffer_mask
 	var min_score uint = out.Score
 	var best_score uint = out.Score
@@ -184,7 +186,7 @@ func (h *h5) FindLongestMatch(
 	out.Len_code_delta = 0
 
 	/* Try last distance first. */
-	for i = 0; i < uint(h.params.Num_last_distances_to_check); i++ {
+	for i = 0; i < numLast; i++ {
 		var backward uint = uint(distance_cache[i])
 		var prev_ix uint = uint(cur_ix - backward)
 		if prev_ix >= cur_ix {
@@ -235,7 +237,7 @@ func (h *h5) FindLongestMatch(
 		for i = uint(num[key]); i > down; {
 			var prev_ix uint
 			i--
-			prev_ix = uint(bucket[uint32(i)&h.block_mask_])
+			prev_ix = uint(bucket[uint32(i)&blockMask])
 			var backward uint = cur_ix - prev_ix
 			if backward > max_backward {
 				break
