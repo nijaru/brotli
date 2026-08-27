@@ -7,4 +7,4 @@ package encoder
 */
 
 // Local constants not yet in internal/common.
-const kCompressFragmentTwoPassBlockSize uint = 1 << 17
+const kCompressFragmentTwoPassBlockSize uint = 1 << 18

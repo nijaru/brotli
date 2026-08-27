@@ -145,6 +145,7 @@ func encoderCompressStreamFast(s *State, op int, availableIn *uint, nextIn *[]by
 	}
 
 	if s.Plan.Tier == TierQ1 {
+		blockSizeLimit = min(blockSizeLimit, kCompressFragmentTwoPassBlockSize)
 		twoPassBufSize := min(kCompressFragmentTwoPassBlockSize, min(*availableIn, blockSizeLimit))
 		if s.CommandBuf == nil || cap(s.CommandBuf) < int(twoPassBufSize) {
 			s.CommandBuf = make([]uint32, twoPassBufSize)
@@ -779,7 +780,6 @@ func encodeData(s *State, isLast bool, forceFlush bool) bool {
 	}
 
 	if s.Plan.Tier == TierQ1 {
-		const kCompressFragmentTwoPassBlockSize uint = 1 << 17
 		if s.CommandBuf == nil || cap(s.CommandBuf) < int(kCompressFragmentTwoPassBlockSize) {
 			s.CommandBuf = make([]uint32, kCompressFragmentTwoPassBlockSize)
 			s.LiteralBuf = make([]byte, kCompressFragmentTwoPassBlockSize)
