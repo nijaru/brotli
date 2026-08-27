@@ -421,7 +421,7 @@ func createCommands(
 						table[prev_hash] = int(ip - base_ip - 3)
 						prev_hash = hashBytesAtOffset(input_bytes, 1, shift, min_match)
 						table[prev_hash] = int(ip - base_ip - 2)
-						prev_hash = hashBytesAtOffset(input_bytes, 0, shift, min_match)
+						prev_hash = hashBytesAtOffset(input_bytes, 2, shift, min_match)
 						table[prev_hash] = int(ip - base_ip - 1)
 					} else {
 						input_bytes = binary.LittleEndian.Uint64(input[ip-5:])
