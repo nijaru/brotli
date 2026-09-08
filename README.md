@@ -1,8 +1,8 @@
 # brotli
 
-Pure Go Brotli compression, RFC 7932 and RFC 9841, with no cgo.
+This package is a brotli compressor and decompressor implemented in Go.
 
-This is a fork of `github.com/andybalholm/brotli`. It keeps the same classic streaming API so existing code switches over, and it adds a block API, lower allocation, and a few extras covered below.
+It is a fork of `andybalholm/brotli` (itself translated from the reference C implementation at https://github.com/google/brotli). The streaming API is unchanged, so it can replace the upstream package without code changes. Compared to upstream, this fork allocates less when compressing at high quality levels, and adds a block API, custom dictionaries, large-window support, range iterators, and HTTP middleware.
 
 ## Installation
 
@@ -103,7 +103,7 @@ Measured with the streaming reset benchmarks (`BenchmarkEncodeLevelsReset`) exce
 
 Conditions: Apple M3 Max, Go 1.27.1, `GOEXPERIMENT=simd` build, 553 KB `testdata/Isaac.Newton-Opticks.txt` corpus. B/op is cumulative bytes allocated per op, not peak heap or RAM.
 
-Compared with upstream `andybalholm/brotli` v1.2.3: Q11 reset encodes allocate 4-6 MB/op here against about 40.6 MB/op there, which is about 90 percent fewer allocated bytes. Q6 fresh (never reset) encoders allocate 11.5 against 15.3 MB/op, which is about 25 percent less. Once reset and reused, both allocate nothing. Throughput is roughly even, with one honest gap: upstream's Q10 encoder runs at 1.76 MB/s against 1.16 here.
+Compared with upstream `andybalholm/brotli` v1.2.3: Q11 reset encodes allocate 4-6 MB/op here against about 40.6 MB/op there, which is about 90 percent fewer allocated bytes. Q6 fresh (never reset) encoders allocate 11.5 against 15.3 MB/op, which is about 25 percent less. Once reset and reused, both allocate nothing. Throughput is roughly even, except Q10: upstream's encoder runs at 1.76 MB/s against 1.16 here.
 
 The SIMD match length kernel runs about 2.5x faster than scalar on its microbenchmark (`BenchmarkFindMatchLength`, 26 against 10 GB/s). The end to end effect is small, a couple percent at Q0.
 
