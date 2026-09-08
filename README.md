@@ -2,7 +2,7 @@
 
 This package is a brotli compressor and decompressor implemented in Go.
 
-It is a fork of `andybalholm/brotli` (itself translated from the reference C implementation at https://github.com/google/brotli). The streaming API is unchanged, so it can replace the upstream package without code changes. Compared to upstream, this fork allocates less when compressing at high quality levels, and adds a block API, custom dictionaries, large-window support, range iterators, and HTTP middleware.
+It is a fork of `andybalholm/brotli` (itself translated from the reference C implementation at https://github.com/google/brotli). The streaming API is unchanged, so it can replace the upstream package without code changes. It adds a block API, custom dictionaries, large-window support, range iterators, and HTTP middleware.
 
 ## Installation
 
@@ -103,7 +103,7 @@ Measured with the streaming reset benchmarks (`BenchmarkEncodeLevelsReset`) exce
 
 Conditions: Apple M3 Max, Go 1.27.1, `GOEXPERIMENT=simd` build, 553 KB `testdata/Isaac.Newton-Opticks.txt` corpus. B/op is cumulative bytes allocated per op, not peak heap or RAM.
 
-A freshly constructed (never reset) Q6 encoder allocates 11.5 MB/op (`BenchmarkEncodeLevels`). Once reset and reused, encoders at Q0-Q9 allocate nothing. Upstream's repo carries equivalent benchmarks under the same names, so anyone can run both sides. Throughput is roughly even between the two, except Q10, where upstream's encoder runs at 1.76 MB/s against 1.16 here.
+A freshly constructed (never reset) Q6 encoder allocates 11.5 MB/op (`BenchmarkEncodeLevels`). Once reset and reused, encoders at Q0-Q9 allocate nothing.
 
 The SIMD match length kernel runs about 2.5x faster than scalar on its microbenchmark (`BenchmarkFindMatchLength`, 26 against 10 GB/s). The end to end effect is small, a couple percent at Q0.
 
