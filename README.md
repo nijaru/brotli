@@ -99,9 +99,9 @@ for chunk, err := range reader.Chunks(8192) {
 | **Q9 (High)** | **19 MB/s** | **0 allocs** |
 | **Q10 (Zopfli)** | 1.16 MB/s | ~62 allocs (~6.7 MB) |
 | **Q11 (Max)** | 0.84 MB/s | ~50 allocs (~4–6 MB, ~90% fewer allocated bytes than upstream) |
-| **Decompress** | **310–346 MB/s** | **0 allocs** |
+| **Decompress (block API)** | 234–348 MB/s (varies by quality; Q6-compressed ~343–348) | **0 allocs** (reused `dst`) |
 
-**Benchmark conditions.** Apple M3 Max, Go 1.27.1, 553 KB `testdata/Isaac.Newton-Opticks.txt` corpus. Allocation figures are `B/op` and `allocs/op` from `go test -benchmem` on `BenchmarkEncodeLevelsReset` (upstream comparison at `andybalholm/brotli` commit `0675b24`, v1.2.0+21). `B/op` is cumulative bytes allocated per operation — not peak heap or RAM usage, which these benchmarks do not measure. Two related measurements often quoted alongside this table:
+**Benchmark conditions.** Apple M3 Max, Go 1.27.1, 553 KB `testdata/Isaac.Newton-Opticks.txt` corpus, `GOEXPERIMENT=simd` build. Allocation figures are `B/op` and `allocs/op` from `go test -benchmem` on `BenchmarkEncodeLevelsReset` / `BenchmarkBlockDecode` (upstream comparison at `andybalholm/brotli` `v1.2.1` = commit `0675b24`; per-op allocation counts fluctuate by one when a bucketed ~24–48 KB hash table allocation lands inside vs outside the timed loop). `B/op` is cumulative bytes allocated per operation — not peak heap or RAM usage, which these benchmarks do not measure. Two related measurements often quoted alongside this table:
 
 - **Q6 fresh construction:** ~25% fewer allocated bytes than upstream (11.5 vs 15.3 MB/op, `BenchmarkEncodeLevels`); steady-state resets are 0-alloc in both libraries.
 - **Q11 84 MB → 4 MB:** an internal before/after comparison of this repo's own Zopfli match-buffer optimization (`BackwardMatch` 16B→8B packing), not an upstream comparison.
