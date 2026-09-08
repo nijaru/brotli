@@ -73,7 +73,7 @@ Stream lines or byte chunks directly inside `for...range` loops:
 
 ```go
 // Read line by line
-for line, err := range reader.Lines() {
+for line, err := range r.Lines() {
     if err != nil {
         log.Fatal(err)
     }
@@ -81,7 +81,7 @@ for line, err := range reader.Lines() {
 }
 
 // Read fixed-size zero-alloc byte chunks
-for chunk, err := range reader.Chunks(8192) {
+for chunk, err := range r.Chunks(8192) {
     if err != nil {
         log.Fatal(err)
     }
@@ -127,4 +127,4 @@ for chunk, err := range reader.Chunks(8192) {
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+[MIT License](LICENSE). See [LICENSE](LICENSE) for details.
