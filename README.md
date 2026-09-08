@@ -2,7 +2,7 @@
 
 A high-performance, pure Go implementation of the Brotli compression format (RFC 7932 & RFC 9841).
 
-`nijaru/brotli` is a drop-in replacement for `andybalholm/brotli` and standard library `compress/*` packages. It provides faster throughput, up to 95% lower memory footprint, zero-allocation in-memory block compression, and native Go 1.23+ range iterators.
+`nijaru/brotli` is a drop-in replacement for `andybalholm/brotli` and standard library `compress/*` packages. It provides faster throughput, up to ~90% fewer allocated bytes per stream in Zopfli modes, zero-allocation in-memory block compression, and native Go 1.23+ range iterators.
 
 ---
 
@@ -14,8 +14,8 @@ A high-performance, pure Go implementation of the Brotli compression format (RFC
   - In-memory `Encode` and `Decode` operate directly on reusable slices without stream wrapping overhead.
 - **RFC 9841 Large Window & Multi-Stream Framing**
   - Supports sliding windows up to 30 bits (~1 GB) and transparent multi-member concatenated stream decoding.
-- **95% Lower Memory Footprint**
-  - Reduces peak heap memory in archival Zopfli modes from 84 MB down to 3.8 MB.
+- **~90% Fewer Allocated Bytes (Zopfli Modes)**
+  - Q11 reset-stream encoding allocates ~4 MB/op vs ~40.6 MB/op for `andybalholm/brotli` (see benchmark conditions below). An earlier internal baseline of 84 MB/op refers to this repo's pre-optimization code, not upstream.
 - **Go 1.27 SIMD Vector Acceleration**
   - Up to 3x faster vector match finding on Go 1.27+ with transparent fallback on Go 1.26.
 - **Go 1.23+ Range Iterators**
@@ -91,15 +91,20 @@ for chunk, err := range reader.Chunks(8192) {
 
 ## Performance (Apple M3 Max)
 
-| Quality Level | Throughput | Stream Reset Memory |
+| Quality Level | Throughput | Reset-Stream Allocations |
 | :--- | :--- | :--- |
-| **Q0 (Fastest)** | **290 MB/s** | **0 allocs** (~2.3 KB) |
-| **Q1** | **204 MB/s** | **0 allocs** (Hasher reuse) |
-| **Q6 (Default)** | **40 MB/s** | **0 allocs** (25% less RAM than upstream) |
-| **Q9 (High)** | **19 MB/s** | 1 alloc (~1.2 MB) |
-| **Q10 (Zopfli)** | 1.16 MB/s | **61 allocs** (5.9 MB) |
-| **Q11 (Max)** | 0.84 MB/s | **63 allocs** (**3.8 MB** — *95% lower memory vs baseline*) |
+| **Q0 (Fastest)** | **290 MB/s** | **0 allocs** |
+| **Q1** | **204 MB/s** | **0 allocs** (hasher reuse) |
+| **Q6 (Default)** | **40 MB/s** | **0 allocs** |
+| **Q9 (High)** | **19 MB/s** | **0 allocs** |
+| **Q10 (Zopfli)** | 1.16 MB/s | ~62 allocs (~6.7 MB) |
+| **Q11 (Max)** | 0.84 MB/s | ~50 allocs (~4–6 MB, ~90% fewer allocated bytes than upstream) |
 | **Decompress** | **310–346 MB/s** | **0 allocs** |
+
+**Benchmark conditions.** Apple M3 Max, Go 1.27.1, 553 KB `testdata/Isaac.Newton-Opticks.txt` corpus. Allocation figures are `B/op` and `allocs/op` from `go test -benchmem` on `BenchmarkEncodeLevelsReset` (upstream comparison at `andybalholm/brotli` commit `0675b24`, v1.2.0+21). `B/op` is cumulative bytes allocated per operation — not peak heap or RAM usage, which these benchmarks do not measure. Two related measurements often quoted alongside this table:
+
+- **Q6 fresh construction:** ~25% fewer allocated bytes than upstream (11.5 vs 15.3 MB/op, `BenchmarkEncodeLevels`); steady-state resets are 0-alloc in both libraries.
+- **Q11 84 MB → 4 MB:** an internal before/after comparison of this repo's own Zopfli match-buffer optimization (`BackwardMatch` 16B→8B packing), not an upstream comparison.
 
 ---
 
