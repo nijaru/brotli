@@ -11,7 +11,7 @@ A high-performance, pure Go implementation of the Brotli compression format (RFC
 - **Drop-In Replacement (Classic Streaming API)**
   - Swap existing `andybalholm/brotli` imports with zero code changes for the classic streaming API (`NewWriter`/`NewWriterLevel`/`NewWriterOptions`/`NewReader`). Upstream's experimental `matchfinder`-based API (`NewWriterV2`, `Encoder`, `FastEncoder`) is not ported.
 - **Zero-Allocation Block API**
-  - In-memory `Encode` and `Decode` operate directly on caller-reused slices with 0 allocs/op and no stream wrapping overhead (verified by `BenchmarkBlockEncode`/`BenchmarkBlockDecode`).
+  - In-memory `Encode` and `Decode` operate directly on caller-reused slices with 0 allocs/op at Q0–Q9 and no stream wrapping overhead (verified by `BenchmarkBlockEncode`/`BenchmarkBlockDecode`; Zopfli levels Q10–Q11 allocate per-op — see table).
 - **RFC 9841 Large Window & Multi-Stream Framing**
   - Supports sliding windows up to 30 bits (~1 GB) and transparent multi-member concatenated stream decoding.
 - **~90% Fewer Allocated Bytes (Zopfli Modes)**
@@ -39,7 +39,7 @@ go get github.com/nijaru/brotli
 
 ### 1. In-Memory Block Compression (Reusable Buffers)
 
-For compressing and decompressing byte slices directly in memory. Reuse `dst` across calls for 0 allocs/op (`BenchmarkBlockEncode`/`BenchmarkBlockDecode`):
+For compressing and decompressing byte slices directly in memory. Reuse `dst` across calls for 0 allocs/op at Q0–Q9 (`BenchmarkBlockEncode`/`BenchmarkBlockDecode`):
 
 ```go
 // Compress (Quality: 0 = Fastest, 6 = Default, 11 = Best)
