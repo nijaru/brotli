@@ -1,8 +1,16 @@
 package brotli
 
+import "sync"
+
 // sliceWriter is a zero-allocation io.Writer adapter that appends directly into a byte slice.
+// Instances are pooled because passing &sw as an io.Writer would otherwise
+// escape to the heap on every Encode call (1 alloc/op).
 type sliceWriter struct {
 	buf []byte
+}
+
+var sliceWriterPool = sync.Pool{
+	New: func() any { return new(sliceWriter) },
 }
 
 func (sw *sliceWriter) Write(p []byte) (int, error) {
@@ -21,13 +29,17 @@ func Encode(dst, src []byte, quality int) []byte {
 		dst = dst[:0]
 	}
 
-	var sw sliceWriter
+	sw := sliceWriterPool.Get().(*sliceWriter)
 	sw.buf = dst
 
-	w := pool.Get(&sw)
+	w := pool.Get(sw)
 	_, _ = w.Write(src)
 	_ = w.Close()
 	pool.Put(w)
 
-	return sw.buf
+	out := sw.buf
+	sw.buf = nil
+	sliceWriterPool.Put(sw)
+
+	return out
 }

@@ -36,11 +36,33 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
+      - name: Install reference brotli CLI
+        run: sudo apt-get update && sudo apt-get install -y brotli
+
       - name: Run Go vet
         run: go vet ./...
 
       - name: Run Go tests
         run: go test -v -count=1 ./...
+
+  fuzz:
+    name: Fuzz (Go 1.27, 60s each)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache: true
+
+      - name: Fuzz Decode
+        run: go test -run=^$ -fuzz=FuzzDecode -fuzztime=60s .
+
+      - name: Fuzz RoundTrip
+        run: go test -run=^$ -fuzz=FuzzRoundTrip -fuzztime=60s .
 
   lint:
     name: Lint & Verification
