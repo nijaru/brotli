@@ -2,7 +2,7 @@
 
 Pure Go Brotli compression (RFC 7932 and RFC 9841).
 
-This is a fork of `andybalholm/brotli` with the same classic streaming API, so existing imports swap over with no code changes. The biggest difference is allocation: a Q11 encode takes about 4 MB per op here versus about 40 MB upstream. It also adds a few things upstream doesn't have: an allocation-free block API, custom dictionaries, large windows, range iterators, and HTTP middleware. Throughput is roughly on par: a touch faster at Q11, about even everywhere else except Q10, where upstream wins.
+A fork of `andybalholm/brotli` with the same streaming API, so existing code switches over untouched. A Q11 encode allocates about 4 MB per op here versus about 40 MB upstream, at roughly the same speed (upstream's Q10 is faster). New in this fork: a zero-allocation block API, custom dictionaries, large windows, range iterators, and HTTP middleware.
 
 ---
 
