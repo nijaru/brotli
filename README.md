@@ -103,7 +103,7 @@ Measured with the streaming reset benchmarks (`BenchmarkEncodeLevelsReset`) exce
 
 Conditions: Apple M3 Max, Go 1.27.1, `GOEXPERIMENT=simd` build, 553 KB `testdata/Isaac.Newton-Opticks.txt` corpus. B/op is cumulative bytes allocated per op, not peak heap or RAM.
 
-Compared with upstream `andybalholm/brotli` v1.2.3: Q11 reset encodes allocate 4-6 MB/op here against about 40.6 MB/op there, which is about 90 percent fewer allocated bytes. Q6 fresh (never reset) encoders allocate 11.5 against 15.3 MB/op, which is about 25 percent less. Once reset and reused, both allocate nothing. Throughput is roughly even, except Q10: upstream's encoder runs at 1.76 MB/s against 1.16 here.
+A freshly constructed (never reset) Q6 encoder allocates 11.5 MB/op (`BenchmarkEncodeLevels`). Once reset and reused, encoders at Q0-Q9 allocate nothing. Upstream's repo carries equivalent benchmarks under the same names, so anyone can run both sides. Throughput is roughly even between the two, except Q10, where upstream's encoder runs at 1.76 MB/s against 1.16 here.
 
 The SIMD match length kernel runs about 2.5x faster than scalar on its microbenchmark (`BenchmarkFindMatchLength`, 26 against 10 GB/s). The end to end effect is small, a couple percent at Q0.
 
