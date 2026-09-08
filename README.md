@@ -2,7 +2,7 @@
 
 Pure Go Brotli compression (RFC 7932 and RFC 9841).
 
-This is a fork of `andybalholm/brotli` with the same classic streaming API, so existing imports swap over with no code changes. Compared to upstream it allocates a lot less in the Zopfli modes (about 90% fewer bytes per op at Q11) and adds a few things upstream doesn't have: an allocation-free block API, custom dictionaries, large windows, range iterators, and HTTP middleware. Throughput is roughly on par: a touch faster at Q11, about even everywhere else except Q10, where upstream wins.
+This is a fork of `andybalholm/brotli` with the same classic streaming API, so existing imports swap over with no code changes. The biggest difference is allocation: a Q11 encode takes about 4 MB per op here versus about 40 MB upstream. It also adds a few things upstream doesn't have: an allocation-free block API, custom dictionaries, large windows, range iterators, and HTTP middleware. Throughput is roughly on par: a touch faster at Q11, about even everywhere else except Q10, where upstream wins.
 
 ---
 
@@ -11,7 +11,7 @@ This is a fork of `andybalholm/brotli` with the same classic streaming API, so e
 - **Drop-in replacement.** Same `NewWriter`, `NewWriterLevel`, `NewWriterOptions`, and `NewReader` API as `andybalholm/brotli`. Upstream's newer experimental API (`NewWriterV2`, `Encoder`, `FastEncoder`, `matchfinder`) is not included.
 - **Zero-allocation block API.** `Encode` and `Decode` work directly on slices you reuse, with no per-op allocations at Q0-Q9. The Zopfli levels Q10-Q11 still allocate per op; see the table below.
 - **Large windows and concatenated streams (RFC 9841).** Sliding windows up to 30 bits (about 1 GB), and multi-member concatenated streams decode without any extra work.
-- **Less allocation in Zopfli modes.** A reset Q11 encoder allocates about 4 MB per op here versus about 40 MB upstream. (An 84 MB figure from older notes was this repo's own code before the match-buffer fix, not upstream's number.)
+- **Less allocation in Zopfli modes.** A reset Q11 encoder allocates about 4 MB per op here versus about 40 MB upstream.
 - **SIMD match finding on Go 1.27.** The match-length kernel runs about 2.5x faster under Go 1.27 (26 GB/s versus 10 GB/s scalar on a microbenchmark). The real-world effect is small, a couple percent at Q0. Go 1.26 builds use a scalar fallback.
 - **Range iterators.** Decompress inside `for...range` loops with `Lines()` and `Chunks()`. Needs Go 1.23+.
 - **Custom dictionaries.** Seed the compressor with a pre-shared dictionary. Useful for small payloads like JSON or RPC bodies. Upstream doesn't support these.
@@ -108,9 +108,9 @@ Two related measurements:
 
 ## Compatibility
 
-- **Against the C library.** Output is byte-identical to the reference C encoder at Q0 on the tested vectors (`TestDirectBitstreamParity`; needs the `brotli` binary, which CI installs). Higher levels are deliberately not compared byte-for-byte: C, upstream, and this library all emit different but equally valid bitstreams there, so the tests check the property that matters instead. At every level Q0-Q11, our decoder reads C's output and C reads ours (`TestDifferentialCBinary`).
+- **Against the C library.** Output is byte-identical to the reference C encoder at Q0 on the tested vectors (`TestDirectBitstreamParity`; needs the `brotli` binary, which CI installs). Higher levels are deliberately not compared byte-for-byte: C, upstream, and this library all emit different but equally valid bitstreams there, so the tests check decode compatibility instead. At every level Q0-Q11, our decoder reads C's output and C reads ours (`TestDifferentialCBinary`).
 - **Against upstream.** Round-trips both directions with `andybalholm/brotli` at every level, on every CI run (`TestCrossDecoderCompatibility`).
-- **Fuzzing.** `FuzzDecode` and `FuzzRoundTrip` run in CI, 60 seconds each per push. Corrupt input has to fail cleanly, never panic.
+- **Fuzzing.** `FuzzDecode` and `FuzzRoundTrip` run in CI, 60 seconds each on every push. Corrupt input has to fail cleanly, never panic.
 
 ---
 
