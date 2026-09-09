@@ -2,7 +2,7 @@
 
 This package is a brotli compressor and decompressor implemented in Go.
 
-It is a fork of `andybalholm/brotli` (itself translated from the reference C implementation at https://github.com/google/brotli). The streaming API is unchanged, so it can replace the upstream package without code changes. It is optimized for low allocation, and adds a block API, custom dictionaries, large-window support, range iterators, and HTTP middleware.
+It is a fork of `andybalholm/brotli` (itself translated from the reference C implementation at https://github.com/google/brotli). A drop-in replacement for it: same streaming API, no code changes needed. It is optimized for low allocation, and adds a block API, custom dictionaries, large-window support, range iterators, and HTTP middleware.
 
 ## Installation
 
