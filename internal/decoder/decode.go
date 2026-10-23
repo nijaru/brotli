@@ -43,6 +43,7 @@ const (
 	decoderErrorFormatPadding1              = -14
 	decoderErrorFormatPadding2              = -15
 	decoderErrorFormatDistance              = -16
+	decoderErrorFormatBlockSwitch           = -17
 	decoderErrorDictionaryNotSet            = -19
 	decoderErrorInvalidArguments            = -20
 	decoderErrorAllocContextModes           = -21
@@ -1228,16 +1229,19 @@ Decodes a command or literal and updates block type ring-buffer.
 
 	Reads 3..54 bits.
 */
-func decodeBlockTypeAndLength(safe int, s *Reader, tree_type int) bool {
+func decodeBlockTypeAndLength(safe int, s *Reader, tree_type int) int {
 	var max_block_type uint32 = s.numBlockTypes[tree_type]
+	if max_block_type <= 1 {
+		/* A block switch is impossible when the stream declares one type.
+		   Report a format error instead of the ambiguous "needs more input". */
+		return decoderErrorFormatBlockSwitch
+	}
+
 	type_tree := s.blockTypeTrees[tree_type*common.HuffmanMaxSize258:]
 	len_tree := s.blockLenTrees[tree_type*common.HuffmanMaxSize26:]
 	var br *common.BitReader = &s.br
 	var ringbuffer []uint32 = s.blockTypeRb[tree_type*2:]
 	var block_type uint32
-	if max_block_type <= 1 {
-		return false
-	}
 
 	/* Read 0..15 + 3..39 bits. */
 	if safe == 0 {
@@ -1247,12 +1251,12 @@ func decodeBlockTypeAndLength(safe int, s *Reader, tree_type int) bool {
 		var memento common.BitReaderState
 		br.SaveState(&memento)
 		if !safeReadSymbol(type_tree, br, &block_type) {
-			return false
+			return decoderNeedsMoreInput
 		}
 		if !safeReadBlockLength(s, &s.blockLength[tree_type], len_tree, br) {
 			s.substate_read_blockLength = stateReadBlockLengthNone
 			br.RestoreState(&memento)
-			return false
+			return decoderNeedsMoreInput
 		}
 	}
 
@@ -1270,7 +1274,7 @@ func decodeBlockTypeAndLength(safe int, s *Reader, tree_type int) bool {
 
 	ringbuffer[0] = ringbuffer[1]
 	ringbuffer[1] = block_type
-	return true
+	return decoderSuccess
 }
 
 func detectTrivialLiteralBlockTypes(s *Reader) {
@@ -1313,20 +1317,21 @@ Decodes the block type and updates the state for literal context.
 
 	Reads 3..54 bits.
 */
-func decodeLiteralBlockSwitchInternal(safe int, s *Reader) bool {
-	if !decodeBlockTypeAndLength(safe, s, 0) {
-		return false
+func decodeLiteralBlockSwitchInternal(safe int, s *Reader) int {
+	result := decodeBlockTypeAndLength(safe, s, 0)
+	if result != decoderSuccess {
+		return result
 	}
 
 	prepareLiteralDecoding(s)
-	return true
+	return decoderSuccess
 }
 
-func decodeLiteralBlockSwitch(s *Reader) {
-	decodeLiteralBlockSwitchInternal(0, s)
+func decodeLiteralBlockSwitch(s *Reader) int {
+	return decodeLiteralBlockSwitchInternal(0, s)
 }
 
-func safeDecodeLiteralBlockSwitch(s *Reader) bool {
+func safeDecodeLiteralBlockSwitch(s *Reader) int {
 	return decodeLiteralBlockSwitchInternal(1, s)
 }
 
@@ -1335,20 +1340,21 @@ Block switch for insert/copy length.
 
 	Reads 3..54 bits.
 */
-func decodeCommandBlockSwitchInternal(safe int, s *Reader) bool {
-	if !decodeBlockTypeAndLength(safe, s, 1) {
-		return false
+func decodeCommandBlockSwitchInternal(safe int, s *Reader) int {
+	result := decodeBlockTypeAndLength(safe, s, 1)
+	if result != decoderSuccess {
+		return result
 	}
 
 	s.htreeCommand = []common.HuffmanCode(s.insertCopyHGroup.HTrees[s.blockTypeRb[3]])
-	return true
+	return decoderSuccess
 }
 
-func decodeCommandBlockSwitch(s *Reader) {
-	decodeCommandBlockSwitchInternal(0, s)
+func decodeCommandBlockSwitch(s *Reader) int {
+	return decodeCommandBlockSwitchInternal(0, s)
 }
 
-func safeDecodeCommandBlockSwitch(s *Reader) bool {
+func safeDecodeCommandBlockSwitch(s *Reader) int {
 	return decodeCommandBlockSwitchInternal(1, s)
 }
 
@@ -1357,21 +1363,22 @@ Block switch for distance codes.
 
 	Reads 3..54 bits.
 */
-func decodeDistanceBlockSwitchInternal(safe int, s *Reader) bool {
-	if !decodeBlockTypeAndLength(safe, s, 2) {
-		return false
+func decodeDistanceBlockSwitchInternal(safe int, s *Reader) int {
+	result := decodeBlockTypeAndLength(safe, s, 2)
+	if result != decoderSuccess {
+		return result
 	}
 
 	s.dist_contextMapSlice = s.distContextMap[s.blockTypeRb[5]<<common.DistanceContextBits:]
 	s.distHtreeIndex = s.dist_contextMapSlice[s.distanceContext]
-	return true
+	return decoderSuccess
 }
 
-func decodeDistanceBlockSwitch(s *Reader) {
-	decodeDistanceBlockSwitchInternal(0, s)
+func decodeDistanceBlockSwitch(s *Reader) int {
+	return decodeDistanceBlockSwitchInternal(0, s)
 }
 
-func safeDecodeDistanceBlockSwitch(s *Reader) bool {
+func safeDecodeDistanceBlockSwitch(s *Reader) int {
 	return decodeDistanceBlockSwitchInternal(1, s)
 }
 
@@ -1846,13 +1853,15 @@ CommandBegin:
 	}
 
 	if s.blockLength[1] == 0 {
+		var status int
 		if safe != 0 {
-			if !safeDecodeCommandBlockSwitch(s) {
-				result = decoderNeedsMoreInput
-				goto saveStateAndReturn
-			}
+			status = safeDecodeCommandBlockSwitch(s)
 		} else {
-			decodeCommandBlockSwitch(s)
+			status = decodeCommandBlockSwitch(s)
+		}
+		if status != decoderSuccess {
+			result = status
+			goto saveStateAndReturn
 		}
 
 		goto CommandBegin
@@ -1892,13 +1901,15 @@ CommandInner:
 			}
 
 			if s.blockLength[0] == 0 {
+				var status int
 				if safe != 0 {
-					if !safeDecodeLiteralBlockSwitch(s) {
-						result = decoderNeedsMoreInput
-						goto saveStateAndReturn
-					}
+					status = safeDecodeLiteralBlockSwitch(s)
 				} else {
-					decodeLiteralBlockSwitch(s)
+					status = decodeLiteralBlockSwitch(s)
+				}
+				if status != decoderSuccess {
+					result = status
+					goto saveStateAndReturn
 				}
 
 				preloadSymbol(safe, s.literalHtree, br, &bits, &value)
@@ -1943,13 +1954,15 @@ CommandInner:
 			}
 
 			if s.blockLength[0] == 0 {
+				var status int
 				if safe != 0 {
-					if !safeDecodeLiteralBlockSwitch(s) {
-						result = decoderNeedsMoreInput
-						goto saveStateAndReturn
-					}
+					status = safeDecodeLiteralBlockSwitch(s)
 				} else {
-					decodeLiteralBlockSwitch(s)
+					status = decodeLiteralBlockSwitch(s)
+				}
+				if status != decoderSuccess {
+					result = status
+					goto saveStateAndReturn
 				}
 
 				if s.trivialLiteralContext != 0 {
@@ -2010,13 +2023,15 @@ CommandPostDecodeLiterals:
 	} else {
 		/* Read distance code in the command, unless it was implicitly zero. */
 		if s.blockLength[2] == 0 {
+			var status int
 			if safe != 0 {
-				if !safeDecodeDistanceBlockSwitch(s) {
-					result = decoderNeedsMoreInput
-					goto saveStateAndReturn
-				}
+				status = safeDecodeDistanceBlockSwitch(s)
 			} else {
-				decodeDistanceBlockSwitch(s)
+				status = decodeDistanceBlockSwitch(s)
+			}
+			if status != decoderSuccess {
+				result = status
+				goto saveStateAndReturn
 			}
 		}
 
@@ -2280,6 +2295,11 @@ func decoderDecompressStream(
 						   input stream. */
 						result = decoderSuccess
 
+						if s.bufferLength >= uint32(len(s.buffer.u8)) {
+							/* A read that keeps requesting bytes without completing
+							   must fail instead of overrunning this staging buffer. */
+							return saveErrorCode(s, decoderErrorUnreachable)
+						}
 						s.buffer.u8[s.bufferLength] = (*next_in)[0]
 						s.bufferLength++
 						br.InputLen = uint(s.bufferLength)
@@ -2299,6 +2319,12 @@ func decoderDecompressStream(
 
 					*available_in = br.InputLen - br.BytePos
 					for *available_in != 0 {
+						if s.bufferLength >= uint32(len(s.buffer.u8)) {
+							/* A read that keeps requesting bytes without completing
+							   must fail instead of overrunning this staging buffer. */
+							result = saveErrorCode(s, decoderErrorUnreachable)
+							break
+						}
 						s.buffer.u8[s.bufferLength] = (*next_in)[0]
 						s.bufferLength++
 						*next_in = (*next_in)[1:]
@@ -2805,6 +2831,8 @@ func decoderErrorString(c int) string {
 		return "PADDING_2"
 	case decoderErrorFormatDistance:
 		return "DISTANCE"
+	case decoderErrorFormatBlockSwitch:
+		return "BLOCK_SWITCH"
 	case decoderErrorDictionaryNotSet:
 		return "DICTIONARY_NOT_SET"
 	case decoderErrorInvalidArguments:
