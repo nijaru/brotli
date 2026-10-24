@@ -65,6 +65,29 @@ func TestGlobalPoolCorrectness(t *testing.T) {
 	}
 }
 
+func TestWriterPoolWithConfig(t *testing.T) {
+	input := bytes.Repeat([]byte("configured pool "), 128)
+	pool := NewWriterPoolWithConfig(WriterConfig{Quality: 5, LGWin: 20})
+
+	var buf bytes.Buffer
+	w := pool.Get(&buf)
+	if _, err := w.Write(input); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+	pool.Put(w)
+
+	decompressed, err := io.ReadAll(NewReader(bytes.NewReader(buf.Bytes())))
+	if err != nil {
+		t.Fatalf("ReadAll() error: %v", err)
+	}
+	if !bytes.Equal(decompressed, input) {
+		t.Fatal("pool output did not match the input")
+	}
+}
+
 func TestWriterPoolNormalizesReturnedWriterQuality(t *testing.T) {
 	p := NewWriterPool(DefaultCompression)
 	w := NewWriterLevel(io.Discard, BestCompression)
@@ -237,4 +260,3 @@ func BenchmarkWriterPoolParallel(b *testing.B) {
 		}
 	})
 }
-
