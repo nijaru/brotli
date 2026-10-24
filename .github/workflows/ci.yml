@@ -64,6 +64,9 @@ jobs:
       - name: Fuzz RoundTrip
         run: go test -run=^$ -fuzz=FuzzRoundTrip -fuzztime=60s .
 
+      - name: Fuzz DecodeLimit
+        run: go test -run=^$ -fuzz=FuzzDecodeLimit -fuzztime=60s .
+
   lint:
     name: Lint & Verification
     runs-on: ubuntu-latest

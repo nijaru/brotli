@@ -997,6 +997,19 @@ func FuzzDecode(f *testing.F) {
 	})
 }
 
+func FuzzDecodeLimit(f *testing.F) {
+	for _, text := range []string{"", "hello world", "the quick brown fox jumps over the lazy dog"} {
+		f.Add(Encode(nil, []byte(text), 0))
+		f.Add(Encode(nil, []byte(text), 6))
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		// Exercise output growth, exact-limit probes, and window rejection.
+		_, _ = DecodeWithLimits(nil, data, 64*1024, 30)
+		_, _ = DecodeWithLimits(nil, data, 64*1024, 16)
+	})
+}
+
 func BenchmarkCompareUpstreamBrotli(b *testing.B) {
 	opticks, err := os.ReadFile("testdata/Isaac.Newton-Opticks.txt")
 	if err != nil {
@@ -1096,4 +1109,3 @@ func TestConcatenatedStreamDecoding(t *testing.T) {
 		t.Fatalf("Concatenated block Decode mismatch:\nGot:  %q\nWant: %q", string(blockDecomp), expectedText)
 	}
 }
-
