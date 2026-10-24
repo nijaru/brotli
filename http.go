@@ -2,15 +2,22 @@ package brotli
 
 import (
 	"compress/gzip"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 )
 
+// ErrNoAcceptableEncoding is returned by HTTPCompressorWithError when the
+// request rejects identity and none of the supported content encodings are
+// acceptable.
+var ErrNoAcceptableEncoding = errors.New("brotli: no acceptable content encoding")
+
 // HTTPCompressor chooses a compression method (brotli, gzip, or none) based on
 // the Accept-Encoding header, sets the Content-Encoding header, and returns a
 // WriteCloser that implements that compression. The Close method must be called
-// before the current HTTP handler returns.
+// before the current HTTP handler returns. Callers that need to reject requests
+// with 406 Not Acceptable should use HTTPCompressorWithError instead.
 func HTTPCompressor(w http.ResponseWriter, r *http.Request) io.WriteCloser {
 	return HTTPCompressorWithLevel(w, r, 4)
 }
@@ -38,12 +45,20 @@ func (pw *pooledWriterWrapper) Close() error {
 }
 
 func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) io.WriteCloser {
-	vary := w.Header().Get("Vary")
-	if vary == "" {
-		w.Header().Set("Vary", "Accept-Encoding")
-	} else if !strings.Contains(strings.ToLower(vary), "accept-encoding") {
-		w.Header().Add("Vary", "Accept-Encoding")
+	wc, err := HTTPCompressorWithError(w, r, level)
+	if err != nil {
+		return nopCloser{w}
 	}
+	return wc
+}
+
+// HTTPCompressorWithError is the error-returning form of
+// HTTPCompressorWithLevel. It returns ErrNoAcceptableEncoding when the request
+// rejects identity and none of the supported content encodings are acceptable.
+// Callers should respond with 406 Not Acceptable in that case. The legacy
+// HTTPCompressorWithLevel keeps its identity fallback for compatibility.
+func HTTPCompressorWithError(w http.ResponseWriter, r *http.Request, level int) (io.WriteCloser, error) {
+	addVaryAcceptEncoding(w)
 
 	encoding := negotiateContentEncoding(r, []string{"br", "gzip"})
 	switch encoding {
@@ -53,16 +68,28 @@ func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) 
 		return &pooledWriterWrapper{
 			w:    pool.Get(w),
 			pool: pool,
-		}
+		}, nil
 	case "gzip":
 		w.Header().Set("Content-Encoding", "gzip")
 		gw, err := gzip.NewWriterLevel(w, gzipLevelForBrotliLevel(level))
 		if err != nil {
-			return gzip.NewWriter(w)
+			return gzip.NewWriter(w), nil
 		}
-		return gw
+		return gw, nil
+	case "identity":
+		return nopCloser{w}, nil
+	default:
+		return nil, ErrNoAcceptableEncoding
 	}
-	return nopCloser{w}
+}
+
+func addVaryAcceptEncoding(w http.ResponseWriter) {
+	vary := w.Header().Get("Vary")
+	if vary == "" {
+		w.Header().Set("Vary", "Accept-Encoding")
+	} else if !strings.Contains(strings.ToLower(vary), "accept-encoding") {
+		w.Header().Add("Vary", "Accept-Encoding")
+	}
 }
 
 func gzipLevelForBrotliLevel(level int) int {
@@ -156,36 +183,54 @@ type acceptSpec struct {
 
 // parseAccept parses Accept* headers.
 func parseAccept(header http.Header, key string) (specs []acceptSpec) {
-loop:
-	for _, s := range header[key] {
+	for _, line := range header[key] {
+		s := line
 		for {
-			var spec acceptSpec
-			spec.Value, s = expectTokenSlash(s)
-			if spec.Value == "" {
-				continue loop
-			}
-			spec.Value = strings.ToLower(spec.Value)
-			spec.Q = 1.0
 			s = skipSpace(s)
+			if s == "" {
+				break
+			}
+
+			value, rest := expectTokenSlash(s)
+			if value == "" {
+				s = skipToNextAcceptElement(s)
+				continue
+			}
+
+			spec := acceptSpec{Value: strings.ToLower(value), Q: 1.0}
+			s = skipSpace(rest)
 			if strings.HasPrefix(s, ";") {
 				s = skipSpace(s[1:])
 				if !strings.HasPrefix(s, "q=") {
-					continue loop
+					s = skipToNextAcceptElement(s)
+					continue
 				}
-				spec.Q, s = expectQuality(s[2:])
+				qualityText := s[2:]
+				spec.Q, s = expectQuality(qualityText)
 				if spec.Q < 0.0 {
-					continue loop
+					s = skipToNextAcceptElement(qualityText)
+					continue
 				}
 			}
+
 			specs = append(specs, spec)
 			s = skipSpace(s)
 			if !strings.HasPrefix(s, ",") {
-				continue loop
+				break
 			}
 			s = skipSpace(s[1:])
 		}
 	}
 	return
+}
+
+// skipToNextAcceptElement discards the current malformed element and returns
+// the remainder after its comma, if any.
+func skipToNextAcceptElement(s string) string {
+	if comma := strings.IndexByte(s, ','); comma >= 0 {
+		return s[comma+1:]
+	}
+	return ""
 }
 
 func skipSpace(s string) (rest string) {
@@ -222,13 +267,16 @@ func expectQuality(s string) (q float64, rest string) {
 	}
 	s = s[1:]
 	if !strings.HasPrefix(s, ".") {
+		if len(s) != 0 && !isQualityTerminator(s[0]) {
+			return -1, ""
+		}
 		return q, s
 	}
 	s = s[1:]
 	i := 0
 	n := 0
 	d := 1
-	for ; i < len(s); i++ {
+	for ; i < len(s) && i < 3; i++ {
 		b := s[i]
 		if b < '0' || b > '9' {
 			break
@@ -236,11 +284,21 @@ func expectQuality(s string) (q float64, rest string) {
 		n = n*10 + int(b) - '0'
 		d *= 10
 	}
+	if i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		return -1, ""
+	}
+	if i < len(s) && !isQualityTerminator(s[i]) {
+		return -1, ""
+	}
 	q += float64(n) / float64(d)
 	if q > 1 {
 		return -1, ""
 	}
 	return q, s[i:]
+}
+
+func isQualityTerminator(b byte) bool {
+	return b == ',' || b == ' ' || b == '\t' || b == '\r' || b == '\n'
 }
 
 // Octet types from RFC 2616.

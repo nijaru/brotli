@@ -107,7 +107,7 @@ Other entry points: `NewWriterLevel`, `NewWriterOptions` with `WriterOptions{Qua
 * RFC 9841 large windows, up to 30 bits (about 1 GB).
 * Multi-member concatenated stream decoding.
 * Range iterators: `Reader.Lines()` and `Reader.Chunks(n)`.
-* Pooled HTTP middleware that picks brotli, gzip, or none from `Accept-Encoding`.
+* Pooled HTTP middleware that picks brotli, gzip, or none from `Accept-Encoding`; `HTTPCompressorWithError` reports when no encoding is acceptable.
 * SIMD match length kernel under Go 1.27 with scalar fallback on older Go.
 
 Upstream's experimental matchfinder API (`NewWriterV2`, `Encoder`, `FastEncoder`) is not ported.
@@ -134,7 +134,7 @@ The SIMD match length kernel runs about 2.5x faster than scalar on its microbenc
 
 ## Compatibility and testing
 
-Output is byte identical to the reference C encoder at Q0 on tested vectors (`TestDirectBitstreamParity`, needs the `brotli` CLI). At higher levels, C, upstream, and this library emit different but valid bytes, so tests check decode compatibility in both directions at every level Q0-Q11 (`TestDifferentialCBinary`). Round trips both ways with `andybalholm/brotli` pass at every level (`TestCrossDecoderCompatibility`). Fuzz targets `FuzzDecode` and `FuzzRoundTrip` run in CI, 60 seconds each per push.
+Output is byte identical to the reference C encoder at Q0 on tested vectors (`TestDirectBitstreamParity`, needs the `brotli` CLI). At higher levels, C, upstream, and this library emit different but valid bytes, so tests check decode compatibility in both directions at every level Q0-Q11 (`TestDifferentialCBinary`). Round trips both ways with `andybalholm/brotli` pass at every level (`TestCrossDecoderCompatibility`). Fuzz targets `FuzzDecode`, `FuzzDecodeLimit`, and `FuzzRoundTrip` run in CI, 60 seconds each per push.
 
 ## Acknowledgements
 

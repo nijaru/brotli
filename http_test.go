@@ -3,6 +3,7 @@ package brotli
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -63,6 +64,87 @@ func TestHTTPCompressorGzipFallback(t *testing.T) {
 	}
 	if !bytes.Equal(output, input) {
 		t.Fatal("gzip output did not round trip")
+	}
+}
+
+func TestHTTPCompressorWithErrorRejectsUnacceptable(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "identity;q=0, *;q=0")
+	rec := httptest.NewRecorder()
+
+	w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
+	if !errors.Is(err, ErrNoAcceptableEncoding) {
+		t.Fatalf("HTTPCompressorWithError() error = %v, want %v", err, ErrNoAcceptableEncoding)
+	}
+	if w != nil {
+		t.Fatal("HTTPCompressorWithError() returned a writer with an unacceptable encoding")
+	}
+	if got := rec.Header().Get("Vary"); got != "Accept-Encoding" {
+		t.Fatalf("Vary=%q, want Accept-Encoding", got)
+	}
+}
+
+func TestHTTPCompressorWithErrorBrotli(t *testing.T) {
+	input := bytes.Repeat([]byte("strict brotli "), 64)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+
+	w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
+	if err != nil {
+		t.Fatalf("HTTPCompressorWithError() error: %v", err)
+	}
+	if _, err := w.Write(input); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "br" {
+		t.Fatalf("Content-Encoding=%q, want br", got)
+	}
+	output, err := io.ReadAll(NewReader(bytes.NewReader(rec.Body.Bytes())))
+	if err != nil {
+		t.Fatalf("ReadAll() error: %v", err)
+	}
+	if !bytes.Equal(output, input) {
+		t.Fatal("brotli output did not round trip")
+	}
+}
+
+func TestHTTPCompressorWithErrorIdentity(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
+	if err != nil {
+		t.Fatalf("HTTPCompressorWithError() error: %v", err)
+	}
+	if _, err := w.Write([]byte("identity")); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding=%q, want empty", got)
+	}
+}
+
+func TestHTTPCompressorWithLevelKeepsIdentityFallback(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "identity;q=0, *;q=0")
+	rec := httptest.NewRecorder()
+
+	w := HTTPCompressorWithLevel(rec, req, DefaultCompression)
+	if _, err := w.Write([]byte("identity")); err != nil {
+		t.Fatalf("Write() error: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close() error: %v", err)
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding=%q, want empty", got)
 	}
 }
 
@@ -193,11 +275,39 @@ func TestNegotiateContentEncoding(t *testing.T) {
 	}
 }
 
-func TestExpectQualityRejectsAboveOne(t *testing.T) {
-	if q, _ := expectQuality("1"); q != 1 {
-		t.Fatalf("expectQuality(1) = %v, want 1", q)
+func TestParseAcceptSkipsMalformedElement(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "br;q=bogus, gzip;q=0.8")
+	if got := negotiateContentEncoding(req, []string{"br", "gzip"}); got != "gzip" {
+		t.Fatalf("negotiateContentEncoding() = %q, want gzip", got)
 	}
-	if q, _ := expectQuality("1.5"); q >= 0 {
-		t.Fatalf("expectQuality(1.5) = %v, want rejection", q)
+}
+
+func TestParseAcceptSkipsMalformedToken(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", ", br;q=0.5")
+	if got := negotiateContentEncoding(req, []string{"br", "gzip"}); got != "br" {
+		t.Fatalf("negotiateContentEncoding() = %q, want br", got)
+	}
+}
+
+func TestExpectQuality(t *testing.T) {
+	tests := []struct {
+		input string
+		want  float64
+	}{
+		{"1", 1},
+		{"0", 0},
+		{"0.5", 0.5},
+		{"1.000", 1},
+		{"1.5", -1},
+		{"0.1234", -1},
+		{"0.5x", -1},
+		{"0.5;q=1", -1},
+	}
+	for _, tt := range tests {
+		if got, _ := expectQuality(tt.input); got != tt.want {
+			t.Errorf("expectQuality(%q) = %v, want %v", tt.input, got, tt.want)
+		}
 	}
 }
