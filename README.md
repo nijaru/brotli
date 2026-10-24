@@ -51,6 +51,22 @@ if _, err := io.Copy(os.Stdout, br); err != nil {
 
 Both types can be reset and reused. Call `bw.Reset(&b)` for the next stream and `br.Reset(&b)` before decoding it.
 
+Bounded decoding for untrusted input. `DecodeLimit` and `NewReaderLimit` fail with `ErrOutputLimitExceeded` rather than producing more decoded bytes than the caller allows.
+
+```go
+const maxOutput = 16 << 20
+
+decompressed, err := brotli.DecodeLimit(nil, compressed, maxOutput)
+if errors.Is(err, brotli.ErrOutputLimitExceeded) {
+    // Reject the payload.
+}
+
+br, err := brotli.NewReaderLimit(bytes.NewReader(compressed), maxOutput)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
 Range iterators over decoded output:
 
 ```go
@@ -78,6 +94,7 @@ Other entry points: `NewWriterLevel`, `NewWriterOptions` with `WriterOptions{Qua
 * Pure Go, no cgo.
 * Same `NewWriter`, `NewWriterLevel`, `NewWriterOptions`, `NewReader`, `Reader`, `Writer`, and `WriterOptions` names as upstream.
 * Block API: `Encode(dst, src, quality)` and `Decode(dst, src)` on caller reused slices, with 0 allocs per op at quality 0-9.
+* Caller-bounded decoding via `DecodeLimit` and `NewReaderLimit`.
 * Pre-shared custom dictionaries.
 * RFC 9841 large windows, up to 30 bits (about 1 GB).
 * Multi-member concatenated stream decoding.
