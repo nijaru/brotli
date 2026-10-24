@@ -55,8 +55,8 @@ func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) 
 // HTTPCompressorWithError is the error-returning form of
 // HTTPCompressorWithLevel. It returns ErrNoAcceptableEncoding when the request
 // rejects identity and none of the supported content encodings are acceptable.
-// Callers should respond with 406 Not Acceptable in that case. The legacy
-// HTTPCompressorWithLevel keeps its identity fallback for compatibility.
+// Callers should respond with 406 Not Acceptable in that case. The
+// upstream-compatible HTTPCompressorWithLevel keeps its identity fallback.
 func HTTPCompressorWithError(w http.ResponseWriter, r *http.Request, level int) (io.WriteCloser, error) {
 	addVaryAcceptEncoding(w)
 
