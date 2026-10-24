@@ -2322,8 +2322,7 @@ func decoderDecompressStream(
 						if s.bufferLength >= uint32(len(s.buffer.u8)) {
 							/* A read that keeps requesting bytes without completing
 							   must fail instead of overrunning this staging buffer. */
-							result = saveErrorCode(s, decoderErrorUnreachable)
-							break
+							return saveErrorCode(s, decoderErrorUnreachable)
 						}
 						s.buffer.u8[s.bufferLength] = (*next_in)[0]
 						s.bufferLength++
