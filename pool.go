@@ -62,11 +62,11 @@ func PutReader(r *Reader) {
 }
 
 // WriterPool manages a thread-safe pool of Writer instances to reduce garbage
-// collection overhead and heap allocations. Each pool is specific to a compression
-// quality level to ensure reused encoders match user-requested behavior.
+// collection overhead and heap allocations. Each pool is specific to a
+// WriterConfig so reused encoders retain the requested settings.
 //
-// Pooling is most useful when compressing many independent streams at the same
-// quality level. A checked-out Writer still has normal Writer ownership rules:
+// Pooling is most useful when compressing many independent streams with the
+// same settings. A checked-out Writer still has normal Writer ownership rules:
 // write to it from one goroutine at a time, call Close when the stream is
 // complete, then return it to the pool and stop using that pointer.
 type WriterPool struct {
