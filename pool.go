@@ -151,9 +151,10 @@ func (p *ReaderPool) Put(r *Reader) {
 		return
 	}
 	r.Reset(nil)
-	// Pooled readers must not retain a caller-configured output limit.
+	// Pooled readers must not retain caller-configured limits.
 	r.limited = false
 	r.limit = 0
 	r.read = 0
+	r.dec.SetMaxWindowBits(0)
 	p.pool.Put(r)
 }

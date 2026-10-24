@@ -21,15 +21,31 @@ func Decode(dst, src []byte) ([]byte, error) {
 // The limit also caps decode-output buffer growth, so a small compressed
 // payload cannot force the output slice to grow without bound.
 func DecodeLimit(dst, src []byte, limit int) ([]byte, error) {
-	if limit < 0 {
+	return decodeWithLimits(dst, src, limit, 0)
+}
+
+// DecodeWithLimits decompresses src with both an output limit and a maximum
+// window size. maxWindowBits must be between 10 and 30; 30 allows the standard
+// and RFC 9841 large windows. A stream requesting a larger window fails with
+// ErrWindowBitsLimitExceeded before the decoder allocates its ring buffer.
+func DecodeWithLimits(dst, src []byte, outputLimit, maxWindowBits int) ([]byte, error) {
+	if err := validateMaxWindowBits(maxWindowBits); err != nil {
+		return nil, err
+	}
+	return decodeWithLimits(dst, src, outputLimit, maxWindowBits)
+}
+
+func decodeWithLimits(dst, src []byte, outputLimit, maxWindowBits int) ([]byte, error) {
+	if outputLimit < 0 {
 		return nil, ErrInvalidOutputLimit
 	}
 
 	r := GetReaderBytes(src)
-	r.limited = true
-	r.limit = int64(limit)
-	r.read = 0
 	defer PutReader(r)
+	r.limited = true
+	r.limit = int64(outputLimit)
+	r.read = 0
+	r.dec.SetMaxWindowBits(maxWindowBits)
 
 	return decode(dst, src, r)
 }

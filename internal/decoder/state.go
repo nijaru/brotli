@@ -173,6 +173,7 @@ type Reader struct {
 	largeWindow               bool
 	sizeNibbles               uint
 	windowBits                uint32
+	maxWindowBits             uint32
 	new_ringbufferSize        int
 	num_literalHtrees         uint32
 	contextMap                []byte
@@ -216,6 +217,9 @@ func decoderStateInit(s *Reader) bool {
 	s.cannyRingbufferAllocation = 1
 
 	s.windowBits = 0
+	if s.maxWindowBits == 0 {
+		s.maxWindowBits = common.LargeMaxWbits
+	}
 	s.maxDistance = 0
 	s.distRb[0] = 16
 	s.distRb[1] = 15

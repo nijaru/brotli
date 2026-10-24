@@ -44,6 +44,7 @@ const (
 	decoderErrorFormatPadding2              = -15
 	decoderErrorFormatDistance              = -16
 	decoderErrorFormatBlockSwitch           = -17
+	decoderErrorWindowBitsLimit             = -18
 	decoderErrorDictionaryNotSet            = -19
 	decoderErrorInvalidArguments            = -20
 	decoderErrorAllocContextModes           = -21
@@ -2392,6 +2393,10 @@ func decoderDecompressStream(
 			/* Maximum distance, see section 9.1. of the spec. */
 		/* Fall through. */
 		case stateInitialize:
+			if s.windowBits > s.maxWindowBits {
+				result = decoderErrorWindowBitsLimit
+				break
+			}
 			s.maxBackwardDistance = (1 << s.windowBits) - common.WindowGap
 
 			neededTrees := 3 * (common.HuffmanMaxSize258 + common.HuffmanMaxSize26)
@@ -2832,6 +2837,8 @@ func decoderErrorString(c int) string {
 		return "DISTANCE"
 	case decoderErrorFormatBlockSwitch:
 		return "BLOCK_SWITCH"
+	case decoderErrorWindowBitsLimit:
+		return "WINDOW_BITS_LIMIT"
 	case decoderErrorDictionaryNotSet:
 		return "DICTIONARY_NOT_SET"
 	case decoderErrorInvalidArguments:

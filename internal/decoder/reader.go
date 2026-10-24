@@ -3,6 +3,8 @@ package decoder
 import (
 	"errors"
 	"io"
+
+	"github.com/nijaru/brotli/internal/common"
 )
 
 type decodeError int
@@ -12,6 +14,10 @@ func (err decodeError) Error() string {
 }
 
 var errInvalidState = errors.New("brotli: invalid state")
+
+// ErrWindowBitsLimitExceeded is returned when a stream requests a window
+// larger than the configured maximum.
+var ErrWindowBitsLimitExceeded = errors.New("brotli: window bits limit exceeded")
 
 // readBufSize is a "good" buffer size that avoids excessive round-trips
 // between C and Go but doesn't waste too much memory on buffering.
@@ -41,6 +47,7 @@ func (r *Reader) Reset(src io.Reader) error {
 	literalHGroup := r.literalHGroup
 	insertCopyHGroup := r.insertCopyHGroup
 	distanceHGroup := r.distanceHGroup
+	maxWindowBits := r.maxWindowBits
 
 	// Zero the struct to clear state machine fields
 	*r = Reader{}
@@ -56,6 +63,7 @@ func (r *Reader) Reset(src io.Reader) error {
 	r.literalHGroup = literalHGroup
 	r.insertCopyHGroup = insertCopyHGroup
 	r.distanceHGroup = distanceHGroup
+	r.maxWindowBits = maxWindowBits
 
 	decoderStateInit(r)
 	r.src = src
@@ -77,6 +85,7 @@ func (r *Reader) ResetBytes(src []byte) {
 	literalHGroup := r.literalHGroup
 	insertCopyHGroup := r.insertCopyHGroup
 	distanceHGroup := r.distanceHGroup
+	maxWindowBits := r.maxWindowBits
 
 	// Zero the struct to clear state machine fields
 	*r = Reader{}
@@ -92,6 +101,7 @@ func (r *Reader) ResetBytes(src []byte) {
 	r.literalHGroup = literalHGroup
 	r.insertCopyHGroup = insertCopyHGroup
 	r.distanceHGroup = distanceHGroup
+	r.maxWindowBits = maxWindowBits
 
 	decoderStateInit(r)
 	r.src = nil
@@ -100,6 +110,17 @@ func (r *Reader) ResetBytes(src []byte) {
 
 func (r *Reader) SetCustomDictionary(dict []byte) {
 	r.customDict = append([]byte(nil), dict...)
+}
+
+// SetMaxWindowBits caps the window size that a stream may request. Values at
+// or below zero restore the default maximum of 30 bits. The decoder applies
+// the cap before allocating its ring buffer.
+func (r *Reader) SetMaxWindowBits(max int) {
+	if max <= 0 {
+		r.maxWindowBits = common.LargeMaxWbits
+		return
+	}
+	r.maxWindowBits = uint32(max)
 }
 
 func (r *Reader) resetForNextMember() {
@@ -116,6 +137,7 @@ func (r *Reader) resetForNextMember() {
 	src := r.src
 	in := r.in
 	customDict := r.customDict
+	maxWindowBits := r.maxWindowBits
 
 	*r = Reader{}
 
@@ -130,6 +152,7 @@ func (r *Reader) resetForNextMember() {
 	r.insertCopyHGroup = insertCopyHGroup
 	r.distanceHGroup = distanceHGroup
 	r.customDict = customDict
+	r.maxWindowBits = maxWindowBits
 
 	decoderStateInit(r)
 	r.src = src
@@ -210,7 +233,11 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 			}
 			return n, nil
 		case decoderResultError:
-			return n, decodeError(decoderGetErrorCode(r))
+			code := decoderGetErrorCode(r)
+			if code == decoderErrorWindowBitsLimit {
+				return n, ErrWindowBitsLimitExceeded
+			}
+			return n, decodeError(code)
 		case decoderResultNeedsMoreOutput:
 			if n == 0 {
 				return 0, io.ErrShortBuffer

@@ -51,21 +51,29 @@ if _, err := io.Copy(os.Stdout, br); err != nil {
 
 Both types can be reset and reused. Call `bw.Reset(&b)` for the next stream and `br.Reset(&b)` before decoding it.
 
-Bounded decoding for untrusted input. `DecodeLimit` and `NewReaderLimit` fail with `ErrOutputLimitExceeded` rather than producing more decoded bytes than the caller allows.
+Bounded decoding for untrusted input. `DecodeLimit` and `NewReaderLimit` fail with `ErrOutputLimitExceeded` rather than producing more decoded bytes than the caller allows. That limit caps decoded output, not the decoder's window or history, so use `DecodeWithLimits` or `NewReaderWithLimits` when working memory also needs a bound.
 
 ```go
-const maxOutput = 16 << 20
+const (
+    maxOutput     = 16 << 20
+    maxWindowBits = 20
+)
 
-decompressed, err := brotli.DecodeLimit(nil, compressed, maxOutput)
+decompressed, err := brotli.DecodeWithLimits(nil, compressed, maxOutput, maxWindowBits)
 if errors.Is(err, brotli.ErrOutputLimitExceeded) {
     // Reject the payload.
 }
+if errors.Is(err, brotli.ErrWindowBitsLimitExceeded) {
+    // The stream asks for a window larger than maxWindowBits.
+}
 
-br, err := brotli.NewReaderLimit(bytes.NewReader(compressed), maxOutput)
+br, err := brotli.NewReaderWithLimits(bytes.NewReader(compressed), maxOutput, maxWindowBits)
 if err != nil {
     log.Fatal(err)
 }
 ```
+
+`DecodeLimit` and `NewReaderLimit` remain available when only the output needs a bound.
 
 Range iterators over decoded output:
 
@@ -94,7 +102,7 @@ Other entry points: `NewWriterLevel`, `NewWriterOptions` with `WriterOptions{Qua
 * Pure Go, no cgo.
 * Same `NewWriter`, `NewWriterLevel`, `NewWriterOptions`, `NewReader`, `Reader`, `Writer`, and `WriterOptions` names as upstream.
 * Block API: `Encode(dst, src, quality)` and `Decode(dst, src)` on caller reused slices, with 0 allocs per op at quality 0-9.
-* Caller-bounded decoding via `DecodeLimit` and `NewReaderLimit`.
+* Caller-bounded decoding via `DecodeLimit`, `NewReaderLimit`, `DecodeWithLimits`, and `NewReaderWithLimits`.
 * Pre-shared custom dictionaries.
 * RFC 9841 large windows, up to 30 bits (about 1 GB).
 * Multi-member concatenated stream decoding.

@@ -7,13 +7,33 @@ import (
 	"github.com/nijaru/brotli/internal/decoder"
 )
 
+const (
+	minWindowBits = 10
+	maxWindowBits = 30
+)
+
 var (
 	// ErrOutputLimitExceeded is returned when decoded output would exceed the
-	// limit configured with NewReaderLimit or DecodeLimit.
+	// limit configured with NewReaderLimit, NewReaderWithLimits, DecodeLimit,
+	// or DecodeWithLimits.
 	ErrOutputLimitExceeded = errors.New("brotli: output limit exceeded")
 	// ErrInvalidOutputLimit is returned when an output limit is negative.
 	ErrInvalidOutputLimit = errors.New("brotli: output limit must be non-negative")
+	// ErrWindowBitsLimitExceeded is returned when a stream requests a window
+	// larger than the limit configured with NewReaderWithLimits or
+	// DecodeWithLimits.
+	ErrWindowBitsLimitExceeded = decoder.ErrWindowBitsLimitExceeded
+	// ErrInvalidWindowBitsLimit is returned when a maximum window size is
+	// outside the supported range of 10 to 30 bits.
+	ErrInvalidWindowBitsLimit = errors.New("brotli: max window bits must be between 10 and 30")
 )
+
+func validateMaxWindowBits(max int) error {
+	if max < minWindowBits || max > maxWindowBits {
+		return ErrInvalidWindowBitsLimit
+	}
+	return nil
+}
 
 // Reader wraps the internal decoder.Reader for API encapsulation,
 // allowing clients to use it as a standard io.Reader.
@@ -89,7 +109,8 @@ func (r *Reader) WriteTo(w io.Writer) (n int64, err error) {
 // Reset discards the Reader's state and makes it equivalent to the result of
 // its original state from NewReader, but reading from src instead.
 // This permits reusing a Reader rather than allocating a new one.
-// The configured output limit, if any, is preserved and applies to the new stream.
+// The configured output and window-bits limits, if any, are preserved and apply
+// to the new stream.
 func (r *Reader) Reset(src io.Reader) error {
 	r.read = 0
 	return r.dec.Reset(src)
@@ -98,7 +119,8 @@ func (r *Reader) Reset(src io.Reader) error {
 // ResetBytes discards the Reader's state and makes it equivalent to the result of
 // its original state from NewReader, but reading from the provided slice instead.
 // This permits reusing a Reader without allocating a bytes.Reader or copying input data.
-// The configured output limit, if any, is preserved and applies to the new stream.
+// The configured output and window-bits limits, if any, are preserved and apply
+// to the new stream.
 func (r *Reader) ResetBytes(src []byte) {
 	r.read = 0
 	r.dec.ResetBytes(src)
@@ -127,5 +149,24 @@ func NewReaderLimit(src io.Reader, limit int) (*Reader, error) {
 	r := NewReader(src)
 	r.limited = true
 	r.limit = int64(limit)
+	return r, nil
+}
+
+// NewReaderWithLimits creates a Reader bounded by both an output limit and a
+// maximum window size. maxWindowBits must be between 10 and 30; 30 allows the
+// standard and RFC 9841 large windows. A stream requesting a larger window
+// fails with ErrWindowBitsLimitExceeded before the decoder allocates its ring
+// buffer. A non-negative outputLimit is required; ErrInvalidOutputLimit is
+// returned otherwise.
+func NewReaderWithLimits(src io.Reader, outputLimit, maxWindowBits int) (*Reader, error) {
+	if err := validateMaxWindowBits(maxWindowBits); err != nil {
+		return nil, err
+	}
+
+	r, err := NewReaderLimit(src, outputLimit)
+	if err != nil {
+		return nil, err
+	}
+	r.dec.SetMaxWindowBits(maxWindowBits)
 	return r, nil
 }
