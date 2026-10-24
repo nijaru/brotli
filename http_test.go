@@ -148,7 +148,7 @@ func TestHTTPCompressorWithLevelKeepsIdentityFallback(t *testing.T) {
 	}
 }
 
-func TestHTTPCompressorVaryExistingHeader(t *testing.T) {
+func TestHTTPCompressorWithLevelPreservesUpstreamVary(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "br")
 	rec := httptest.NewRecorder()
@@ -158,15 +158,95 @@ func TestHTTPCompressorVaryExistingHeader(t *testing.T) {
 	w.Write([]byte("hello"))
 	w.Close()
 
-	varValues := rec.Header().Values("Vary")
-	foundAcceptEncoding := false
-	for _, v := range varValues {
+	for _, v := range rec.Header().Values("Vary") {
 		if v == "Accept-Encoding" {
-			foundAcceptEncoding = true
+			t.Fatal("upstream-compatible compressor added Accept-Encoding to an existing Vary header")
 		}
 	}
-	if !foundAcceptEncoding {
-		t.Errorf("Vary values %v did not contain Accept-Encoding", varValues)
+}
+
+func TestHTTPCompressorWithErrorAddsVary(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	rec.Header().Set("Vary", "Accept-Language")
+
+	w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Write([]byte("hello"))
+	w.Close()
+
+	for _, v := range rec.Header().Values("Vary") {
+		if v == "Accept-Encoding" {
+			return
+		}
+	}
+	t.Fatal("strict compressor did not add Accept-Encoding to Vary")
+}
+
+func TestHTTPCompressorWithLevelMatchesUpstreamNegotiation(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{"upstream identity weighting", "identity;q=0.9, gzip;q=0.5", "gzip"},
+		{"upstream case sensitivity", "BR", ""},
+		{"upstream malformed line", "br;q=bogus, gzip", ""},
+		{"gzip", "gzip;q=0.5", "gzip"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("Accept-Encoding", tt.header)
+			rec := httptest.NewRecorder()
+
+			w := HTTPCompressorWithLevel(rec, req, DefaultCompression)
+			if _, err := w.Write([]byte("payload")); err != nil {
+				t.Fatalf("Write() error: %v", err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatalf("Close() error: %v", err)
+			}
+			if got := rec.Header().Get("Content-Encoding"); got != tt.want {
+				t.Fatalf("Content-Encoding=%q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHTTPCompressorWithErrorUsesRFCSemantics(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{"identity wins", "identity;q=0.9, gzip;q=0.5", ""},
+		{"case insensitive", "BR", "br"},
+		{"malformed element skipped", "br;q=bogus, gzip", "gzip"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("Accept-Encoding", tt.header)
+			rec := httptest.NewRecorder()
+
+			w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
+			if err != nil {
+				t.Fatalf("HTTPCompressorWithError() error: %v", err)
+			}
+			if _, err := w.Write([]byte("payload")); err != nil {
+				t.Fatalf("Write() error: %v", err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatalf("Close() error: %v", err)
+			}
+			if got := rec.Header().Get("Content-Encoding"); got != tt.want {
+				t.Fatalf("Content-Encoding=%q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

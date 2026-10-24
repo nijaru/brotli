@@ -44,23 +44,35 @@ func (pw *pooledWriterWrapper) Close() error {
 	return err
 }
 
+// HTTPCompressorWithLevel is the upstream-compatible compressor. It preserves
+// upstream's Accept-Encoding parsing, identity selection, and Vary behavior.
 func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) io.WriteCloser {
-	wc, err := HTTPCompressorWithError(w, r, level)
-	if err != nil {
+	if w.Header().Get("Vary") == "" {
+		w.Header().Set("Vary", "Accept-Encoding")
+	}
+
+	wc, ok := compressorForEncoding(w, level, negotiateContentEncodingUpstream(r, []string{"br", "gzip"}))
+	if !ok {
 		return nopCloser{w}
 	}
 	return wc
 }
 
-// HTTPCompressorWithError is the error-returning form of
+// HTTPCompressorWithError is the strict, RFC-correct form of
 // HTTPCompressorWithLevel. It returns ErrNoAcceptableEncoding when the request
 // rejects identity and none of the supported content encodings are acceptable.
-// Callers should respond with 406 Not Acceptable in that case. The
-// upstream-compatible HTTPCompressorWithLevel keeps its identity fallback.
+// Callers should respond with 406 Not Acceptable in that case.
 func HTTPCompressorWithError(w http.ResponseWriter, r *http.Request, level int) (io.WriteCloser, error) {
 	addVaryAcceptEncoding(w)
 
-	encoding := negotiateContentEncoding(r, []string{"br", "gzip"})
+	wc, ok := compressorForEncoding(w, level, negotiateContentEncoding(r, []string{"br", "gzip"}))
+	if !ok {
+		return nil, ErrNoAcceptableEncoding
+	}
+	return wc, nil
+}
+
+func compressorForEncoding(w http.ResponseWriter, level int, encoding string) (io.WriteCloser, bool) {
 	switch encoding {
 	case "br":
 		w.Header().Set("Content-Encoding", "br")
@@ -68,18 +80,18 @@ func HTTPCompressorWithError(w http.ResponseWriter, r *http.Request, level int) 
 		return &pooledWriterWrapper{
 			w:    pool.Get(w),
 			pool: pool,
-		}, nil
+		}, true
 	case "gzip":
 		w.Header().Set("Content-Encoding", "gzip")
 		gw, err := gzip.NewWriterLevel(w, gzipLevelForBrotliLevel(level))
 		if err != nil {
-			return gzip.NewWriter(w), nil
+			return gzip.NewWriter(w), true
 		}
-		return gw, nil
+		return gw, true
 	case "identity":
-		return nopCloser{w}, nil
+		return nopCloser{w}, true
 	default:
-		return nil, ErrNoAcceptableEncoding
+		return nil, false
 	}
 }
 
@@ -101,6 +113,26 @@ func gzipLevelForBrotliLevel(level int) int {
 	default:
 		return level
 	}
+}
+
+// negotiateContentEncodingUpstream mirrors the upstream helper's selection
+// algorithm for the upstream-compatible HTTP functions.
+func negotiateContentEncodingUpstream(r *http.Request, offers []string) string {
+	bestOffer := "identity"
+	bestQ := -1.0
+	specs := parseAcceptUpstream(r.Header, "Accept-Encoding")
+	for _, offer := range offers {
+		for _, spec := range specs {
+			if spec.Q > bestQ && (spec.Value == "*" || spec.Value == offer) {
+				bestQ = spec.Q
+				bestOffer = offer
+			}
+		}
+	}
+	if bestQ == 0 {
+		bestOffer = ""
+	}
+	return bestOffer
 }
 
 // negotiateContentEncoding returns the best offered content encoding for the
@@ -181,6 +213,39 @@ type acceptSpec struct {
 	Q     float64
 }
 
+// parseAcceptUpstream mirrors the upstream parser for compatibility.
+func parseAcceptUpstream(header http.Header, key string) (specs []acceptSpec) {
+loop:
+	for _, s := range header[key] {
+		for {
+			var spec acceptSpec
+			spec.Value, s = expectTokenSlash(s)
+			if spec.Value == "" {
+				continue loop
+			}
+			spec.Q = 1.0
+			s = skipSpace(s)
+			if strings.HasPrefix(s, ";") {
+				s = skipSpace(s[1:])
+				if !strings.HasPrefix(s, "q=") {
+					continue loop
+				}
+				spec.Q, s = expectQualityUpstream(s[2:])
+				if spec.Q < 0.0 {
+					continue loop
+				}
+			}
+			specs = append(specs, spec)
+			s = skipSpace(s)
+			if !strings.HasPrefix(s, ",") {
+				continue loop
+			}
+			s = skipSpace(s[1:])
+		}
+	}
+	return
+}
+
 // parseAccept parses Accept* headers.
 func parseAccept(header http.Header, key string) (specs []acceptSpec) {
 	for _, line := range header[key] {
@@ -252,6 +317,36 @@ func expectTokenSlash(s string) (token, rest string) {
 		}
 	}
 	return s[:i], s[i:]
+}
+
+func expectQualityUpstream(s string) (q float64, rest string) {
+	switch {
+	case len(s) == 0:
+		return -1, ""
+	case s[0] == '0':
+		q = 0
+	case s[0] == '1':
+		q = 1
+	default:
+		return -1, ""
+	}
+	s = s[1:]
+	if !strings.HasPrefix(s, ".") {
+		return q, s
+	}
+	s = s[1:]
+	i := 0
+	n := 0
+	d := 1
+	for ; i < len(s); i++ {
+		b := s[i]
+		if b < '0' || b > '9' {
+			break
+		}
+		n = n*10 + int(b) - '0'
+		d *= 10
+	}
+	return q + float64(n)/float64(d), s[i:]
 }
 
 func expectQuality(s string) (q float64, rest string) {

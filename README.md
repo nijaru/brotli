@@ -12,8 +12,10 @@ The stable upstream streaming API is drop-in compatible: `NewReader`,
 `WriterOptions` matches upstream exactly (`Quality`, `LGWin`). Use
 `WriterConfig` for custom dictionaries and RFC 9841 large windows.
 
-The upstream HTTP helpers keep the identity fallback. Use
-`HTTPCompressorWithError` when a handler must return 406.
+`HTTPCompressor` and `HTTPCompressorWithLevel` preserve upstream behavior,
+including its `Accept-Encoding` parsing and identity fallback. Use
+`HTTPCompressorWithError` for RFC-correct negotiation, correct `Vary`
+handling, and a 406 error when no encoding is acceptable.
 
 Upstream's experimental matchfinder API (`NewWriterV2`, `Encoder`,
 `FastEncoder`) is not ported.
