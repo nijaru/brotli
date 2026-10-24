@@ -114,13 +114,26 @@ func (r *Reader) SetCustomDictionary(dict []byte) {
 
 // SetMaxWindowBits caps the window size that a stream may request. Values at
 // or below zero restore the default maximum of 30 bits. The decoder applies
-// the cap before allocating its ring buffer.
+// the cap before allocating its ring buffer. If the decoder retains a larger
+// ring buffer from an earlier stream, setting a smaller cap releases it.
+//
+// Call SetMaxWindowBits before decoding starts.
 func (r *Reader) SetMaxWindowBits(max int) {
 	if max <= 0 {
 		r.maxWindowBits = common.LargeMaxWbits
 		return
 	}
 	r.maxWindowBits = uint32(max)
+
+	limit := (1 << uint(max)) + int(kRingBufferWriteAheadSlack)
+	if r.ringbuffer != nil && cap(r.ringbuffer) > limit {
+		r.ringbuffer = nil
+		r.ringbufferEnd = nil
+		r.ringbufferSize = 0
+		r.ringbufferMask = 0
+		r.new_ringbufferSize = 0
+		r.pos = 0
+	}
 }
 
 func (r *Reader) resetForNextMember() {
