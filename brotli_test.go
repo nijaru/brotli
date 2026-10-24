@@ -1049,7 +1049,7 @@ func TestLargeWindowEncodingAndDecoding(t *testing.T) {
 	// Test windows from 20 up to 28 bits
 	for _, lgwin := range []int{22, 24, 26, 28} {
 		var compressed bytes.Buffer
-		w := NewWriterOptions(&compressed, WriterOptions{
+		w := NewWriterConfig(&compressed, WriterConfig{
 			Quality:     6,
 			LGWin:       lgwin,
 			LargeWindow: lgwin > 24,

@@ -26,7 +26,7 @@ func init() {
 
 // getWriterPool returns the thread-safe WriterPool matching the normalized quality level.
 func getWriterPool(quality int) *WriterPool {
-	opts, _ := normalizeWriterOptions(WriterOptions{Quality: quality})
+	opts, _ := normalizeWriterConfig(WriterConfig{Quality: quality})
 	return writerPools[opts.Quality]
 }
 
@@ -71,12 +71,18 @@ func PutReader(r *Reader) {
 // complete, then return it to the pool and stop using that pointer.
 type WriterPool struct {
 	pool    sync.Pool
-	options WriterOptions
+	options WriterConfig
 }
 
 // NewWriterPool creates a new WriterPool for the given quality level.
 func NewWriterPool(quality int) *WriterPool {
-	options, _ := normalizeWriterOptions(WriterOptions{Quality: quality})
+	return NewWriterPoolWithConfig(WriterConfig{Quality: quality})
+}
+
+// NewWriterPoolWithConfig creates a WriterPool for the given writer config,
+// including custom dictionaries and RFC 9841 large windows.
+func NewWriterPoolWithConfig(config WriterConfig) *WriterPool {
+	options, _ := normalizeWriterConfig(config)
 	return &WriterPool{
 		options: options,
 	}
@@ -87,7 +93,7 @@ func NewWriterPool(quality int) *WriterPool {
 func (p *WriterPool) Get(dst io.Writer) *Writer {
 	v := p.pool.Get()
 	if v == nil {
-		return NewWriterOptions(dst, p.options)
+		return NewWriterConfig(dst, p.options)
 	}
 	w := v.(*Writer)
 	w.options = p.options

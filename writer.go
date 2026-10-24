@@ -22,18 +22,29 @@ const (
 	operationEmitMetadata = 3
 )
 
-// WriterOptions configures Writer.
+// WriterOptions configures Writer. Its fields match upstream
+// github.com/andybalholm/brotli.
 type WriterOptions struct {
 	// Quality controls the compression-speed vs compression-density trade-offs.
 	// The higher the quality, the slower the compression. Range is 0 to 11.
 	Quality int
 	// LGWin is the base 2 logarithm of the sliding window size.
-	// Range is 10 to 24 (or up to 30 when LargeWindow is true). 0 indicates automatic configuration.
+	// Range is 10 to 24. 0 indicates automatic configuration based on Quality.
 	LGWin int
-	// CustomDict is an optional pre-shared dictionary slice used to seed the sliding window.
+}
+
+// WriterConfig configures Writer with the first-party extensions.
+type WriterConfig struct {
+	// Quality controls the compression-speed vs compression-density trade-offs.
+	// The higher the quality, the slower the compression. Range is 0 to 11.
+	Quality int
+	// LGWin is the base 2 logarithm of the sliding window size.
+	// Range is 10 to 24, or 30 when LargeWindow is true. 0 selects the default.
+	LGWin int
+	// CustomDict is an optional pre-shared dictionary used to seed the sliding window.
 	CustomDict []byte
-	// LargeWindow enables RFC 9841 large sliding windows (LGWin up to 30, ~1 GB).
-	// Large-window streams require RFC 9841 compatible decoders.
+	// LargeWindow enables RFC 9841 large sliding windows (LGWin up to 30).
+	// Large-window streams require an RFC 9841 compatible decoder.
 	LargeWindow bool
 }
 
@@ -44,7 +55,7 @@ var (
 
 type Writer struct {
 	dst     io.Writer
-	options WriterOptions
+	options WriterConfig
 	err     error
 	plan    encoder.Plan
 
@@ -69,23 +80,31 @@ func NewWriterLevel(dst io.Writer, level int) *Writer {
 	})
 }
 
-// NewWriterOptions is like NewWriter but specifies WriterOptions
+// NewWriterOptions is like NewWriter but specifies WriterOptions.
 func NewWriterOptions(dst io.Writer, options WriterOptions) *Writer {
-	w := &Writer{options: options}
+	return NewWriterConfig(dst, WriterConfig{
+		Quality: options.Quality,
+		LGWin:   options.LGWin,
+	})
+}
+
+// NewWriterConfig is like NewWriterOptions but accepts first-party extensions.
+func NewWriterConfig(dst io.Writer, config WriterConfig) *Writer {
+	w := &Writer{options: config}
 	w.Reset(dst)
 	return w
 }
 
-func normalizeWriterOptions(options WriterOptions) (WriterOptions, encoder.Plan) {
+func normalizeWriterConfig(config WriterConfig) (WriterConfig, encoder.Plan) {
 	lgwin := 22
-	if options.LGWin > 0 {
-		lgwin = options.LGWin
+	if config.LGWin > 0 {
+		lgwin = config.LGWin
 	}
-	plan := encoder.NewPlan(options.Quality, lgwin, 0, 0, options.LargeWindow)
-	return WriterOptions{
+	plan := encoder.NewPlan(config.Quality, lgwin, 0, 0, config.LargeWindow)
+	return WriterConfig{
 		Quality:     plan.Quality,
 		LGWin:       plan.Lgwin,
-		CustomDict:  options.CustomDict,
+		CustomDict:  config.CustomDict,
 		LargeWindow: plan.LargeWindow,
 	}, plan
 }
@@ -97,7 +116,7 @@ func (w *Writer) Reset(dst io.Writer) {
 	w.dst = dst
 	w.err = nil
 
-	w.options, w.plan = normalizeWriterOptions(w.options)
+	w.options, w.plan = normalizeWriterConfig(w.options)
 	lgwin := uint(w.plan.Lgwin)
 
 	if w.plan.Tier == encoder.TierQ0 {

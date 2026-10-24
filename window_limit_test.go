@@ -11,7 +11,7 @@ func encodeWindowStream(t *testing.T, source []byte, lgwin int, large bool) []by
 	t.Helper()
 
 	var compressed bytes.Buffer
-	w := NewWriterOptions(&compressed, WriterOptions{
+	w := NewWriterConfig(&compressed, WriterConfig{
 		Quality:     6,
 		LGWin:       lgwin,
 		LargeWindow: large,
