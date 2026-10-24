@@ -157,3 +157,47 @@ func BenchmarkHTTPResponseCompressionNoPool(b *testing.B) {
 		w.Close()
 	}
 }
+
+func TestNegotiateContentEncoding(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{"no header", "", "identity"},
+		{"brotli", "br", "br"},
+		{"gzip", "gzip", "gzip"},
+		{"both prefer brotli", "gzip, br", "br"},
+		{"brotli higher q", "gzip;q=0.5, br;q=0.9", "br"},
+		{"gzip higher q", "gzip;q=0.9, br;q=0.5", "gzip"},
+		{"wildcard", "*", "br"},
+		{"identity excluded", "identity;q=0", ""},
+		{"identity excluded brotli", "identity;q=0, br;q=0.5", "br"},
+		{"identity preferred", "identity;q=0.9, gzip;q=0.5", "identity"},
+		{"wildcard skips explicit zero", "br;q=0, *;q=1", "gzip"},
+		{"case insensitive", "BR", "br"},
+		{"all excluded", "identity;q=0, *;q=0", ""},
+		{"offered coding beats implicit identity", "gzip;q=0.5", "gzip"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.header != "" {
+				req.Header.Set("Accept-Encoding", tt.header)
+			}
+			if got := negotiateContentEncoding(req, []string{"br", "gzip"}); got != tt.want {
+				t.Fatalf("negotiateContentEncoding(%q) = %q, want %q", tt.header, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExpectQualityRejectsAboveOne(t *testing.T) {
+	if q, _ := expectQuality("1"); q != 1 {
+		t.Fatalf("expectQuality(1) = %v, want 1", q)
+	}
+	if q, _ := expectQuality("1.5"); q >= 0 {
+		t.Fatalf("expectQuality(1.5) = %v, want rejection", q)
+	}
+}

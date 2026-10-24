@@ -81,21 +81,70 @@ func gzipLevelForBrotliLevel(level int) int {
 // then the offer earlier in the list is preferred. If no offers are
 // acceptable, then "" is returned.
 func negotiateContentEncoding(r *http.Request, offers []string) string {
-	bestOffer := "identity"
-	bestQ := -1.0
 	specs := parseAccept(r.Header, "Accept-Encoding")
-	for _, offer := range offers {
+	if len(specs) == 0 {
+		return "identity"
+	}
+
+	// quality returns the best explicit q-value for coding, falling back to a
+	// wildcard. Explicit entries win over the wildcard by RFC 9110.
+	quality := func(coding string) (float64, bool) {
+		q := -1.0
+		wildcard := -1.0
 		for _, spec := range specs {
-			if spec.Q > bestQ &&
-				(spec.Value == "*" || spec.Value == offer) {
-				bestQ = spec.Q
-				bestOffer = offer
+			switch spec.Value {
+			case coding:
+				if spec.Q > q {
+					q = spec.Q
+				}
+			case "*":
+				if spec.Q > wildcard {
+					wildcard = spec.Q
+				}
 			}
 		}
+		if q >= 0 {
+			return q, true
+		}
+		if wildcard >= 0 {
+			return wildcard, true
+		}
+		return 0, false
 	}
-	if bestQ == 0 {
-		bestOffer = ""
+
+	bestOffer := ""
+	bestQ := -1.0
+	for _, offer := range offers {
+		q, ok := quality(offer)
+		if !ok || q <= 0 {
+			continue
+		}
+		// Keep the first offer on ties between offered codings.
+		if q > bestQ {
+			bestOffer, bestQ = offer, q
+		}
 	}
+
+	// Identity is the fallback when no offered coding is acceptable. An
+	// explicit identity q-value can override an offer or exclude it.
+	identityQ, identityKnown := quality("identity")
+	identityExplicit := false
+	for _, spec := range specs {
+		if spec.Value == "identity" {
+			identityExplicit = true
+			break
+		}
+	}
+	if identityExplicit && identityQ > bestQ {
+		bestOffer, bestQ = "identity", identityQ
+	}
+	if bestOffer == "" || bestQ <= 0 {
+		if identityKnown && identityQ <= 0 {
+			return ""
+		}
+		return "identity"
+	}
+
 	return bestOffer
 }
 
@@ -115,6 +164,7 @@ loop:
 			if spec.Value == "" {
 				continue loop
 			}
+			spec.Value = strings.ToLower(spec.Value)
 			spec.Q = 1.0
 			s = skipSpace(s)
 			if strings.HasPrefix(s, ";") {
@@ -186,7 +236,11 @@ func expectQuality(s string) (q float64, rest string) {
 		n = n*10 + int(b) - '0'
 		d *= 10
 	}
-	return q + float64(n)/float64(d), s[i:]
+	q += float64(n) / float64(d)
+	if q > 1 {
+		return -1, ""
+	}
+	return q, s[i:]
 }
 
 // Octet types from RFC 2616.
