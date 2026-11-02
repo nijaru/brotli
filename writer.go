@@ -115,6 +115,9 @@ func normalizeWriterConfig(config WriterConfig) (WriterConfig, encoder.Plan) {
 func (w *Writer) Reset(dst io.Writer) {
 	w.dst = dst
 	w.err = nil
+	// A pool may switch tiers; the inactive state must not retain a destination.
+	w.genericState.Dst = nil
+	w.genericState.Err = nil
 
 	w.options, w.plan = normalizeWriterConfig(w.options)
 	lgwin := uint(w.plan.Lgwin)
@@ -128,7 +131,6 @@ func (w *Writer) Reset(dst io.Writer) {
 		w.genericState.Params.Large_window = w.plan.LargeWindow
 		w.genericState.Plan = w.plan
 		w.genericState.Dst = dst
-		w.genericState.Err = nil
 	}
 }
 

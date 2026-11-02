@@ -2,6 +2,7 @@ package brotli
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -103,6 +104,33 @@ func TestWriterPoolNormalizesReturnedWriterQuality(t *testing.T) {
 		t.Fatalf("Get returned quality %d, want %d", reused.options.Quality, DefaultCompression)
 	}
 	p.Put(reused)
+}
+
+func TestWriterPoolReleasesDestinationAcrossQualitySwitch(t *testing.T) {
+	for _, quality := range []int{BestSpeed, DefaultCompression} {
+		t.Run(fmt.Sprintf("Q%d", quality), func(t *testing.T) {
+			dst := &failingPoolDestination{err: errors.New("destination failed")}
+			w := NewWriterLevel(dst, DefaultCompression)
+			if _, err := w.Write([]byte("hello")); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Flush(); !errors.Is(err, dst.err) {
+				t.Fatalf("Flush = %v, want destination error", err)
+			}
+			NewWriterPool(quality).Put(w)
+			if w.dst != nil || w.err != nil || w.genericState.Dst != nil || w.genericState.Err != nil {
+				t.Fatal("Put retained the destination or its error")
+			}
+		})
+	}
+}
+
+type failingPoolDestination struct {
+	err error
+}
+
+func (w *failingPoolDestination) Write([]byte) (int, error) {
+	return 0, w.err
 }
 
 func BenchmarkPoolUsage(b *testing.B) {
