@@ -173,43 +173,33 @@ func (r *Reader) resetForNextMember() {
 }
 
 func (r *Reader) Read(p []byte) (n int, err error) {
-	if !decoderHasMoreOutput(r) && len(r.in) == 0 {
-		if r.src == nil {
-			return 0, io.EOF
-		}
-		m, readErr := r.src.Read(r.buf)
-		if m == 0 {
-			if readErr == io.EOF && r.state != stateDone {
-				readErr = io.ErrUnexpectedEOF
-			}
-			// If readErr is `nil`, we just proxy underlying stream behavior.
-			return 0, readErr
-		}
-		r.in = r.buf[:m]
-	}
-
-	if r.state == stateDone && !decoderHasMoreOutput(r) && (len(r.in) > 0 || r.src != nil) {
-		if len(r.in) == 0 {
-			m, readErr := r.src.Read(r.buf)
-			if m > 0 {
-				r.in = r.buf[:m]
-				r.resetForNextMember()
-			} else {
-				if readErr == io.EOF {
-					return 0, io.EOF
+	for {
+		if !decoderHasMoreOutput(r) && len(r.in) == 0 {
+			if r.src == nil {
+				if r.state != stateDone {
+					return 0, io.ErrUnexpectedEOF
 				}
+				return 0, io.EOF
+			}
+			m, readErr := r.src.Read(r.buf)
+			if m == 0 {
+				if readErr == io.EOF && r.state != stateDone {
+					readErr = io.ErrUnexpectedEOF
+				}
+				// If readErr is `nil`, we just proxy underlying stream behavior.
 				return 0, readErr
 			}
-		} else {
+			r.in = r.buf[:m]
+		}
+
+		if r.state == stateDone && !decoderHasMoreOutput(r) {
 			r.resetForNextMember()
 		}
-	}
 
-	if len(p) == 0 {
-		return 0, nil
-	}
+		if len(p) == 0 {
+			return 0, nil
+		}
 
-	for {
 		var written uint
 		in_len := uint(len(r.in))
 		out_len := uint(len(p))
@@ -221,30 +211,12 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 
 		switch result {
 		case decoderResultSuccess:
-			if !decoderHasMoreOutput(r) {
-				if len(r.in) > 0 {
-					r.resetForNextMember()
-					if n > 0 {
-						return n, nil
-					}
-					continue
-				}
-				if r.src != nil {
-					encN, err := r.src.Read(r.buf)
-					if encN > 0 {
-						r.in = r.buf[:encN]
-						r.resetForNextMember()
-						if n > 0 {
-							return n, nil
-						}
-						continue
-					}
-					if err != nil && err != io.EOF {
-						return n, err
-					}
-				}
+			// Discovering another member may block on an open source.
+			// Return completed output before asking for more input.
+			if n > 0 {
+				return n, nil
 			}
-			return n, nil
+			continue
 		case decoderResultError:
 			code := decoderGetErrorCode(r)
 			if code == decoderErrorWindowBitsLimit {
