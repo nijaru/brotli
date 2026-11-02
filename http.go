@@ -45,7 +45,7 @@ func (pw *pooledWriterWrapper) Close() error {
 }
 
 // HTTPCompressorWithLevel is the upstream-compatible compressor. It preserves
-// upstream's Accept-Encoding parsing, identity selection, and Vary behavior.
+// upstream v1.2.2's Accept-Encoding parsing, identity selection, and Vary behavior.
 func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) io.WriteCloser {
 	if w.Header().Get("Vary") == "" {
 		w.Header().Set("Vary", "Accept-Encoding")
@@ -96,12 +96,15 @@ func compressorForEncoding(w http.ResponseWriter, level int, encoding string) (i
 }
 
 func addVaryAcceptEncoding(w http.ResponseWriter) {
-	vary := w.Header().Get("Vary")
-	if vary == "" {
-		w.Header().Set("Vary", "Accept-Encoding")
-	} else if !strings.Contains(strings.ToLower(vary), "accept-encoding") {
-		w.Header().Add("Vary", "Accept-Encoding")
+	for _, line := range w.Header().Values("Vary") {
+		for _, token := range strings.Split(line, ",") {
+			token = strings.TrimSpace(token)
+			if token == "*" || strings.EqualFold(token, "Accept-Encoding") {
+				return
+			}
+		}
 	}
+	w.Header().Add("Vary", "Accept-Encoding")
 }
 
 func gzipLevelForBrotliLevel(level int) int {
@@ -266,7 +269,7 @@ func parseAccept(header http.Header, key string) (specs []acceptSpec) {
 			s = skipSpace(rest)
 			if strings.HasPrefix(s, ";") {
 				s = skipSpace(s[1:])
-				if !strings.HasPrefix(s, "q=") {
+				if len(s) < 2 || (s[0] != 'q' && s[0] != 'Q') || s[1] != '=' {
 					s = skipToNextAcceptElement(s)
 					continue
 				}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"testing"
 )
@@ -165,25 +166,38 @@ func TestHTTPCompressorWithLevelPreservesUpstreamVary(t *testing.T) {
 	}
 }
 
-func TestHTTPCompressorWithErrorAddsVary(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("Accept-Encoding", "br")
-	rec := httptest.NewRecorder()
-	rec.Header().Set("Vary", "Accept-Language")
-
-	w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
-	if err != nil {
-		t.Fatal(err)
+func TestHTTPCompressorWithErrorVary(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		vary []string
+		want []string
+	}{
+		{"absent", nil, []string{"Accept-Encoding"}},
+		{"other field", []string{"Accept-Language"}, []string{"Accept-Language", "Accept-Encoding"}},
+		{"substring", []string{"X-Accept-Encoding"}, []string{"X-Accept-Encoding", "Accept-Encoding"}},
+		{"comma tokens", []string{"Accept-Language, aCcEpT-EnCoDiNg"}, []string{"Accept-Language, aCcEpT-EnCoDiNg"}},
+		{"multiple lines", []string{"Accept-Language", "Accept-Encoding"}, []string{"Accept-Language", "Accept-Encoding"}},
+		{"wildcard", []string{"*"}, []string{"*"}},
+		{"wildcard second line", []string{"Accept-Language", "Origin, *"}, []string{"Accept-Language", "Origin, *"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			rec := httptest.NewRecorder()
+			for _, v := range tt.vary {
+				rec.Header().Add("Vary", v)
+			}
+			w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if got := rec.Header().Values("Vary"); !slices.Equal(got, tt.want) {
+				t.Fatalf("Vary = %q, want %q", got, tt.want)
+			}
+		})
 	}
-	w.Write([]byte("hello"))
-	w.Close()
-
-	for _, v := range rec.Header().Values("Vary") {
-		if v == "Accept-Encoding" {
-			return
-		}
-	}
-	t.Fatal("strict compressor did not add Accept-Encoding to Vary")
 }
 
 func TestHTTPCompressorWithLevelMatchesUpstreamNegotiation(t *testing.T) {
@@ -195,6 +209,8 @@ func TestHTTPCompressorWithLevelMatchesUpstreamNegotiation(t *testing.T) {
 		{"upstream identity weighting", "identity;q=0.9, gzip;q=0.5", "gzip"},
 		{"upstream case sensitivity", "BR", ""},
 		{"upstream malformed line", "br;q=bogus, gzip", ""},
+		{"upstream uppercase quality", "br;Q=1, gzip", ""},
+		{"upstream permissive quality", "br;q=1.5, gzip;q=1", "br"},
 		{"gzip", "gzip;q=0.5", "gzip"},
 	}
 	for _, tt := range tests {
@@ -225,6 +241,11 @@ func TestHTTPCompressorWithErrorUsesRFCSemantics(t *testing.T) {
 	}{
 		{"identity wins", "identity;q=0.9, gzip;q=0.5", ""},
 		{"case insensitive", "BR", "br"},
+		{"uppercase quality", "br;Q=1", "br"},
+		{"mixed quality case", "br;Q=0.1, gzip;q=0.8", "gzip"},
+		{"uppercase zero quality", "br;Q=0, gzip;q=0.8", "gzip"},
+		{"uppercase identity quality", "br;q=0.5, identity;Q=1", ""},
+		{"invalid uppercase quality", "br;Q=1.5, gzip;q=1", "gzip"},
 		{"malformed element skipped", "br;q=bogus, gzip", "gzip"},
 	}
 	for _, tt := range tests {
