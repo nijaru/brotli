@@ -97,7 +97,7 @@ func compressorForEncoding(w http.ResponseWriter, level int, encoding string) (i
 
 func addVaryAcceptEncoding(w http.ResponseWriter) {
 	for _, line := range w.Header().Values("Vary") {
-		for _, token := range strings.Split(line, ",") {
+		for token := range strings.SplitSeq(line, ",") {
 			token = strings.TrimSpace(token)
 			if token == "*" || strings.EqualFold(token, "Accept-Encoding") {
 				return

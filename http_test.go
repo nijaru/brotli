@@ -327,6 +327,36 @@ func BenchmarkHTTPResponseCompression(b *testing.B) {
 	}
 }
 
+func BenchmarkHTTPCompressorWithErrorVary(b *testing.B) {
+	for _, tc := range []struct {
+		name string
+		vary []string
+	}{
+		{"single", []string{"Accept-Encoding"}},
+		{"comma_list", []string{"Origin, Accept-Encoding"}},
+		{"multiple_lines", []string{"Origin", "Accept-Encoding"}},
+		{"wildcard", []string{"*"}},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			rec := httptest.NewRecorder()
+			for _, value := range tc.vary {
+				rec.Header().Add("Vary", value)
+			}
+			b.ReportAllocs()
+			for b.Loop() {
+				w, err := HTTPCompressorWithError(rec, req, DefaultCompression)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if err := w.Close(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkHTTPResponseCompressionNoPool(b *testing.B) {
 	input := bytes.Repeat([]byte("benchmark http payload content "), 100)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
