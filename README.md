@@ -6,13 +6,13 @@ block API, bounded decoding, reusable pools, large windows, and HTTP helpers.
 
 ## Compatibility
 
-The stable upstream streaming API is drop-in compatible: `NewReader`,
+The stable streaming API targets upstream v1.2.2: `NewReader`,
 `NewWriter`, `NewWriterLevel`, `NewWriterOptions`, `WriterOptions`,
 `HTTPCompressor`, and `HTTPCompressorWithLevel` keep their signatures.
 `WriterOptions` matches upstream exactly (`Quality`, `LGWin`). Use
 `WriterConfig` for custom dictionaries and RFC 9841 large windows.
 
-`HTTPCompressor` and `HTTPCompressorWithLevel` preserve upstream behavior,
+`HTTPCompressor` and `HTTPCompressorWithLevel` preserve upstream v1.2.2 behavior,
 including its `Accept-Encoding` parsing and identity fallback. Use
 `HTTPCompressorWithError` for RFC-correct negotiation, correct `Vary`
 handling, and a 406 error when no encoding is acceptable.
@@ -22,8 +22,10 @@ Upstream's experimental matchfinder API (`NewWriterV2`, `Encoder`,
 
 ## Install
 
+Install the current `master` branch; this fork has no maintained releases:
+
 ```sh
-go get github.com/nijaru/brotli
+go get github.com/nijaru/brotli@master
 ```
 
 Requires Go 1.26 or later.
