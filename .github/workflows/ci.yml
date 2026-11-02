@@ -59,13 +59,13 @@ jobs:
           cache: true
 
       - name: Fuzz Decode
-        run: go test -run=^$ -fuzz=FuzzDecode -fuzztime=60s .
+        run: go test -run=^$ -fuzz='^FuzzDecode$' -fuzztime=60s .
 
       - name: Fuzz RoundTrip
-        run: go test -run=^$ -fuzz=FuzzRoundTrip -fuzztime=60s .
+        run: go test -run=^$ -fuzz='^FuzzRoundTrip$' -fuzztime=60s .
 
       - name: Fuzz DecodeLimit
-        run: go test -run=^$ -fuzz=FuzzDecodeLimit -fuzztime=60s .
+        run: go test -run=^$ -fuzz='^FuzzDecodeLimit$' -fuzztime=60s .
 
   lint:
     name: Lint & Verification

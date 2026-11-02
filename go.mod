@@ -6,4 +6,4 @@ retract v1.0.1 // occasional panics and data corruption
 
 require github.com/xyproto/randomstring v1.2.0
 
-require github.com/andybalholm/brotli v1.2.2
+require github.com/andybalholm/brotli v1.2.7
